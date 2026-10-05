@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Partite</title>
+  
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1d5fa8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Partite">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='110' fill='%231d5fa8'/%3E%3Ccircle cx='256' cy='256' r='160' fill='none' stroke='white' stroke-width='28'/%3E%3Cpath d='M256 96v320M96 256h320M143 143c70 45 156 45 226 0M143 369c70-45 156-45 226 0' fill='none' stroke='white' stroke-width='24' stroke-linecap='round'/%3E%3C/svg%3E">
+
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="sticky-top-wrap">
+  <header>
+    <div class="title-with-sync">
+      <h1>Partite</h1>
+      <!-- Indicatore discreto di Sincronizzazione -->
+      <div id="syncIndicatorWrap" class="sync-indicator-wrap">
+        <span id="syncDot" class="sync-dot sync-green" title="Sincronizzato"></span>
+        <!-- Tasto allarme conflitti -->
+        <button id="conflictAlertBtn" class="conflict-alert-btn" title="Nessun conflitto rilevato" style="display:none">❗</button>
+        <button id="quickSaveBtn" class="pill-btn-sm" title="Salva modifiche sul cloud (Ctrl+S)">💾 Salva</button>
+        <button id="quickPullBtn" class="pill-btn-sm" title="Aggiorna dal cloud">↻</button>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <button id="add" class="primary">+ Partita</button>
+      <button id="todayBtn" title="Vai a oggi">Oggi</button>
+      <button id="undoBtn" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
+
+      <div class="menuWrap">
+        <button id="gearBtn" aria-haspopup="true" aria-expanded="false" title="Impostazioni">⚙️</button>
+        <div class="menuDrop" id="gearDrop" role="menu" hidden>
+          <button id="themeBtn" role="menuitem">🎨 Tema / Stile</button>
+          <button id="exportMultiJsonBtn" role="menuitem">📤 Esporta JSON (Mesi)</button>
+          <button id="importBtn" role="menuitem">📥 Importa JSON</button>
+          <button id="pdfImportBtn" role="menuitem">📄 Importa da PDF</button>
+          <button id="syncBtn" role="menuitem">🔄 Sincronizzazione</button>
+          <button id="roBtn" role="menuitem">🔗 Link sola lettura</button>
+          <button id="accessBtn" role="menuitem">👥 Accessi</button>
+        </div>
+      </div>
+      <div class="menuWrap">
+        <button id="menuBtn" aria-haspopup="true" aria-expanded="false" title="Menu">☰</button>
+        <div class="menuDrop" id="menuDrop" role="menu" hidden>
+          <button id="resocontoBtn" role="menuitem">📊 Resoconto Stagionale</button>
+          <button id="share" role="menuitem">Copia link dati</button>
+          <button id="printBtn" role="menuitem">Stampa PDF</button>
+          <button id="namesBtn" role="menuitem">Gestione Nomi</button>
+          <button id="catBtn" role="menuitem">Gestione Categorie</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="filterBar">
+    <select id="filterCat"><option value="">Tutte le categorie</option></select>
+    <button id="filterIncomplete" aria-pressed="false">Senza T1 <span id="incCount" style="opacity:.75"></span></button>
+    <button class="waBtn" id="waTodayBtn" type="button" title="Copia turni dei prossimi 7 giorni">📲 WA Prossimi 7gg</button>
+  </div>
+</div>
+
+<main>
+  <datalist id="namesList"></datalist>
+  <datalist id="categoriesList"></datalist>
+  <div class="robanner" id="roBanner" style="display:none">Modalità sola lettura: aggiornamento automatico attivo.</div>
+
+  <div id="list"></div>
+</main>
+<div id="msg" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
