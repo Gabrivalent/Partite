@@ -19,9 +19,10 @@
   <header>
     <div class="title-with-sync">
       <h1>Partite</h1>
+      <button id="conflictAlertBtn" type="button" class="alert-btn-standalone status-ok" title="Stato partite: tutto regolare">✓</button>
+
       <div id="syncIndicatorWrap" class="sync-indicator-wrap">
         <span id="syncDot" class="sync-dot sync-green" title="Pronto"></span>
-        <button id="conflictAlertBtn" class="conflict-alert-btn" title="Nessun conflitto rilevato" style="display:none">❗</button>
         <button id="quickSaveBtn" class="pill-btn-sm auth-only" title="Salva modifiche sul cloud (Ctrl+S)">💾 Salva</button>
         <button id="quickPullBtn" class="pill-btn-sm" title="Aggiorna dal cloud">↻</button>
       </div>
@@ -30,15 +31,13 @@
     <div class="top-actions">
       <input type="file" id="importFile" accept="application/json,.json" hidden>
       
-      <!-- Invocazione diretta per bypassare qualsiasi blocco di script -->
       <button id="authBtn" type="button" class="auth-btn" onclick="handleAuthClick()">🔒 Accedi</button>
-
       <button id="add" type="button" class="primary auth-only">+ Partita</button>
       <button id="todayBtn" type="button" title="Vai a oggi">Oggi</button>
       <button id="undoBtn" type="button" class="auth-only" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
 
       <div class="menuWrap">
-        <button id="gearBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Impostazioni">⚙️</button>
+        <button id="gearBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Impostazioni">⚙️️</button>
         <div class="menuDrop" id="gearDrop" role="menu" hidden>
           <button id="themeBtn" type="button" role="menuitem">🎨 Tema / Stile</button>
           <button id="notifyBtn" type="button" role="menuitem">🔔 Abilita Notifiche</button>
@@ -55,7 +54,7 @@
           <button id="shareLinkBtn" type="button" role="menuitem">🔗 Copia Link Calendario</button>
           <button id="printBtn" type="button" role="menuitem">🖨️ Stampa PDF</button>
           <button id="namesBtn" type="button" class="auth-only" role="menuitem">👥 Gestione Nomi</button>
-          <button id="catBtn" type="button" class="auth-only" role="menuitem">🏷️️ Gestione Categorie</button>
+          <button id="catBtn" type="button" class="auth-only" role="menuitem">🏷️ Gestione Categorie</button>
         </div>
       </div>
     </div>
@@ -63,7 +62,7 @@
 
   <div class="filterBar">
     <select id="filterCat"><option value="">Tutte le categorie</option></select>
-    <button id="filterIncomplete" type="button" aria-pressed="false">Senza T1 <span id="incCount" style="opacity:.75"></span></button>
+    <button id="filterIncomplete" type="button" aria-pressed="false">Incomplete <span id="incCount" style="opacity:.75"></span></button>
     <button class="waBtn" id="waTodayBtn" type="button" title="Copia turni dei prossimi 7 giorni">📲 WA Prossimi 7gg</button>
   </div>
 </div>

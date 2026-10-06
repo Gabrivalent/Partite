@@ -12,7 +12,7 @@ const SUPABASE_CONFIG = {
 const DEFAULT_PIN = '1234';
 let READONLY = true;
 
-// Funzione globale esposta subito nel Window per garantire apertura
+// Gestione click Login
 window.handleAuthClick = function() {
   if (READONLY) {
     promptLogin();
@@ -23,7 +23,7 @@ window.handleAuthClick = function() {
   }
 };
 
-// Registrazione Service Worker senza bloccare
+// Registrazione Service Worker
 let swRegistration = null;
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js')
@@ -31,7 +31,7 @@ if ('serviceWorker' in navigator) {
     .catch(() => {});
 }
 
-// Modulo Notifiche
+// MODULO NOTIFICHE
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
     toast('Notifiche non supportate');
@@ -43,26 +43,70 @@ async function requestNotificationPermission() {
   }
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
-    toast('Notifiche attivate!');
+    toast('Notifiche attivate con successo!');
+    checkAndTriggerScheduledNotifications();
     return true;
   }
   toast('Permesso non concesso');
   return false;
 }
 
-function dispatchAppNotification(title, options = {}) {
+function dispatchAppNotification(title, bodyText, tag = 'partite-alert') {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const def = {
+  const cfg = {
+    body: bodyText,
+    tag: tag,
     icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="110" fill="%231d5fa8"/%3E%3Ccircle cx="256" cy="256" r="160" fill="none" stroke="white" stroke-width="28"/%3E%3C/svg%3E',
+    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Ccircle cx="256" cy="256" r="256" fill="%231d5fa8"/%3E%3C/svg%3E',
     vibrate: [200, 100, 200]
   };
-  const cfg = Object.assign(def, options);
   if (swRegistration && swRegistration.showNotification) {
     swRegistration.showNotification(title, cfg);
   } else {
     new Notification(title, cfg);
   }
 }
+
+// LOGICA SCHEDULAZIONE NOTIFICHE
+function checkAndTriggerScheduledNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const now = new Date();
+  const todayIso = iso(now);
+  const currentHour = now.getHours();
+
+  // 1. Notifica Mercoledì alle 10:00 (promemoria invio turni giovedì -> mercoledì)
+  if (now.getDay() === 3 && currentHour >= 10) {
+    const wedKey = `notif_wed_${todayIso}`;
+    if (!localStorage.getItem(wedKey)) {
+      dispatchAppNotification(
+        '🏀 Promemoria Invio Turni',
+        'È mercoledì! Ricordati di inviare i turni per le partite da domani a mercoledì prossimo.',
+        'wed-rolling-reminder'
+      );
+      localStorage.setItem(wedKey, '1');
+    }
+  }
+
+  // 2. Notifiche Partite Incomplete del giorno dopo (alle 10:00 e poi ogni ora)
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowIso = iso(tomorrow);
+
+  const incompleteTomorrow = items.filter(it => it.date === tomorrowIso && isMissingRequirements(it));
+  if (incompleteTomorrow.length > 0 && currentHour >= 10) {
+    const hourlyKey = `notif_incomp_${tomorrowIso}_h${currentHour}`;
+    if (!localStorage.getItem(hourlyKey)) {
+      dispatchAppNotification(
+        '⚠️ Partite di domani incomplete!',
+        `Ci sono ${incompleteTomorrow.length} partite in programma domani con turni incompleti!`,
+        'urgent-incomplete-tomorrow'
+      );
+      localStorage.setItem(hourlyKey, '1');
+    }
+  }
+}
+
+setInterval(checkAndTriggerScheduledNotifications, 60000);
 
 // Gestione Temi
 let currentTheme = localStorage.getItem('partite-theme') || 'default';
@@ -74,7 +118,7 @@ function applyTheme(themeName) {
 }
 if (currentTheme !== 'default') applyTheme(currentTheme);
 
-// Dati Locali
+// Stato & Memoria
 const KEY = 'partite-v1';
 let items = [];
 try { items = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){}
@@ -97,7 +141,7 @@ let isDirty = false;
 const saveLocalOnly = () => {
   try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){}
   updateIncompleteBadge();
-  updateConflictBadge();
+  updateAlertStatusBadge();
   isDirty = true;
 };
 const saveDLocalOnly = () => {
@@ -131,7 +175,6 @@ try {
   }
 } catch(e) {
   sb = null;
-  console.warn("Supabase init bypassed:", e);
 }
 
 function setSyncVisualState(state, tooltip) {
@@ -246,17 +289,49 @@ function renderCategoriesList() {
   }
 }
 
-function isMissingT1(item) {
-  return !(item.t1 && item.t1.trim());
+// LOGICA CATEGORIE E COMPLETEZZA
+function isU15OrAbove(cat) {
+  if (!cat) return false;
+  const c = cat.toUpperCase().replace(/\s+/g, '');
+  const m = c.match(/^U(\d+)/i);
+  if (m) return parseInt(m[1], 10) >= 15;
+  return /SERIE|DIVIS|PROMOZ|SENIOR|ECCELL/i.test(cat);
+}
+
+function isMissingRequirements(item) {
+  const hasT1 = !!(item.t1 && item.t1.trim());
+  const hasT2 = !!(item.t2 && item.t2.trim());
+  const hasArb = !!(item.arb && item.arb.trim());
+
+  // 1. Amichevole: richiede sempre T1 e Arbitro
+  if (item.friendly) {
+    return !hasT1 || !hasArb;
+  }
+
+  // 2. Sopra o uguale a U15: richiede T1 e T2 (arbitro è federazione)
+  if (isU15OrAbove(item.cat)) {
+    return !hasT1 || !hasT2;
+  }
+
+  // 3. Sotto U15 (non contando U15): richiede T1, T2 e Arbitro
+  return !hasT1 || !hasT2 || !hasArb;
 }
 
 function updateIncompleteBadge() {
   const b = document.getElementById('incCount');
   if (!b) return;
-  const count = items.filter(isMissingT1).length;
+  const count = items.filter(isMissingRequirements).length;
   b.textContent = count ? `(${count})` : '';
 }
 
+function getTomorrowIncompleteMatches() {
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  const tomorrowIso = iso(t);
+  return items.filter(it => it.date === tomorrowIso && isMissingRequirements(it));
+}
+
+// Conflitti orari
 function findConflictingMatches() {
   const conflicts = new Map();
   const groups = {};
@@ -277,18 +352,34 @@ function findConflictingMatches() {
   return conflicts;
 }
 
-function updateConflictBadge() {
+function updateAlertStatusBadge() {
   const btn = document.getElementById('conflictAlertBtn');
   if (!btn) return;
+
   const conflictsMap = findConflictingMatches();
-  const count = conflictsMap.size;
-  if (count > 0) {
-    btn.style.display = 'inline-flex';
-    btn.textContent = `❗ ${count}`;
-    btn.title = `${count} partite in conflitto di orario!`;
-  } else {
-    btn.style.display = 'none';
+  const conflictCount = conflictsMap.size;
+  const tomorrowIncomplete = getTomorrowIncompleteMatches();
+
+  if (conflictCount > 0) {
+    btn.className = 'alert-btn-standalone status-conflict';
+    btn.textContent = `❗ ${conflictCount}`;
+    btn.title = `${conflictCount} partite in conflitto di orario! Clicca per risolvere.`;
+    btn.onclick = openConflictsModal;
+    return;
   }
+
+  if (tomorrowIncomplete.length > 0) {
+    btn.className = 'alert-btn-standalone status-urgent-incomplete';
+    btn.textContent = `⚠️ ${tomorrowIncomplete.length}`;
+    btn.title = `${tomorrowIncomplete.length} gara/e di domani ancora con turni incompleti!`;
+    btn.onclick = openUrgentIncompleteModal;
+    return;
+  }
+
+  btn.className = 'alert-btn-standalone status-ok';
+  btn.textContent = `✓`;
+  btn.title = `Nessun conflitto o urgenza rilevata. Calendario regolare.`;
+  btn.onclick = () => toast('Nessun conflitto o turno incompleto per domani.');
 }
 
 function openConflictsModal() {
@@ -311,11 +402,11 @@ function openConflictsModal() {
   Object.keys(grouped).sort().forEach(dt => {
     const arr = Array.from(grouped[dt]);
     listHtml += `<div style="margin-bottom:12px;border:1px solid #ef4444;border-radius:8px;padding:8px;background:var(--bg)">
-      <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px">⚠️ Conflitto: ${dt} (${arr.length} gare)</div>`;
+      <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px">⚠️ Conflitto: ${dt} (${arr.length} gare simultanee)</div>`;
     arr.forEach(it => {
       listHtml += `<div class="conflict-list-item" data-goto="${it.id}">
         <strong>${esc(it.title || 'Partita senza titolo')}</strong>
-        <span style="font-size:12px;color:var(--mute)">Cat: ${esc(it.cat || 'n.d.')} | T1: ${esc(it.t1 || 'Vuoto')}</span>
+        <span style="font-size:12px;color:var(--mute)">Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''}</span>
         <span style="font-size:11px;color:var(--acc);font-weight:600">Vai alla partita ➔</span>
       </div>`;
     });
@@ -349,6 +440,56 @@ function openConflictsModal() {
   });
   document.getElementById('confClose').onclick = () => ov.remove();
   document.getElementById('confCloseTop').onclick = () => ov.remove();
+}
+
+function openUrgentIncompleteModal() {
+  const urgentList = getTomorrowIncompleteMatches();
+  if (!urgentList.length) { toast('Nessuna gara urgente per domani'); return; }
+
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'urgentOv';
+
+  let listHtml = urgentList.map(it => {
+    let reqs = [];
+    if (!it.t1?.trim()) reqs.push('Tavolo 1');
+    if (!it.friendly && !it.t2?.trim()) reqs.push('Tavolo 2');
+    if ((it.friendly || !isU15OrAbove(it.cat)) && !it.arb?.trim()) reqs.push('Arbitro');
+
+    return `<div class="conflict-list-item" style="border-color:#f97316" data-goto="${it.id}">
+      <strong>${esc(it.title || 'Partita senza titolo')}</strong>
+      <span style="font-size:12px;color:var(--mute)">Ore: ${esc(it.time || 'n.d.')} | Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''}</span>
+      <span style="font-size:11px;color:#f97316;font-weight:700">Mancano: ${reqs.join(', ')} ➔</span>
+    </div>`;
+  }).join('');
+
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Gare di domani incomplete" style="max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="margin:0;color:#f97316">Partite di Domani Incomplete</h3>
+      <button id="urgCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le seguenti gare di domani richiedono ancora turni di servizio:</p>
+    <div style="display:grid;gap:8px">${listHtml}</div>
+    <div class="mbtns" style="margin-top:14px"><button class="primary" id="urgClose">Chiudi</button></div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => {
+    if (e.target === ov) ov.remove();
+    const itemEl = e.target.closest('[data-goto]');
+    if (itemEl) {
+      const targetId = itemEl.dataset.goto;
+      ov.remove();
+      const targetMatch = items.find(x => x.id === targetId);
+      if (targetMatch) {
+        setParam('m', targetMatch.date.slice(0, 7));
+        setParam('s', iso(monday(targetMatch.date)));
+        render(targetId);
+      }
+    }
+  });
+  document.getElementById('urgClose').onclick = () => ov.remove();
+  document.getElementById('urgCloseTop').onclick = () => ov.remove();
 }
 
 const COMMON_TIMES = ['09:00', '11:00', '11:15', '11:30', '15:00', '15:30', '17:00', '17:30', '18:00', '20:30', '21:00'];
@@ -439,7 +580,7 @@ function openMoltModal(name, counts, month) {
 function exportSelectedMonthsJSON(selectedMonths) {
   const days = {};
   items.filter(i => selectedMonths.some(m => i.date.startsWith(m))).forEach(i => {
-    (days[i.date] ??= []).push({ partita: i.title || '', tavolo1: i.t1 || '', tavolo2: i.t2 || '', arbitro: i.arb || '', orario: i.time || '' });
+    (days[i.date] ??= []).push({ partita: i.title || '', tavolo1: i.t1 || '', tavolo2: i.t2 || '', arbitro: i.arb || '', orario: i.time || '', amichevole: !!i.friendly });
   });
   const out = Object.keys(days).filter(d => days[d].length).sort().map(d => {
     const x = dayMeta[d] || {};
@@ -512,7 +653,7 @@ function copyMonthRecapWhatsApp(m) {
     out += `• *${r.n}*: ${tot}€ (Partite: ${r.p}, Ap/Ch: ${r.a + r.c})\n`;
   });
   try {
-    navigator.clipboard.writeText(out);
+    navigator.clipboard.writeText(out.trim());
     toast('Riepilogo copiato per WhatsApp!');
   } catch(e) { prompt('Copia il testo:', out); }
 }
@@ -581,25 +722,28 @@ function writeHash(p) {
 }
 function setParam(k, v) { const p = params(); v ? p.set(k, v) : p.delete(k); writeHash(p); }
 
-function isU15OrAbove(cat) {
-  if (!cat) return false;
-  const c = cat.toUpperCase().replace(/\s+/g, '');
-  const m = c.match(/^U(\d+)/i);
-  if (m) return parseInt(m[1], 10) >= 15;
-  return /SERIE|DIVIS|PROMOZ|SENIOR|ECCELL/i.test(cat);
-}
-
-function card(i, hasConflict) {
+function card(i, hasConflict, isUrgentIncomplete) {
   const ghostOn = !READONLY && !!i.ghost;
-  const missingT1 = isMissingT1(i);
+  const missingReq = isMissingRequirements(i);
   const t1Val = (i.t1 && i.t1.trim()) ? esc(i.t1) : '<span class="empty-req">Da assegnare</span>';
-  const t2Val = (i.t2 && i.t2.trim()) ? esc(i.t2) : '<span class="empty-opt">—</span>';
-  const arbVal = (i.arb && i.arb.trim()) ? esc(i.arb) : '<span class="empty-opt">—</span>';
-  const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
-  const conflictBadge = hasConflict ? `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>` : '';
+  
+  // Tavolo 2 richiesto se non amichevole
+  const t2Required = !i.friendly;
+  const t2Val = (i.t2 && i.t2.trim()) ? esc(i.t2) : (t2Required ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">—</span>');
 
-  return `<div class="match${ghostOn ? ' ghost' : ''}${missingT1 ? ' missing-t1' : ''}${hasConflict ? ' conflict-match' : ''}" data-id="${i.id}">
-    ${conflictBadge}
+  // Arbitro richiesto se amichevole oppure se categoria sotto U15
+  const arbRequired = i.friendly || !isU15OrAbove(i.cat);
+  const arbVal = (i.arb && i.arb.trim()) ? esc(i.arb) : (arbRequired ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">Federazione</span>');
+
+  const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
+  const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Partita Amichevole">A</span>` : '';
+  
+  let badgeHtml = '';
+  if (hasConflict) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
+  else if (isUrgentIncomplete) badgeHtml = `<div class="urgent-badge">⏰ GARA DI DOMANI INCOMPLETA</div>`;
+
+  return `<div class="match${ghostOn ? ' ghost' : ''}${missingReq ? ' missing-t1' : ''}${hasConflict ? ' conflict-match' : ''}${isUrgentIncomplete ? ' urgent-incomplete' : ''}" data-id="${i.id}">
+    ${badgeHtml}
     <div class="m-top">
       <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita (senza nome)'}</div>
       <div class="m-actions">
@@ -610,6 +754,7 @@ function card(i, hasConflict) {
     <div class="m-meta">
       <div class="m-time">${i.time ? 'Ore ' + i.time : 'Orario n.d.'}</div>
       ${catHtml}
+      ${friendlyHtml}
       <div class="m-date">${i.date}</div>
     </div>
     <div class="m-roster">
@@ -634,6 +779,14 @@ function openEditModal(matchId) {
     <div class="frow"><label>Orario di Gioco</label>${buildCustomTimePicker(it.time || '15:30')}</div>
     <div class="frow"><label for="edTitle">Partita (Squadre)</label><input id="edTitle" type="text" value="${esc(it.title)}"></div>
     <div class="frow"><label for="edCat">Categoria</label><input id="edCat" type="text" list="categoriesList" value="${esc(it.cat)}"></div>
+    
+    <div class="frow" style="margin: 8px 0 12px">
+      <label class="checkbox-item" style="padding:4px 8px;font-size:13px">
+        <input id="edFriendly" type="checkbox"${it.friendly ? ' checked' : ''}>
+        <span style="font-weight:700;color:#9c17a3">Partita Amichevole (badge A)</span>
+      </label>
+    </div>
+
     <div style="border-top:1px solid var(--line);margin:12px 0 10px;padding-top:8px">
       <div class="frow"><label for="edT1">Tavolo 1 *</label><input id="edT1" type="text" list="namesList" value="${esc(it.t1)}" placeholder="Nome obbligatorio"></div>
       <div class="frow"><label for="edT2">Tavolo 2</label><input id="edT2" type="text" list="namesList" value="${esc(it.t2)}" placeholder="Nome"></div>
@@ -684,6 +837,7 @@ function openEditModal(matchId) {
     it.time = document.getElementById('finalTimeVal').value;
     it.title = document.getElementById('edTitle').value.trim();
     it.cat = document.getElementById('edCat').value.trim();
+    it.friendly = document.getElementById('edFriendly').checked;
     it.t1 = document.getElementById('edT1').value.trim();
     it.t2 = document.getElementById('edT2').value.trim();
     it.arb = document.getElementById('edArb').value.trim();
@@ -713,15 +867,17 @@ function generateWhatsAppText(startDate, endDate, customTitle) {
     out += `🏀 *${fmtDayHeader(dayStr)}*\n`;
     arr.forEach(it => {
       const timeStr = it.time ? `Ore ${it.time} - ` : '';
-      const catStr = it.cat ? `[${it.cat}] ` : '';
+      const catStr = it.cat ? `[${it.cat}${it.friendly ? ' (AMICHEVOLE)' : ''}] ` : (it.friendly ? '[AMICHEVOLE] ' : '');
       const title = it.title || 'Partita';
       const t1 = it.t1 && it.t1.trim() ? it.t1.trim() : '...';
       const t2 = it.t2 && it.t2.trim() ? it.t2.trim() : '...';
 
       out += `• ${timeStr}${catStr}${title}\n`;
       out += `  - Tavolo 1: ${t1}\n`;
-      out += `  - Tavolo 2: ${t2}\n`;
-      if (!isU15OrAbove(it.cat)) {
+      if (!it.friendly) {
+        out += `  - Tavolo 2: ${t2}\n`;
+      }
+      if (it.friendly || !isU15OrAbove(it.cat)) {
         const arb = it.arb && it.arb.trim() ? it.arb.trim() : '...';
         out += `  - Arbitro: ${arb}\n`;
       }
@@ -762,7 +918,7 @@ function render(focusId) {
   
   const filtered = items.filter(i =>
     (!filterCat || i.cat === filterCat) &&
-    (!filterIncomplete || isMissingT1(i))
+    (!filterIncomplete || isMissingRequirements(i))
   );
   const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date));
   const months = {};
@@ -771,7 +927,7 @@ function render(focusId) {
   if (!keys.length) {
     listEl.innerHTML = '<div class="empty">Nessuna partita presente.' + (!READONLY ? ' Tocca “+ Partita” per iniziare.' : '') + '</div>';
     updateIncompleteBadge();
-    updateConflictBadge();
+    updateAlertStatusBadge();
     return;
   }
   const nowM = iso(new Date()).slice(0, 7);
@@ -779,6 +935,9 @@ function render(focusId) {
   const fmt = (d, o) => d.toLocaleDateString('it-IT', o);
 
   const conflictsMap = findConflictingMatches();
+  const tomorrowObj = new Date();
+  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+  const tomorrowIso = iso(tomorrowObj);
 
   listEl.innerHTML = keys.map(m => {
     const label = fmt(new Date(m + '-15T12:00'), { month: 'long', year: 'numeric' });
@@ -793,14 +952,17 @@ function render(focusId) {
         if (!b.time) return 1;
         return a.time.localeCompare(b.time);
       }));
-      const dayHtml = Object.keys(days).sort().map(dt => `<div class="day"><h4>${fmt(new Date(dt + 'T12:00'), { weekday: 'short', day: 'numeric', month: 'short' })}</h4>${openClose(dt)}<div class="matches">${days[dt].map(it => card(it, conflictsMap.has(it.id))).join('')}</div></div>`).join('');
+      const dayHtml = Object.keys(days).sort().map(dt => {
+        const isUrgentDay = dt === tomorrowIso;
+        return `<div class="day"><h4>${fmt(new Date(dt + 'T12:00'), { weekday: 'short', day: 'numeric', month: 'short' })}</h4>${openClose(dt)}<div class="matches">${days[dt].map(it => card(it, conflictsMap.has(it.id), isUrgentDay && isMissingRequirements(it))).join('')}</div></div>`;
+      }).join('');
       return `<details class="week${wantW === w ? ' hl' : ''}" id="w-${w}" data-m="${m}" data-w="${w}"${isOpen ? ' open' : ''}><summary><span class="t">Settimana ${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short' })}</span><span class="n">${list.length} ${list.length === 1 ? 'gara' : 'gare'}<button class="waBtn" data-wamsg="${w}" type="button" title="Copia turni">📲 WA</button></span></summary>${dayHtml}</details>`;
     }).join('');
     return `<details class="month" data-m="${m}"${m === open ? ' open' : ''}><summary><span class="t">${label}<button class="waBtn" data-warecap="${m}" type="button" title="Copia riepilogo">📲 WA Riepilogo</button></span><span class="n">${count} gare</span></summary><div class="mbody">${recapHTML(m)}<div class="mweeks">${wkHtml}</div></div></details>`;
   }).join('');
   setTimeout(() => { ready = true; }, 150);
   updateIncompleteBadge();
-  updateConflictBadge();
+  updateAlertStatusBadge();
   if (wantW) { const el = document.getElementById('w-' + wantW); if (el) el.scrollIntoView({ block: 'start' }); }
   if (focusId) {
     const el = document.querySelector(`[data-id="${focusId}"]`);
@@ -881,6 +1043,14 @@ function openAddModal() {
     <div class="frow"><label>Orario di Gioco</label>${buildCustomTimePicker('15:30')}</div>
     <div class="frow"><label for="nTitle">Partita</label><input id="nTitle" type="text" placeholder="Squadra A – Squadra B"></div>
     <div class="frow"><label for="nCat">Categoria</label><input id="nCat" type="text" list="categoriesList" placeholder="Es. U17"></div>
+    
+    <div class="frow" style="margin: 8px 0 12px">
+      <label class="checkbox-item" style="padding:4px 8px;font-size:13px">
+        <input id="nFriendly" type="checkbox">
+        <span style="font-weight:700;color:#9c17a3">Partita Amichevole (badge A)</span>
+      </label>
+    </div>
+
     <div class="frow"><label for="nT1">Tavolo 1</label><input id="nT1" type="text" list="namesList" placeholder="Nome"></div>
     <div class="frow"><label for="nT2">Tavolo 2</label><input id="nT2" type="text" list="namesList" placeholder="Nome"></div>
     <div class="frow"><label for="nArb">Arbitro</label><input id="nArb" type="text" list="namesList" placeholder="Nome"></div>
@@ -895,8 +1065,18 @@ function openAddModal() {
     const date = document.getElementById('nDate').value;
     if (!date) { document.getElementById('nErr').classList.add('on'); document.getElementById('nDate').focus(); return; }
     const time = document.getElementById('finalTimeVal').value;
-    const it = { id: uid(), title: document.getElementById('nTitle').value, date, time, cat: document.getElementById('nCat').value,
-      t1: document.getElementById('nT1').value, t2: document.getElementById('nT2').value, arb: document.getElementById('nArb').value, ts: Date.now() };
+    const it = { 
+      id: uid(), 
+      title: document.getElementById('nTitle').value, 
+      date, 
+      time, 
+      cat: document.getElementById('nCat').value,
+      friendly: document.getElementById('nFriendly').checked,
+      t1: document.getElementById('nT1').value, 
+      t2: document.getElementById('nT2').value, 
+      arb: document.getElementById('nArb').value, 
+      ts: Date.now() 
+    };
     pushUndo(); items.push(it); save(); ov.remove();
     setParam('m', it.date.slice(0, 7)); setParam('s', iso(monday(it.date))); render(it.id);
   };
@@ -996,7 +1176,16 @@ function fromExportFormat(arr) {
       chNome: (day.chiusura && day.chiusura.si) ? (day.chiusura.nome || '') : ''
     };
     (day.partite || []).forEach(p => {
-      newItems.push({ id: uid(), date: d, title: p.partita || '', t1: p.tavolo1 || '', t2: p.tavolo2 || '', arb: p.arbitro || '', time: p.orario || '' });
+      newItems.push({ 
+        id: uid(), 
+        date: d, 
+        title: p.partita || '', 
+        t1: p.tavolo1 || '', 
+        t2: p.tavolo2 || '', 
+        arb: p.arbitro || '', 
+        time: p.orario || '',
+        friendly: !!p.amichevole 
+      });
     });
   });
   return { newItems, wi };
@@ -1081,7 +1270,8 @@ function extractHomeMatches(lines, teamName) {
           date: matchDate,
           time: matchTime,
           title: (homeTeam + ' - ' + (awayTeam || 'Avversario')).replace(/\s+/g, ' '),
-          cat: detectedCat
+          cat: detectedCat,
+          friendly: false
         });
       }
     }
@@ -1190,7 +1380,7 @@ function generateMonthPDF(m) {
     const ch = x.ch === 'si' ? ('Chiusura: sì (' + (x.chNome || '—') + ')') : 'Chiusura: no';
     doc.text(ap + '    ' + ch, ml, y); nl(16);
     list.forEach(it => {
-      doc.setFont('helvetica', 'bold'); doc.text(`• ${it.time ? it.time + ' - ' : ''}${it.title || '(senza titolo)'}`, ml + 6, y); nl(13);
+      doc.setFont('helvetica', 'bold'); doc.text(`• ${it.time ? it.time + ' - ' : ''}${it.title || '(senza titolo)'}${it.friendly ? ' [AMICHEVOLE]' : ''}`, ml + 6, y); nl(13);
       doc.setFont('helvetica', 'normal');
       doc.text(`Tavolo 1: ${it.t1 || '—'}    Tavolo 2: ${it.t2 || '—'}    Arbitro: ${it.arb || '—'}`, ml + 16, y);
       nl(16);
@@ -1357,9 +1547,6 @@ function bindEvents() {
     render();
     toast('Aggiornato!');
   };
-
-  const confAlertBtn = $('#conflictAlertBtn');
-  if (confAlertBtn) confAlertBtn.onclick = openConflictsModal;
 
   const expMulti = $('#exportMultiJsonBtn');
   if (expMulti) expMulti.onclick = openExportMultiModal;
@@ -1567,6 +1754,7 @@ function bindEvents() {
             date: c.date, 
             time: c.time || '', 
             cat: c.cat || '', 
+            friendly: false,
             t1: '', t2: '', arb: '', 
             ts: Date.now() 
           });
@@ -1613,6 +1801,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   render();
+  checkAndTriggerScheduledNotifications();
 
   if (sb) {
     setInterval(() => cloudPullSafe(true).then(render), 15000);
