@@ -1,1639 +1,1633 @@
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function toast(t) { const m = $('#msg'); if (m) { m.textContent = t; m.classList.add('on'); setTimeout(() => m.classList.remove('on'), 2200); } }
+
+// --- CONFIGURAZIONE CLOUD SUPABASE ---
+const SUPABASE_CONFIG = {
+  url: 'https://bhyfeoyyuscrsypaiemx.supabase.co',
+  key: 'sb_publishable_dQyrFbjusGoZtWr1MHkoiA_VPVngPrC',
+  board: 'partite'
+};
+
+// Password di default iniziale (accetta sia lettere che numeri)
+const DEFAULT_PIN = '1234';
+
+// --- STATO AUTENTICAZIONE ---
+let READONLY = true;
+
+// Registrazione Service Worker (PWA)
+let swRegistration = null;
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => { swRegistration = reg; })
+      .catch(err => console.log('SW fail:', err));
   });
 }
 
-// ----------------------------------------------------
-// INTEGRAZIONE SUPABASE (SERVER DATABASE)
-// ----------------------------------------------------
-let supabaseClient = null;
-let supabaseUrl = localStorage.getItem('supabase_url') || '';
-let supabaseKey = localStorage.getItem('supabase_key') || '';
-
-const cloudStatusDot = document.getElementById('cloudStatusDot');
-
-function initSupabase() {
-  if (supabaseUrl && supabaseKey && window.supabase) {
-    try {
-      supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-      if (cloudStatusDot) cloudStatusDot.classList.add('online');
-      fetchDataFromSupabase();
-    } catch (e) {
-      if (cloudStatusDot) cloudStatusDot.classList.remove('online');
-    }
-  } else {
-    if (cloudStatusDot) cloudStatusDot.classList.remove('online');
+// --- MODULO NOTIFICHE ---
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    toast('Notifiche non supportate da questo browser');
+    return false;
   }
-}
-
-// Scarica i dati dal server e aggiorna la UI
-async function fetchDataFromSupabase() {
-  if (!supabaseClient) return;
-
-  try {
-    // 1. Categorie
-    const { data: catData, error: catErr } = await supabaseClient
-      .from('categories')
-      .select('name');
-
-    if (!catErr && catData && catData.length > 0) {
-      appData.categories = catData.map(c => c.name);
-    }
-
-    // 2. Elementi
-    const { data: itemData, error: itemErr } = await supabaseClient
-      .from('items')
-      .select('*');
-
-    if (!itemErr && itemData) {
-      appData.items = itemData.map(row => ({
-        id: Number(row.id),
-        title: row.title,
-        set: row.set_type,
-        category: row.category,
-        date: row.date,
-        number: row.number,
-        rating: row.rating,
-        unplayed: Boolean(row.unplayed),
-        purchased: Boolean(row.purchased),
-        missingGapNotice: row.missing_gap_notice,
-        readingChapter: row.reading_chapter || '',
-        privateComment: row.private_comment || ''
-      }));
-    }
-
-    saveData();
-    updateCategoryDropdown();
-    renderList();
-  } catch (err) {}
-}
-
-// Sincronizza una singola riga su Supabase (Upsert)
-async function syncItemToSupabase(item) {
-  if (!supabaseClient) return;
-
-  try {
-    await supabaseClient.from('items').upsert({
-      id: item.id,
-      title: item.title,
-      set_type: item.set,
-      category: item.category || 'Generale',
-      date: item.date || null,
-      number: item.number || null,
-      rating: item.rating !== undefined ? item.rating : null,
-      unplayed: Boolean(item.unplayed),
-      purchased: Boolean(item.purchased),
-      missing_gap_notice: item.missingGapNotice || null,
-      reading_chapter: item.readingChapter || null,
-      private_comment: item.privateComment || null
-    });
-  } catch (err) {}
-}
-
-// Rimuove una riga da Supabase
-async function deleteItemFromSupabase(id) {
-  if (!supabaseClient) return;
-
-  try {
-    await supabaseClient.from('items').delete().eq('id', id);
-  } catch (err) {}
-}
-
-// Sincronizza le categorie su Supabase
-async function syncCategoriesToSupabase() {
-  if (!supabaseClient) return;
-
-  try {
-    const payload = appData.categories.map(c => ({ id: c, name: c }));
-    await supabaseClient.from('categories').upsert(payload);
-  } catch (err) {}
-}
-
-// ----------------------------------------------------
-// STATO APPLICAZIONE LOCALE
-// ----------------------------------------------------
-const DEFAULT_DATA = {
-  categories: ['Generale', 'Manga', 'Comics', 'Libri', 'Videogiochi'],
-  items: [
-    { id: 1, title: 'Rick and Morty deluxe', set: 'Acquisti', category: 'Generale', date: null, number: '1', rating: null, unplayed: false, purchased: false },
-    { id: 2, title: 'Treehouse of horror Simpson', set: 'Acquisti', category: 'Generale', date: null, number: '1', rating: null, unplayed: false, purchased: false },
-    { id: 3, title: 'Naruto color', set: 'Acquisti', category: 'Generale', date: '2026-09-10', number: '11', rating: null, unplayed: false, purchased: true },
-    { id: 4, title: 'Demon slayer', set: 'Acquisti', category: 'Generale', date: '2026-09-15', number: '1', rating: null, unplayed: false, purchased: true },
-    { id: 5, title: 'Naruto color', set: 'Acquisti', category: 'Generale', date: '2026-09-17', number: '12', rating: null, unplayed: false, purchased: false },
-    { id: 6, title: 'Naruto color', set: 'Acquisti', category: 'Generale', date: '2026-09-24', number: '13', rating: null, unplayed: false, purchased: false },
-    { id: 7, title: 'Naruto color', set: 'Acquisti', category: 'Generale', date: '2026-10-01', number: '14', rating: null, unplayed: false, purchased: false },
-    { id: 8, title: 'Jjk mod1 +variant', set: 'Acquisti', category: 'Generale', date: '2026-10-01', number: '30', rating: null, unplayed: false, purchased: false },
-    { id: 9, title: 'Pineapple army cof', set: 'Acquisti', category: 'Generale', date: '2026-10-02', number: '1', rating: null, unplayed: false, purchased: false },
-    { id: 10, title: 'OP + limited', set: 'Acquisti', category: 'Generale', date: '2026-10-06', number: '114', rating: null, unplayed: false, purchased: false },
-    { id: 11, title: 'Naruto color', set: 'Acquisti', category: 'Generale', date: '2026-10-08', number: '15', rating: null, unplayed: false, purchased: false },
-    { id: 12, title: 'Gachiakuta', set: 'Acquisti', category: 'Generale', date: '2026-10-13', number: '17', rating: null, unplayed: false, purchased: false },
-    { id: 16, title: 'Naruto color', set: 'Posseduti', category: 'Generale', date: null, number: '10', rating: null, unplayed: false, purchased: false, readingChapter: 'Cap. 95', privateComment: 'Rilettura saga esami Chunin.' },
-    { id: 17, title: 'Demon slayer', set: 'Posseduti', category: 'Generale', date: null, number: '1', rating: null, unplayed: false, purchased: false, readingChapter: '', privateComment: '' },
-    { id: 13, title: 'Watchmen', set: 'Voti', category: 'Comics', date: null, number: null, rating: 98, unplayed: false, purchased: false },
-    { id: 14, title: 'Berserk Deluxe 1', set: 'Voti', category: 'Manga', date: null, number: null, rating: 92, unplayed: false, purchased: false },
-    { id: 15, title: 'Elden Ring', set: 'Voti', category: 'Videogiochi', date: null, number: null, rating: null, unplayed: true, purchased: false }
-  ]
-};
-
-let appData = JSON.parse(localStorage.getItem('collection_data')) || JSON.parse(JSON.stringify(DEFAULT_DATA));
-
-appData.items.forEach(item => {
-  if (typeof item.purchased === 'undefined') item.purchased = false;
-  if (typeof item.unplayed === 'undefined') item.unplayed = false;
-  if (typeof item.readingChapter === 'undefined') item.readingChapter = '';
-  if (typeof item.privateComment === 'undefined') item.privateComment = '';
-  if (item.rating && item.rating <= 5) item.rating = item.rating * 20;
-});
-
-let activeSet = localStorage.getItem('pref_set') || 'Acquisti';
-let activeCategory = localStorage.getItem('pref_category') || 'Generale';
-let activeTimeFilter = localStorage.getItem('pref_time_filter') || 'all';
-let currentSortMode = localStorage.getItem('pref_sort_mode') || 'date';
-let isPurchasedSectionOpen = localStorage.getItem('pref_purchased_open') === 'true';
-let notificationsEnabled = localStorage.getItem('pref_notifications') === 'true';
-
-let searchSeriesQuery = '';
-let deletedItemBuffer = null;
-let undoTimeoutId = null;
-let currentOverviewItemId = null;
-
-const SORT_LABELS = {
-  date: 'Per Data',
-  name: 'Per Nome (A-Z)',
-  number: 'Per Valore / #'
-};
-
-const CATEGORY_COLORS = ['#38bdf8', '#c084fc', '#f59e0b', '#34d399', '#f472b6', '#a78bfa', '#fb923c'];
-
-function getCategoryColor(catName) {
-  if (!catName) return '#38bdf8';
-  let hash = 0;
-  for (let i = 0; i < catName.length; i++) {
-    hash = catName.charCodeAt(i) + ((hash << 5) - hash);
+  if (Notification.permission === 'granted') {
+    toast('Notifiche già abilitate');
+    return true;
   }
-  const index = Math.abs(hash) % CATEGORY_COLORS.length;
-  return CATEGORY_COLORS[index];
-}
-
-// DOM
-const contentList = document.getElementById('contentList');
-const categoryFilter = document.getElementById('categoryFilter');
-const setTabs = document.getElementById('setTabs');
-const timeFilterRow = document.getElementById('timeFilterRow');
-const toggleSortBtn = document.getElementById('toggleSortBtn');
-const sortIndicatorText = document.getElementById('sortIndicatorText');
-
-const searchBarWrap = document.getElementById('searchBarWrap');
-const seriesSearchInput = document.getElementById('seriesSearchInput');
-const clearSearchBtn = document.getElementById('clearSearchBtn');
-
-const purchasedSection = document.getElementById('purchasedSection');
-const purchasedList = document.getElementById('purchasedList');
-const togglePurchasedBtn = document.getElementById('togglePurchasedBtn');
-const purchasedCount = document.getElementById('purchasedCount');
-const chevronIcon = document.getElementById('chevronIcon');
-
-const undoToast = document.getElementById('undoToast');
-const undoToastMsg = document.getElementById('undoToastMsg');
-const undoBtn = document.getElementById('undoBtn');
-
-// Modale Elemento Form
-const openModalBtn = document.getElementById('openModalBtn');
-const closeModalBtn = document.getElementById('closeModalBtn');
-const cancelBtn = document.getElementById('cancelBtn');
-const modalBackdrop = document.getElementById('modalBackdrop');
-const itemForm = document.getElementById('itemForm');
-const modalTitle = document.getElementById('modalTitle');
-const editItemId = document.getElementById('editItemId');
-
-const itemTitle = document.getElementById('itemTitle');
-const targetSet = document.getElementById('targetSet');
-const purchasesFields = document.getElementById('purchasesFields');
-const dateGroupWrapper = document.getElementById('dateGroupWrapper');
-const itemDate = document.getElementById('itemDate');
-const itemNumber = document.getElementById('itemNumber');
-const ratingInputGroup = document.getElementById('ratingInputGroup');
-const itemScoreInput = document.getElementById('itemScoreInput');
-const itemUnplayedCheckbox = document.getElementById('itemUnplayedCheckbox');
-
-const categorySelect = document.getElementById('categorySelect');
-const newCategoryGroup = document.getElementById('newCategoryGroup');
-const newCategoryInput = document.getElementById('newCategoryInput');
-const existingTitlesList = document.getElementById('existingTitlesList');
-
-// Modale Panoramica Posseduti
-const overviewModalBackdrop = document.getElementById('overviewModalBackdrop');
-const closeOverviewBtn = document.getElementById('closeOverviewBtn');
-const overviewCategoryTag = document.getElementById('overviewCategoryTag');
-const overviewTitleDisplay = document.getElementById('overviewTitleDisplay');
-const overviewVolumeDisplay = document.getElementById('overviewVolumeDisplay');
-const overviewGapPill = document.getElementById('overviewGapPill');
-const overviewGapDisplay = document.getElementById('overviewGapDisplay');
-const overviewReadingProgressInput = document.getElementById('overviewReadingProgressInput');
-const overviewCommentInput = document.getElementById('overviewCommentInput');
-const overviewEditFullBtn = document.getElementById('overviewEditFullBtn');
-const saveOverviewDetailsBtn = document.getElementById('saveOverviewDetailsBtn');
-
-// Modale Impostazioni
-const openSettingsBtn = document.getElementById('openSettingsBtn');
-const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-const settingsModalBackdrop = document.getElementById('settingsModalBackdrop');
-const settingsTitle = document.getElementById('settingsTitle');
-const settingsBackBtn = document.getElementById('settingsBackBtn');
-
-const settingsMainView = document.getElementById('settingsMainView');
-const settingsCloudView = document.getElementById('settingsCloudView');
-const settingsCategoriesView = document.getElementById('settingsCategoriesView');
-const settingsExportView = document.getElementById('settingsExportView');
-const settingsImportView = document.getElementById('settingsImportView');
-const settingsResetView = document.getElementById('settingsResetView');
-
-const goToCloudBtn = document.getElementById('goToCloudBtn');
-const goToCategoriesBtn = document.getElementById('goToCategoriesBtn');
-const goToExportBtn = document.getElementById('goToExportBtn');
-const goToImportBtn = document.getElementById('goToImportBtn');
-const goToResetBtn = document.getElementById('goToResetBtn');
-const notificationsToggleCheckbox = document.getElementById('notificationsToggleCheckbox');
-
-// Campi Cloud Supabase
-const supabaseUrlInput = document.getElementById('supabaseUrlInput');
-const supabaseKeyInput = document.getElementById('supabaseKeyInput');
-const saveCloudSettingsBtn = document.getElementById('saveCloudSettingsBtn');
-const disconnectCloudBtn = document.getElementById('disconnectCloudBtn');
-
-// CRUD Categorie
-const manageCatList = document.getElementById('manageCatList');
-const newCatManageInput = document.getElementById('newCatManageInput');
-const addCatManageBtn = document.getElementById('addCatManageBtn');
-
-// Backup & Reset
-const confirmExportBtn = document.getElementById('confirmExportBtn');
-const exportAcquisti = document.getElementById('exportAcquisti');
-const exportVoti = document.getElementById('exportVoti');
-const exportPosseduti = document.getElementById('exportPosseduti');
-const triggerImportBtn = document.getElementById('triggerImportBtn');
-const importJsonFileInput = document.getElementById('importJsonFileInput');
-const cancelResetBtn = document.getElementById('cancelResetBtn');
-const confirmFactoryResetBtn = document.getElementById('confirmFactoryResetBtn');
-
-function saveData() {
-  localStorage.setItem('collection_data', JSON.stringify(appData));
-}
-
-function getTodayString() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getDateStatus(dateStr) {
-  if (!dateStr) return { colorClass: 'status-orange', label: '', isToday: false, badgeType: 'standard', badgeText: '' };
-
-  const todayStr = getTodayString();
-  const [ty, tm, td] = todayStr.split('-').map(Number);
-  const todayDate = new Date(ty, tm - 1, td);
-
-  const [iy, im, id] = dateStr.split('-').map(Number);
-  const itemDate = new Date(iy, im - 1, id);
-
-  const diffTime = itemDate - todayDate;
-  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return { colorClass: 'status-today', label: id, isToday: true, badgeType: 'today', badgeText: 'OGGI' };
-  } else if (diffDays === -1) {
-    return { colorClass: 'status-green', label: id, isToday: false, badgeType: 'yesterday', badgeText: 'IERI' };
-  } else if (diffDays > 0 && diffDays <= 7) {
-    return { colorClass: 'status-red', label: id, isToday: false, badgeType: 'countdown', badgeText: `-${diffDays} gg` };
-  } else if (diffDays < 0) {
-    return { colorClass: 'status-green', label: id, isToday: false, badgeType: 'standard', badgeText: formatDisplayDate(dateStr) };
-  } else {
-    return { colorClass: 'status-red', label: id, isToday: false, badgeType: 'standard', badgeText: formatDisplayDate(dateStr) };
-  }
-}
-
-function formatDisplayDate(dateStr) {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
-  const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-  return date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-}
-
-function getMonthYearTitle(dateStr) {
-  const [y, m] = dateStr.split('-');
-  const date = new Date(parseInt(y), parseInt(m) - 1, 1);
-  const monthName = date.toLocaleDateString('it-IT', { month: 'long' });
-  return monthName.charAt(0).toUpperCase() + monthName.slice(1);
-}
-
-function updateCategoryDropdown() {
-  const previous = activeCategory;
-  categoryFilter.innerHTML = '<option value="Tutte">Tutte le Categorie</option>';
-
-  appData.categories.forEach(cat => {
-    const opt = document.createElement('option');
-    opt.value = cat;
-    opt.textContent = cat;
-    if (cat === previous) opt.selected = true;
-    categoryFilter.appendChild(opt);
-  });
-
-  if (!appData.categories.includes(activeCategory) && activeCategory !== 'Tutte') {
-    activeCategory = 'Generale';
-    categoryFilter.value = 'Generale';
-  }
-}
-
-categoryFilter.addEventListener('change', (e) => {
-  activeCategory = e.target.value;
-  localStorage.setItem('pref_category', activeCategory);
-  renderList();
-});
-
-toggleSortBtn.addEventListener('click', () => {
-  if (currentSortMode === 'date') currentSortMode = 'name';
-  else if (currentSortMode === 'name') currentSortMode = 'number';
-  else currentSortMode = 'date';
-
-  localStorage.setItem('pref_sort_mode', currentSortMode);
-  sortIndicatorText.textContent = SORT_LABELS[currentSortMode];
-  renderList();
-});
-
-setTabs.addEventListener('click', (e) => {
-  const btn = e.target.closest('.segment-btn');
-  if (!btn) return;
-
-  document.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  activeSet = btn.dataset.set;
-  localStorage.setItem('pref_set', activeSet);
-
-  updateFilterBarChips();
-  renderList();
-});
-
-function updateFilterBarChips() {
-  if (activeSet === 'Acquisti') {
-    timeFilterRow.style.display = 'flex';
-    timeFilterRow.innerHTML = `
-      <button class="time-chip ${activeTimeFilter === 'all' ? 'active' : ''}" data-filter="all" type="button">Tutti</button>
-      <button class="time-chip ${activeTimeFilter === 'today' ? 'active' : ''}" data-filter="today" type="button">Oggi</button>
-      <button class="time-chip ${activeTimeFilter === 'week' ? 'active' : ''}" data-filter="week" type="button">Questa Settimana</button>
-      <button class="time-chip ${activeTimeFilter === 'month' ? 'active' : ''}" data-filter="month" type="button">Questo Mese</button>
-      <button class="time-chip ${activeTimeFilter === 'nodate' ? 'active' : ''}" data-filter="nodate" type="button">Senza Data</button>
-    `;
-  } else if (activeSet === 'Voti') {
-    timeFilterRow.style.display = 'flex';
-    timeFilterRow.innerHTML = `
-      <button class="time-chip ${activeTimeFilter === 'all' ? 'active' : ''}" data-filter="all" type="button">Tutti</button>
-      <button class="time-chip ${activeTimeFilter === 'scored' ? 'active' : ''}" data-filter="scored" type="button">★ Valutati</button>
-      <button class="time-chip ${activeTimeFilter === 'unplayed' ? 'active' : ''}" data-filter="unplayed" type="button">⏳ Da iniziare</button>
-    `;
-  } else {
-    timeFilterRow.style.display = 'none';
-  }
-
-  timeFilterRow.querySelectorAll('.time-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      timeFilterRow.querySelectorAll('.time-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      activeTimeFilter = chip.dataset.filter;
-      localStorage.setItem('pref_time_filter', activeTimeFilter);
-      renderList();
-    });
-  });
-}
-
-seriesSearchInput.addEventListener('input', (e) => {
-  searchSeriesQuery = e.target.value.trim().toLowerCase();
-  clearSearchBtn.style.display = searchSeriesQuery ? 'flex' : 'none';
-  renderList();
-});
-
-clearSearchBtn.addEventListener('click', () => {
-  seriesSearchInput.value = '';
-  searchSeriesQuery = '';
-  clearSearchBtn.style.display = 'none';
-  renderList();
-});
-
-togglePurchasedBtn.addEventListener('click', () => {
-  isPurchasedSectionOpen = !isPurchasedSectionOpen;
-  localStorage.setItem('pref_purchased_open', isPurchasedSectionOpen);
-  purchasedList.classList.toggle('open', isPurchasedSectionOpen);
-  chevronIcon.classList.toggle('open', isPurchasedSectionOpen);
-});
-
-function matchesActiveFilter(item) {
-  if (activeTimeFilter === 'all') return true;
-
-  if (activeSet === 'Acquisti') {
-    if (activeTimeFilter === 'nodate') return !item.date;
-    if (!item.date) return false;
-
-    const todayStr = getTodayString();
-    const [ty, tm, td] = todayStr.split('-').map(Number);
-    const today = new Date(ty, tm - 1, td);
-
-    const [iy, im, id] = item.date.split('-').map(Number);
-    const itemDateObj = new Date(iy, im - 1, id);
-
-    if (activeTimeFilter === 'today') return item.date === todayStr;
-    if (activeTimeFilter === 'month') return item.date.slice(0, 7) === todayStr.slice(0, 7);
-    if (activeTimeFilter === 'week') {
-      const currentDayOfWeek = today.getDay();
-      const distanceToMonday = (currentDayOfWeek + 6) % 7;
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - distanceToMonday);
-      monday.setHours(0, 0, 0, 0);
-
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
-
-      return itemDateObj >= monday && itemDateObj <= sunday;
-    }
-  } else if (activeSet === 'Voti') {
-    if (activeTimeFilter === 'unplayed') return item.unplayed === true;
-    if (activeTimeFilter === 'scored') return item.unplayed !== true && item.rating !== null && item.rating !== undefined;
-  }
-
-  return true;
-}
-
-function sortItems(itemsArray) {
-  return [...itemsArray].sort((a, b) => {
-    if (currentSortMode === 'name') {
-      return a.title.localeCompare(b.title);
-    } else if (currentSortMode === 'number') {
-      if (activeSet === 'Voti') {
-        const scoreA = (a.unplayed ? -1 : (a.rating || 0));
-        const scoreB = (b.unplayed ? -1 : (b.rating || 0));
-        return scoreB - scoreA;
-      } else {
-        const numA = parseInt(a.number, 10) || 0;
-        const numB = parseInt(b.number, 10) || 0;
-        return numA - numB;
-      }
-    } else {
-      if (!a.date && !b.date) return 0;
-      if (!a.date) return -1;
-      if (!b.date) return 1;
-      return a.date.localeCompare(b.date);
-    }
-  });
-}
-
-function renderList() {
-  contentList.innerHTML = '';
-  purchasedList.innerHTML = '';
-
-  let filtered = appData.items.filter(item => item.set === activeSet);
-
-  if (activeCategory !== 'Tutte') {
-    filtered = filtered.filter(item => (item.category || 'Generale') === activeCategory);
-  }
-
-  if (searchSeriesQuery) {
-    filtered = filtered.filter(item => item.title.toLowerCase().includes(searchSeriesQuery));
-  }
-
-  if (activeSet === 'Acquisti') {
-    renderPurchasesLayout(filtered);
-  } else {
-    purchasedSection.style.display = 'none';
-    renderStandardLayout(filtered);
-  }
-}
-
-function renderPurchasesLayout(items) {
-  const timeFiltered = items.filter(matchesActiveFilter);
-
-  const activeItems = timeFiltered.filter(i => !i.purchased);
-  const purchasedItems = timeFiltered.filter(i => i.purchased);
-
-  if (purchasedItems.length > 0) {
-    purchasedSection.style.display = 'block';
-    purchasedCount.textContent = purchasedItems.length;
-    sortItems(purchasedItems).forEach(item => {
-      purchasedList.appendChild(createItemCard(item, true));
-    });
-  } else {
-    purchasedSection.style.display = 'none';
-  }
-
-  if (activeItems.length === 0 && purchasedItems.length === 0) {
-    if (searchSeriesQuery) {
-      contentList.innerHTML = `
-        <div class="empty-state-box">
-          <span>Nessun volume trovato per "${escapeHtml(searchSeriesQuery)}".</span>
-          <button type="button" class="quick-add-search-btn" id="quickAddSearchedBtn">
-            + Aggiungi "${escapeHtml(searchSeriesQuery)}" agli Acquisti
-          </button>
-        </div>
-      `;
-      document.getElementById('quickAddSearchedBtn').addEventListener('click', () => {
-        openCreateModalWithTitle(searchSeriesQuery);
-      });
-    } else {
-      contentList.innerHTML = `<div class="empty-state-box">Nessun elemento presente con questi filtri.</div>`;
-    }
-    return;
-  }
-
-  if (currentSortMode !== 'date') {
-    sortItems(activeItems).forEach(item => {
-      contentList.appendChild(createItemCard(item, false));
-    });
-    return;
-  }
-
-  const noDateItems = activeItems.filter(i => !i.date);
-  const withDateItems = activeItems.filter(i => i.date);
-
-  withDateItems.sort((a, b) => a.date.localeCompare(b.date));
-
-  noDateItems.forEach(item => {
-    contentList.appendChild(createItemCard(item, false));
-  });
-
-  const monthGroups = {};
-  withDateItems.forEach(item => {
-    const groupKey = item.date.slice(0, 7);
-    if (!monthGroups[groupKey]) monthGroups[groupKey] = [];
-    monthGroups[groupKey].push(item);
-  });
-
-  Object.keys(monthGroups).sort().forEach(groupKey => {
-    const header = document.createElement('div');
-    header.className = 'month-group-header';
-
-    const count = monthGroups[groupKey].length;
-    const countLabel = count === 1 ? '1 volume' : `${count} volumi`;
-
-    header.innerHTML = `
-      <span class="month-group-title">${getMonthYearTitle(monthGroups[groupKey][0].date)}</span>
-      <span class="month-count-pill">${countLabel}</span>
-    `;
-    contentList.appendChild(header);
-
-    monthGroups[groupKey].forEach(item => {
-      contentList.appendChild(createItemCard(item, false));
-    });
-  });
-}
-
-function renderStandardLayout(items) {
-  const filtered = items.filter(matchesActiveFilter);
-
-  if (filtered.length === 0) {
-    contentList.innerHTML = `<div class="empty-state-box">Nessun elemento presente in "${activeSet}".</div>`;
-    return;
-  }
-  sortItems(filtered).forEach(item => {
-    contentList.appendChild(createItemCard(item, false));
-  });
-}
-
-// Sincronizzazione automatica al check
-function syncPurchasedWithPosseduti(purchasedItem) {
-  const purchasedNum = parseInt(purchasedItem.number, 10);
-  const titleClean = purchasedItem.title.trim().toLowerCase();
-
-  const existingPosseduto = appData.items.find(
-    i => i.set === 'Posseduti' && i.title.trim().toLowerCase() === titleClean
-  );
-
-  if (!existingPosseduto) {
-    const newItem = {
-      id: Date.now() + Math.floor(Math.random() * 500),
-      title: purchasedItem.title,
-      set: 'Posseduti',
-      category: purchasedItem.category || 'Generale',
-      date: null,
-      number: purchasedItem.number || '1',
-      rating: null,
-      unplayed: false,
-      purchased: false,
-      autoGeneratedFromPurchase: true,
-      missingGapNotice: null,
-      readingChapter: '',
-      privateComment: ''
-    };
-    appData.items.unshift(newItem);
-    syncItemToSupabase(newItem);
-
-    showToastNotice(`"${purchasedItem.title}" aggiunto in Posseduti (Vol. #${purchasedItem.number || '1'})`);
-  } else {
-    const currentOwnedNum = parseInt(existingPosseduto.number, 10);
-
-    if (isNaN(purchasedNum) || isNaN(currentOwnedNum)) {
-      if (purchasedItem.number && existingPosseduto.number !== purchasedItem.number) {
-        existingPosseduto.number = purchasedItem.number;
-        syncItemToSupabase(existingPosseduto);
-        showToastNotice(`Aggiornato ${existingPosseduto.title} a #${purchasedItem.number}`);
-      }
-    } else if (purchasedNum === currentOwnedNum + 1) {
-      existingPosseduto.number = String(purchasedNum);
-      existingPosseduto.missingGapNotice = null;
-      syncItemToSupabase(existingPosseduto);
-      showToastNotice(`Posseduti aggiornato: ${existingPosseduto.title} ora al Vol. #${purchasedNum}`);
-    } else if (purchasedNum > currentOwnedNum + 1) {
-      const startMissing = currentOwnedNum + 1;
-      const endMissing = purchasedNum - 1;
-      const missingRange = (startMissing === endMissing) ? `#${startMissing}` : `#${startMissing} - #${endMissing}`;
-      
-      existingPosseduto.missingGapNotice = `Mancano vol. ${missingRange}`;
-      syncItemToSupabase(existingPosseduto);
-      showToastNotice(`⚠️ Attenzione: per "${existingPosseduto.title}" mancano i volumi ${missingRange}!`);
+  if (Notification.permission !== 'denied') {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      toast('Notifiche abilitate con successo!');
+      return true;
     }
   }
-
-  saveData();
+  toast('Permesso notifiche negato');
+  return false;
 }
 
-// Rollback se tolto il check per errore
-function rollbackPurchasedFromPosseduti(uncheckItem) {
-  const uncheckNum = parseInt(uncheckItem.number, 10);
-  const titleClean = uncheckItem.title.trim().toLowerCase();
-
-  const existingPosseduto = appData.items.find(
-    i => i.set === 'Posseduti' && i.title.trim().toLowerCase() === titleClean
-  );
-
-  if (!existingPosseduto) return;
-
-  const currentOwnedNum = parseInt(existingPosseduto.number, 10);
-
-  if (existingPosseduto.autoGeneratedFromPurchase && (existingPosseduto.number === uncheckItem.number)) {
-    appData.items = appData.items.filter(i => i.id !== existingPosseduto.id);
-    deleteItemFromSupabase(existingPosseduto.id);
-    showToastNotice(`"${uncheckItem.title}" rimosso da Posseduti (errore annullato)`);
-  } else if (!isNaN(uncheckNum) && !isNaN(currentOwnedNum) && currentOwnedNum === uncheckNum) {
-    const previousNum = currentOwnedNum - 1;
-    if (previousNum > 0) {
-      existingPosseduto.number = String(previousNum);
-      existingPosseduto.missingGapNotice = null;
-      syncItemToSupabase(existingPosseduto);
-      showToastNotice(`Posseduti scalato: ${existingPosseduto.title} tornato al Vol. #${previousNum}`);
-    } else {
-      appData.items = appData.items.filter(i => i.id !== existingPosseduto.id);
-      deleteItemFromSupabase(existingPosseduto.id);
-      showToastNotice(`"${uncheckItem.title}" rimosso da Posseduti`);
-    }
-  } else if (existingPosseduto.missingGapNotice) {
-    existingPosseduto.missingGapNotice = null;
-    syncItemToSupabase(existingPosseduto);
-    showToastNotice(`Avviso volumi mancanti rimosso per "${existingPosseduto.title}"`);
-  }
-
-  saveData();
-}
-
-// Notifiche Native di Uscita
-function checkAndTriggerTodayNotifications() {
-  if (!notificationsEnabled) return;
+// Helper pronto per l'invio delle notifiche
+function dispatchAppNotification(title, options = {}) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-
-  const todayStr = getTodayString();
-  const lastNotifiedDate = localStorage.getItem('last_notified_date');
-
-  if (lastNotifiedDate === todayStr) return;
-
-  const todayReleases = appData.items.filter(
-    i => i.set === 'Acquisti' && !i.purchased && i.date === todayStr
-  );
-
-  if (todayReleases.length > 0) {
-    const titleText = todayReleases.length === 1 
-      ? `In uscita oggi: ${todayReleases[0].title} ${todayReleases[0].number ? '#' + todayReleases[0].number : ''}`
-      : `Oggi ci sono ${todayReleases.length} uscite in fumetteria!`;
-
-    const bodyText = todayReleases.map(i => `${i.title} ${i.number ? '#' + i.number : ''}`).join(', ');
-
-    try {
-      new Notification(titleText, {
-        body: bodyText,
-        icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%230d0e12'/><circle cx='96' cy='96' r='48' fill='%2338bdf8'/></svg>"
-      });
-      localStorage.setItem('last_notified_date', todayStr);
-    } catch (e) {}
-  }
-}
-
-// Toggle Notifiche
-notificationsToggleCheckbox.checked = notificationsEnabled;
-notificationsToggleCheckbox.addEventListener('change', async (e) => {
-  if (e.target.checked) {
-    if (!('Notification' in window)) {
-      alert('Il tuo browser non supporta le notifiche native.');
-      e.target.checked = false;
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      notificationsEnabled = true;
-      localStorage.setItem('pref_notifications', 'true');
-      showToastNotice('Notifiche native attivate!');
-      checkAndTriggerTodayNotifications();
-    } else {
-      notificationsEnabled = false;
-      localStorage.setItem('pref_notifications', 'false');
-      e.target.checked = false;
-      alert('Permesso per le notifiche negato nelle impostazioni.');
-    }
+  const def = {
+    icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="110" fill="%231d5fa8"/%3E%3Ccircle cx="256" cy="256" r="160" fill="none" stroke="white" stroke-width="28"/%3E%3C/svg%3E',
+    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Ccircle cx="256" cy="256" r="256" fill="%231d5fa8"/%3E%3C/svg%3E',
+    vibrate: [200, 100, 200]
+  };
+  const cfg = Object.assign(def, options);
+  if (swRegistration && swRegistration.showNotification) {
+    swRegistration.showNotification(title, cfg);
   } else {
-    notificationsEnabled = false;
-    localStorage.setItem('pref_notifications', 'false');
-    showToastNotice('Notifiche disattivate.');
+    new Notification(title, cfg);
   }
-});
-
-function showToastNotice(message) {
-  undoToastMsg.textContent = message;
-  undoBtn.style.display = 'none';
-  undoToast.classList.add('show');
-
-  if (undoTimeoutId) clearTimeout(undoTimeoutId);
-  undoTimeoutId = setTimeout(() => {
-    undoToast.classList.remove('show');
-    undoBtn.style.display = 'inline-block';
-  }, 4500);
 }
 
-function createItemCard(item, isCompact) {
-  const card = document.createElement('div');
-  const catName = escapeHtml(item.category || 'Generale');
-  const catColor = getCategoryColor(item.category || 'Generale');
-  const dateInfo = getDateStatus(item.date);
+// Gestione Temi
+let currentTheme = localStorage.getItem('partite-theme') || 'default';
+function applyTheme(themeName) {
+  currentTheme = themeName;
+  if (themeName === 'default') document.body.removeAttribute('data-theme');
+  else document.body.setAttribute('data-theme', themeName);
+  localStorage.setItem('partite-theme', themeName);
+}
+if (currentTheme !== 'default') applyTheme(currentTheme);
 
-  const statusClass = (item.set === 'Acquisti') ? dateInfo.colorClass : '';
-  const compactClass = isCompact ? 'compact-purchased' : '';
-  card.className = `item-card ${statusClass} ${compactClass}`;
+// Stato & Memoria Locale
+const KEY = 'partite-v1';
+let items = [];
+try { items = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){}
 
-  let checkHtml = '';
-  if (item.set === 'Acquisti') {
-    checkHtml = `
-      <button type="button" class="check-btn ${item.purchased ? 'checked' : ''}" title="${item.purchased ? 'Segna come da acquistare' : 'Segna come acquistato'}">
-        <div class="custom-checkbox">
-          <svg viewBox="0 0 24 24" width="12" height="12">
-            <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-          </svg>
-        </div>
-      </button>
-    `;
+let dayMeta = {};
+try { dayMeta = JSON.parse(localStorage.getItem('partite-giorni-v1')) || {}; } catch(e){}
+
+let molt = {};
+try { molt = JSON.parse(localStorage.getItem('partite-molt-v1')) || {}; } catch(e){}
+
+let names = [];
+try { names = JSON.parse(localStorage.getItem('partite-nomi-v1')) || []; } catch(e){}
+
+let categories = [];
+try { categories = JSON.parse(localStorage.getItem('partite-categorie-v1')) || []; } catch(e){}
+
+let pinHash = null;
+let isDirty = false;
+
+const saveLocalOnly = () => {
+  try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){}
+  updateIncompleteBadge();
+  updateConflictBadge();
+  isDirty = true;
+};
+const saveDLocalOnly = () => {
+  try { localStorage.setItem('partite-giorni-v1', JSON.stringify(dayMeta)); } catch(e){}
+  isDirty = true;
+};
+const saveMoltLocal = () => {
+  try { localStorage.setItem('partite-molt-v1', JSON.stringify(molt)); } catch(e){}
+  isDirty = true;
+};
+const saveNamesLocal = () => {
+  try { localStorage.setItem('partite-nomi-v1', JSON.stringify(names)); } catch(e){}
+  isDirty = true;
+};
+const saveCategoriesLocal = () => {
+  try { localStorage.setItem('partite-categorie-v1', JSON.stringify(categories)); } catch(e){}
+  isDirty = true;
+};
+
+const save = () => { saveLocalOnly(); scheduleCloudPush(); };
+const saveD = () => { saveDLocalOnly(); scheduleCloudPush(); };
+const saveMolt = () => { saveMoltLocal(); scheduleCloudPush(); };
+const saveNames = () => { saveNamesLocal(); scheduleCloudPush(); };
+const saveCategories = () => { saveCategoriesLocal(); scheduleCloudPush(); };
+
+// Inizializzazione Client Supabase
+let sb = null;
+try {
+  if (window.supabase && SUPABASE_CONFIG.url && SUPABASE_CONFIG.key) {
+    sb = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
   }
+} catch(e) { sb = null; }
 
-  let dateHtml = '';
-  if (item.set === 'Acquisti') {
-    if (dateInfo.badgeType === 'today') {
-      dateHtml = `<span class="date-badge badge-today">OGGI</span>`;
-    } else if (dateInfo.badgeType === 'yesterday') {
-      dateHtml = `<span class="date-badge badge-yesterday">IERI</span>`;
-    } else if (dateInfo.badgeType === 'countdown') {
-      dateHtml = `<span class="date-badge badge-countdown">${dateInfo.badgeText}</span>`;
-    } else if (dateInfo.badgeText) {
-      dateHtml = `<span class="date-badge">${dateInfo.badgeText}</span>`;
+let syncOrangeUntil = 0;
+function setSyncVisualState(state, tooltip) {
+  const dot = document.getElementById('syncDot');
+  const wrap = document.getElementById('syncIndicatorWrap');
+  if (!wrap || !dot) return;
+  wrap.style.display = 'inline-flex';
+
+  if (state === 'orange') {
+    syncOrangeUntil = Date.now() + 3000;
+    dot.className = 'sync-dot sync-orange';
+    dot.title = tooltip || 'Sincronizzazione in corso…';
+  } else if (state === 'green') {
+    const remaining = syncOrangeUntil - Date.now();
+    if (remaining > 0) {
+      setTimeout(() => {
+        dot.className = 'sync-dot sync-green';
+        dot.title = tooltip || (sb ? 'Sincronizzato sul cloud' : 'Salvataggio locale');
+      }, remaining);
+    } else {
+      dot.className = 'sync-dot sync-green';
+      dot.title = tooltip || (sb ? 'Sincronizzato sul cloud' : 'Salvataggio locale');
     }
+  } else if (state === 'red') {
+    dot.className = 'sync-dot sync-red';
+    dot.title = tooltip || 'Errore o cloud non raggiungibile';
   }
+}
 
-  let mainValueHtml = '';
-  if (item.set === 'Acquisti') {
-    if (item.number) {
-      mainValueHtml = `<span class="item-num">#${escapeHtml(item.number)}</span>`;
+async function sha256hex(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function cloudFetchRaw() {
+  if (!sb) return null;
+  const { data, error } = await sb.from('partite_board').select('data').eq('id', SUPABASE_CONFIG.board).maybeSingle();
+  if (error) throw error;
+  return data && data.data ? data.data : null;
+}
+
+function applyCloudData(raw) {
+  items = Array.isArray(raw.items) ? raw.items : [];
+  dayMeta = raw.dayMeta && typeof raw.dayMeta === 'object' ? raw.dayMeta : {};
+  molt = raw.molt && typeof raw.molt === 'object' ? raw.molt : {};
+  names = Array.isArray(raw.names) ? raw.names : [];
+  categories = Array.isArray(raw.categories) ? raw.categories : [];
+  if (raw.pinHash) pinHash = raw.pinHash;
+  isDirty = false;
+  saveLocalOnly(); saveDLocalOnly(); saveMoltLocal(); saveNamesLocal(); saveCategoriesLocal();
+  isDirty = false;
+  renderNamesList(); renderCategoriesList();
+}
+
+async function cloudPushNow() {
+  if (!sb || READONLY) return false;
+  setSyncVisualState('orange', 'Salvataggio in corso…');
+  try {
+    const { error } = await sb.from('partite_board').upsert({
+      id: SUPABASE_CONFIG.board,
+      data: { items, dayMeta, molt, names, categories, pinHash },
+      updated_at: new Date().toISOString()
+    });
+    if (error) throw error;
+    isDirty = false;
+    setSyncVisualState('green', 'Modifiche salvate sul cloud');
+    return true;
+  } catch (err) {
+    setSyncVisualState('red', 'Errore salvataggio: dati salvati solo in locale');
+    return false;
+  }
+}
+
+let syncTimer = null;
+function scheduleCloudPush() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(cloudPushNow, 1200);
+}
+
+async function cloudPullSafe(silent) {
+  if (!sb) return false;
+  if (isDirty && !READONLY) {
+    await cloudPushNow();
+  }
+  if (!silent) setSyncVisualState('orange', 'Download aggiornamenti…');
+  try {
+    const raw = await cloudFetchRaw();
+    if (raw) {
+      applyCloudData(raw);
+      setSyncVisualState('green', 'Sincronizzato');
+      return true;
     }
-  } else if (item.set === 'Posseduti') {
-    const numDisplay = item.number ? `<span class="item-num">#${escapeHtml(item.number)}</span>` : '';
-    const gapDisplay = item.missingGapNotice ? `<span class="gap-badge" title="Volumi intermedi non ancora registrati">${escapeHtml(item.missingGapNotice)}</span>` : '';
-    mainValueHtml = `${gapDisplay} ${numDisplay}`;
-  } else if (item.set === 'Voti') {
-    if (item.unplayed) {
-      mainValueHtml = `
-        <span class="unplayed-badge" title="Non ancora letto o giocato">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-            <path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z"/>
-          </svg>
-          Da iniziare
-        </span>
-      `;
-    } else if (item.rating !== null && item.rating !== undefined) {
-      mainValueHtml = `<span class="score-badge-100">${item.rating}/100</span>`;
+    setSyncVisualState('green', 'Pronto');
+    return false;
+  } catch(e) {
+    setSyncVisualState('red', 'Errore connessione');
+    return false;
+  }
+}
+
+setInterval(() => {
+  if (isDirty && sb && !READONLY) {
+    cloudPushNow();
+  }
+}, 5000);
+
+let filterCat = '';
+let filterIncomplete = false;
+
+function renderNamesList() {
+  const dl = document.getElementById('namesList');
+  if (dl) dl.innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+}
+
+function renderCategoriesList() {
+  const dl = document.getElementById('categoriesList');
+  if (dl) dl.innerHTML = categories.map(c => `<option value="${esc(c)}">`).join('');
+  const sel = document.getElementById('filterCat');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Tutte le categorie</option>' + categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    sel.value = categories.includes(cur) ? cur : '';
+  }
+}
+
+function isMissingT1(item) {
+  return !(item.t1 && item.t1.trim());
+}
+
+function updateIncompleteBadge() {
+  const b = document.getElementById('incCount');
+  if (!b) return;
+  const count = items.filter(isMissingT1).length;
+  b.textContent = count ? `(${count})` : '';
+}
+
+// Conflitti orari
+function findConflictingMatches() {
+  const conflicts = new Map();
+  const groups = {};
+  
+  items.forEach(it => {
+    if (it.date && it.time && it.time.trim()) {
+      const key = `${it.date}_${it.time.trim()}`;
+      (groups[key] ??= []).push(it);
     }
-  }
+  });
 
-  let nextVolHtml = '';
-  if (item.set === 'Acquisti' && item.number && !isNaN(parseInt(item.number, 10))) {
-    nextVolHtml = `<button class="icon-btn next-btn" title="Crea volume successivo (+1)" type="button">+1</button>`;
-  }
+  Object.values(groups).forEach(list => {
+    if (list.length > 1) {
+      list.forEach(m => {
+        const others = list.filter(o => o.id !== m.id);
+        conflicts.set(m.id, others);
+      });
+    }
+  });
 
-  card.innerHTML = `
-    <div class="card-left-section">
-      ${checkHtml}
-      <div class="item-main-details">
-        <span class="item-tag-inline" style="color: ${catColor};">${catName}</span>
-        <span class="item-name">${escapeHtml(item.title)}</span>
-      </div>
+  return conflicts;
+}
+
+function updateConflictBadge() {
+  const btn = document.getElementById('conflictAlertBtn');
+  if (!btn) return;
+  const conflictsMap = findConflictingMatches();
+  const count = conflictsMap.size;
+  if (count > 0) {
+    btn.style.display = 'inline-flex';
+    btn.textContent = `❗ ${count}`;
+    btn.title = `${count} partite in conflitto di orario! Clicca per visualizzarle.`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function openConflictsModal() {
+  const conflictsMap = findConflictingMatches();
+  if (!conflictsMap.size) { toast('Nessun conflitto presente'); return; }
+
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'conflictOv';
+
+  const grouped = {};
+  conflictsMap.forEach((others, myId) => {
+    const me = items.find(x => x.id === myId);
+    if (!me) return;
+    const k = `${me.date} alle ${me.time}`;
+    (grouped[k] ??= new Set()).add(me);
+  });
+
+  let listHtml = '';
+  Object.keys(grouped).sort().forEach(dt => {
+    const arr = Array.from(grouped[dt]);
+    listHtml += `<div style="margin-bottom:12px;border:1px solid #ef4444;border-radius:8px;padding:8px;background:var(--bg)">
+      <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px">⚠️ Conflitto: ${dt} (${arr.length} gare simultanee)</div>`;
+    arr.forEach(it => {
+      listHtml += `<div class="conflict-list-item" data-goto="${it.id}">
+        <strong>${esc(it.title || 'Partita senza titolo')}</strong>
+        <span style="font-size:12px;color:var(--mute)">Cat: ${esc(it.cat || 'n.d.')} | T1: ${esc(it.t1 || 'Vuoto')}</span>
+        <span style="font-size:11px;color:var(--acc);font-weight:600">Tocca per andare alla partita ➔</span>
+      </div>`;
+    });
+    listHtml += `</div>`;
+  });
+
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Conflitti di Orario" style="max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="margin:0;color:#ef4444">Conflitti di Orario</h3>
+      <button id="confCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
     </div>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le seguenti gare si sovrappongono esattamente allo stesso giorno e orario:</p>
+    <div>${listHtml}</div>
+    <div class="mbtns" style="margin-top:14px"><button class="primary" id="confClose">Chiudi</button></div>
+  </div>`;
 
-    <div class="card-right-section">
-      ${dateHtml}
-      ${mainValueHtml}
-      ${nextVolHtml}
-      <div class="card-actions">
-        <button class="icon-btn edit-btn" title="Modifica" type="button">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-          </svg>
-        </button>
-        <button class="icon-btn delete-btn" title="Elimina" type="button">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-          </svg>
-        </button>
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => {
+    if (e.target === ov) ov.remove();
+    const itemEl = e.target.closest('[data-goto]');
+    if (itemEl) {
+      const targetId = itemEl.dataset.goto;
+      ov.remove();
+      const targetMatch = items.find(x => x.id === targetId);
+      if (targetMatch) {
+        setParam('m', targetMatch.date.slice(0, 7));
+        setParam('s', iso(monday(targetMatch.date)));
+        render(targetId);
+      }
+    }
+  });
+  document.getElementById('confClose').onclick = () => ov.remove();
+  document.getElementById('confCloseTop').onclick = () => ov.remove();
+}
+
+// Time Picker
+const COMMON_TIMES = ['09:00', '11:00', '11:15', '11:30', '15:00', '15:30', '17:00', '17:30', '18:00', '20:30', '21:00'];
+function buildCustomTimePicker(initialVal) {
+  let [h, m] = (initialVal || '15:30').split(':');
+  if (!h) h = '15';
+  if (!m) m = '30';
+
+  const hoursOpts = Array.from({ length: 16 }, (_, i) => String(i + 8).padStart(2, '0'))
+    .map(val => `<option value="${val}"${val === h ? ' selected' : ''}>${val}</option>`).join('');
+
+  const minsOpts = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']
+    .map(val => `<option value="${val}"${val === m ? ' selected' : ''}>${val}</option>`).join('');
+
+  const chipsHtml = COMMON_TIMES.map(t => `
+    <button type="button" class="time-chip${t === initialVal ? ' active' : ''}" data-timeval="${t}">${t}</button>
+  `).join('');
+
+  return `
+    <div class="time-picker-box" id="timePickerBox">
+      <div class="time-dropdowns">
+        <label style="margin:0;font-size:13px;font-weight:700">Ore:</label>
+        <select id="pickHour">${hoursOpts}</select>
+        <span style="font-size:18px;font-weight:700">:</span>
+        <label style="margin:0;font-size:13px;font-weight:700">Min:</label>
+        <select id="pickMin">${minsOpts}</select>
+        <input type="hidden" id="finalTimeVal" value="${initialVal || '15:30'}">
+      </div>
+      <div style="font-size:11px;color:var(--mute);text-align:center;font-weight:600">Oppure seleziona un orario frequente:</div>
+      <div class="time-chips" id="timeChipsWrap">
+        ${chipsHtml}
       </div>
     </div>
   `;
-
-  card.addEventListener('click', (e) => {
-    if (e.target.closest('.check-btn') || e.target.closest('.icon-btn')) return;
-    if (item.set === 'Posseduti') {
-      openOverviewModal(item);
-    }
-  });
-
-  card.addEventListener('dblclick', () => {
-    openEditModal(item);
-  });
-
-  if (item.set === 'Acquisti') {
-    card.querySelector('.check-btn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const willBePurchased = !item.purchased;
-      item.purchased = willBePurchased;
-      saveData();
-      syncItemToSupabase(item);
-
-      if (willBePurchased) {
-        syncPurchasedWithPosseduti(item);
-      } else {
-        rollbackPurchasedFromPosseduti(item);
-      }
-
-      renderList();
-    });
-  }
-
-  const nextBtn = card.querySelector('.next-btn');
-  if (nextBtn) {
-    nextBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      createNextVolume(item);
-    });
-  }
-
-  card.querySelector('.edit-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    openEditModal(item);
-  });
-
-  card.querySelector('.delete-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    deleteItemWithUndo(item);
-  });
-
-  return card;
 }
 
-// Panoramica Posseduti
-function openOverviewModal(item) {
-  currentOverviewItemId = item.id;
-  overviewTitleDisplay.textContent = item.title;
-  overviewCategoryTag.textContent = item.category || 'Generale';
-  overviewCategoryTag.style.color = getCategoryColor(item.category || 'Generale');
+function bindTimePickerEvents(container) {
+  const pHour = container.querySelector('#pickHour');
+  const pMin = container.querySelector('#pickMin');
+  const hInput = container.querySelector('#finalTimeVal');
+  const chips = container.querySelectorAll('.time-chip');
 
-  overviewVolumeDisplay.textContent = item.number ? `#${item.number}` : 'N.D.';
-
-  if (item.missingGapNotice) {
-    overviewGapPill.style.display = 'flex';
-    overviewGapDisplay.textContent = item.missingGapNotice;
-  } else {
-    overviewGapPill.style.display = 'none';
-  }
-
-  overviewReadingProgressInput.value = item.readingChapter || '';
-  overviewCommentInput.value = item.privateComment || '';
-
-  overviewModalBackdrop.classList.add('active');
-}
-
-function closeOverviewModal() {
-  overviewModalBackdrop.classList.remove('active');
-  currentOverviewItemId = null;
-}
-
-closeOverviewBtn.addEventListener('click', closeOverviewModal);
-
-overviewModalBackdrop.addEventListener('click', (e) => {
-  if (e.target === overviewModalBackdrop) closeOverviewModal();
-});
-
-saveOverviewDetailsBtn.addEventListener('click', () => {
-  if (!currentOverviewItemId) return;
-  const item = appData.items.find(i => i.id === currentOverviewItemId);
-  if (item) {
-    item.readingChapter = overviewReadingProgressInput.value.trim();
-    item.privateComment = overviewCommentInput.value.trim();
-    saveData();
-    syncItemToSupabase(item);
-    closeOverviewModal();
-    showToastNotice(`Panoramica di "${item.title}" salvata!`);
-  }
-});
-
-overviewEditFullBtn.addEventListener('click', () => {
-  if (!currentOverviewItemId) return;
-  const item = appData.items.find(i => i.id === currentOverviewItemId);
-  if (item) {
-    closeOverviewModal();
-    openEditModal(item);
-  }
-});
-
-function deleteItemWithUndo(item) {
-  deletedItemBuffer = { ...item };
-  appData.items = appData.items.filter(i => i.id !== item.id);
-  saveData();
-  deleteItemFromSupabase(item.id);
-  renderList();
-
-  undoBtn.style.display = 'inline-block';
-  undoToastMsg.textContent = `"${item.title}" eliminato`;
-  undoToast.classList.add('show');
-
-  if (undoTimeoutId) clearTimeout(undoTimeoutId);
-  undoTimeoutId = setTimeout(() => {
-    undoToast.classList.remove('show');
-    deletedItemBuffer = null;
-  }, 5000);
-}
-
-undoBtn.addEventListener('click', () => {
-  if (deletedItemBuffer) {
-    appData.items.unshift(deletedItemBuffer);
-    saveData();
-    syncItemToSupabase(deletedItemBuffer);
-    renderList();
-    deletedItemBuffer = null;
-    undoToast.classList.remove('show');
-    if (undoTimeoutId) clearTimeout(undoTimeoutId);
-  }
-});
-
-function createNextVolume(item) {
-  const currentNum = parseInt(item.number, 10);
-  const nextNum = isNaN(currentNum) ? '' : String(currentNum + 1);
-
-  const newItem = {
-    id: Date.now(),
-    title: item.title,
-    set: 'Acquisti',
-    category: item.category || 'Generale',
-    date: null,
-    number: nextNum,
-    rating: null,
-    unplayed: false,
-    purchased: false
+  const updateFromSelects = () => {
+    const val = `${pHour.value}:${pMin.value}`;
+    hInput.value = val;
+    chips.forEach(c => c.classList.toggle('active', c.dataset.timeval === val));
   };
 
-  appData.items.unshift(newItem);
-  saveData();
-  syncItemToSupabase(newItem);
-  renderList();
-}
+  pHour.onchange = updateFromSelects;
+  pMin.onchange = updateFromSelects;
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-function populateFormCategories() {
-  categorySelect.innerHTML = '';
-  appData.categories.forEach(cat => {
-    const opt = document.createElement('option');
-    opt.value = cat;
-    opt.textContent = cat;
-    categorySelect.appendChild(opt);
-  });
-}
-
-function updateAutoCompletionList() {
-  const uniqueTitles = [...new Set(appData.items.map(i => i.title))];
-  existingTitlesList.innerHTML = '';
-  uniqueTitles.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t;
-    existingTitlesList.appendChild(opt);
-  });
-}
-
-function adjustModalFields(set) {
-  purchasesFields.style.display = (set === 'Acquisti' || set === 'Posseduti') ? 'flex' : 'none';
-  dateGroupWrapper.style.display = (set === 'Acquisti') ? 'flex' : 'none';
-  ratingInputGroup.style.display = (set === 'Voti') ? 'block' : 'none';
-}
-
-targetSet.addEventListener('change', (e) => {
-  adjustModalFields(e.target.value);
-});
-
-itemUnplayedCheckbox.addEventListener('change', (e) => {
-  if (e.target.checked) {
-    itemScoreInput.value = '';
-    itemScoreInput.disabled = true;
-    itemScoreInput.placeholder = 'Non applicabile (Da iniziare)';
-  } else {
-    itemScoreInput.disabled = false;
-    itemScoreInput.placeholder = 'es. 85';
-  }
-});
-
-itemTitle.addEventListener('input', (e) => {
-  const val = e.target.value;
-
-  const matched = appData.items.find(i => i.title.toLowerCase() === val.trim().toLowerCase());
-  if (matched && matched.category) {
-    categorySelect.value = matched.category;
-  }
-
-  const numberMatch = val.match(/^(.*?)\s+#?(\d+)$/);
-  if (numberMatch && (targetSet.value === 'Acquisti' || targetSet.value === 'Posseduti') && !itemNumber.value) {
-    itemNumber.value = numberMatch[2];
-  }
-});
-
-function openCreateModal() {
-  openCreateModalWithTitle('');
-}
-
-function openCreateModalWithTitle(initialTitle) {
-  modalTitle.textContent = 'Nuovo Elemento';
-  editItemId.value = '';
-  itemForm.reset();
-  itemScoreInput.disabled = false;
-  itemScoreInput.placeholder = 'es. 85';
-
-  populateFormCategories();
-  updateAutoCompletionList();
-
-  newCategoryGroup.style.display = 'flex';
-  targetSet.value = activeSet;
-  adjustModalFields(activeSet);
-  categorySelect.value = (activeCategory !== 'Tutte') ? activeCategory : 'Generale';
-
-  if (initialTitle) {
-    itemTitle.value = initialTitle;
-  }
-
-  modalBackdrop.classList.add('active');
-  itemTitle.focus();
-}
-
-function openEditModal(item) {
-  modalTitle.textContent = 'Modifica Elemento';
-  editItemId.value = item.id;
-  populateFormCategories();
-  updateAutoCompletionList();
-
-  newCategoryGroup.style.display = 'none';
-  newCategoryInput.value = '';
-
-  itemTitle.value = item.title;
-  targetSet.value = item.set;
-  adjustModalFields(item.set);
-
-  itemDate.value = item.date || '';
-  itemNumber.value = item.number || '';
-
-  itemUnplayedCheckbox.checked = Boolean(item.unplayed);
-  if (item.unplayed) {
-    itemScoreInput.value = '';
-    itemScoreInput.disabled = true;
-    itemScoreInput.placeholder = 'Non applicabile (Da iniziare)';
-  } else {
-    itemScoreInput.disabled = false;
-    itemScoreInput.value = (item.rating !== null && item.rating !== undefined) ? item.rating : '';
-    itemScoreInput.placeholder = 'es. 85';
-  }
-
-  categorySelect.value = item.category || 'Generale';
-  modalBackdrop.classList.add('active');
-}
-
-function closeModal() {
-  modalBackdrop.classList.remove('active');
-  itemForm.reset();
-  editItemId.value = '';
-}
-
-openModalBtn.addEventListener('click', openCreateModal);
-closeModalBtn.addEventListener('click', closeModal);
-cancelBtn.addEventListener('click', closeModal);
-
-modalBackdrop.addEventListener('click', (e) => {
-  if (e.target === modalBackdrop) closeModal();
-});
-
-itemForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-
-  const idToEdit = editItemId.value;
-  let title = itemTitle.value.trim();
-  const set = targetSet.value;
-  const typedCat = newCategoryInput.value.trim();
-  let category = categorySelect.value;
-
-  const numInTitleMatch = title.match(/^(.*?)\s+#?(\d+)$/);
-  if (numInTitleMatch && itemNumber.value === numInTitleMatch[2] && (set === 'Acquisti' || set === 'Posseduti')) {
-    title = numInTitleMatch[1];
-  }
-
-  if (!idToEdit && typedCat) {
-    category = typedCat;
-    if (!appData.categories.includes(category)) {
-      appData.categories.push(category);
-      syncCategoriesToSupabase();
-    }
-  }
-
-  if (!category) category = 'Generale';
-
-  const date = (set === 'Acquisti') ? (itemDate.value || null) : null;
-  const number = (set === 'Acquisti' || set === 'Posseduti') ? (itemNumber.value.trim() || null) : null;
-
-  let rating = null;
-  let unplayed = false;
-
-  if (set === 'Voti') {
-    unplayed = itemUnplayedCheckbox.checked;
-    if (!unplayed && itemScoreInput.value !== '') {
-      let scoreNum = parseInt(itemScoreInput.value, 10);
-      if (isNaN(scoreNum)) scoreNum = 0;
-      if (scoreNum < 0) scoreNum = 0;
-      if (scoreNum > 100) scoreNum = 100;
-      rating = scoreNum;
-    }
-  }
-
-  let finalItem = null;
-
-  if (idToEdit) {
-    const existing = appData.items.find(i => i.id == idToEdit);
-    if (existing) {
-      existing.title = title;
-      existing.set = set;
-      existing.category = category;
-      existing.date = date;
-      existing.number = number;
-      existing.rating = rating;
-      existing.unplayed = unplayed;
-      finalItem = existing;
-    }
-  } else {
-    finalItem = {
-      id: Date.now(),
-      title,
-      set,
-      category,
-      date,
-      number,
-      rating,
-      unplayed,
-      purchased: false,
-      missingGapNotice: null,
-      readingChapter: '',
-      privateComment: ''
+  chips.forEach(chip => {
+    chip.onclick = () => {
+      const [newH, newM] = chip.dataset.timeval.split(':');
+      pHour.value = newH;
+      pMin.value = newM;
+      hInput.value = chip.dataset.timeval;
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
     };
-    appData.items.unshift(finalItem);
-  }
-
-  saveData();
-  if (finalItem) syncItemToSupabase(finalItem);
-  closeModal();
-  updateCategoryDropdown();
-
-  if (activeSet !== set) {
-    activeSet = set;
-    localStorage.setItem('pref_set', activeSet);
-    document.querySelectorAll('.segment-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.set === set);
-    });
-    updateFilterBarChips();
-  }
-
-  renderList();
-});
-
-// Scorciatoie tastiera
-window.addEventListener('keydown', (e) => {
-  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-    if (e.key === 'Escape') {
-      document.activeElement.blur();
-      closeModal();
-      closeOverviewModal();
-      closeSettingsModal();
-    }
-    return;
-  }
-
-  if (e.key === 'n' || e.key === 'N') {
-    e.preventDefault();
-    openCreateModal();
-  } else if (e.key === '/') {
-    e.preventDefault();
-    seriesSearchInput.focus();
-  } else if (e.key === 'Escape') {
-    closeModal();
-    closeOverviewModal();
-    closeSettingsModal();
-  }
-});
-
-// Sotto-viste Impostazioni
-function showSettingsView(viewName) {
-  settingsMainView.style.display = (viewName === 'main') ? 'block' : 'none';
-  settingsCloudView.style.display = (viewName === 'cloud') ? 'block' : 'none';
-  settingsCategoriesView.style.display = (viewName === 'categories') ? 'block' : 'none';
-  settingsExportView.style.display = (viewName === 'export') ? 'block' : 'none';
-  settingsImportView.style.display = (viewName === 'import') ? 'block' : 'none';
-  settingsResetView.style.display = (viewName === 'reset') ? 'block' : 'none';
-
-  if (viewName === 'main') {
-    settingsTitle.textContent = 'Impostazioni';
-    settingsBackBtn.style.display = 'none';
-  } else if (viewName === 'cloud') {
-    settingsTitle.textContent = 'Server Cloud';
-    settingsBackBtn.style.display = 'flex';
-    supabaseUrlInput.value = localStorage.getItem('supabase_url') || '';
-    supabaseKeyInput.value = localStorage.getItem('supabase_key') || '';
-  } else if (viewName === 'categories') {
-    settingsTitle.textContent = 'Gestione Categorie';
-    settingsBackBtn.style.display = 'flex';
-    renderManageCategoriesList();
-  } else if (viewName === 'export') {
-    settingsTitle.textContent = 'Esporta Backup JSON';
-    settingsBackBtn.style.display = 'flex';
-  } else if (viewName === 'import') {
-    settingsTitle.textContent = 'Importa Backup JSON';
-    settingsBackBtn.style.display = 'flex';
-  } else if (viewName === 'reset') {
-    settingsTitle.textContent = 'Ripristino di Fabbrica';
-    settingsBackBtn.style.display = 'flex';
-  }
-}
-
-function openSettingsModal() {
-  showSettingsView('main');
-  settingsModalBackdrop.classList.add('active');
-}
-
-function closeSettingsModal() {
-  settingsModalBackdrop.classList.remove('active');
-}
-
-openSettingsBtn.addEventListener('click', openSettingsModal);
-closeSettingsBtn.addEventListener('click', closeSettingsModal);
-settingsBackBtn.addEventListener('click', () => showSettingsView('main'));
-
-goToCloudBtn.addEventListener('click', () => showSettingsView('cloud'));
-goToCategoriesBtn.addEventListener('click', () => showSettingsView('categories'));
-goToExportBtn.addEventListener('click', () => showSettingsView('export'));
-goToImportBtn.addEventListener('click', () => showSettingsView('import'));
-goToResetBtn.addEventListener('click', () => showSettingsView('reset'));
-
-settingsModalBackdrop.addEventListener('click', (e) => {
-  if (e.target === settingsModalBackdrop) closeSettingsModal();
-});
-
-// Configurazione Cloud Supabase
-saveCloudSettingsBtn.addEventListener('click', () => {
-  const url = supabaseUrlInput.value.trim();
-  const key = supabaseKeyInput.value.trim();
-
-  if (!url || !key) {
-    alert('Inserisci sia l\'URL che la Anon Key.');
-    return;
-  }
-
-  supabaseUrl = url;
-  supabaseKey = key;
-  localStorage.setItem('supabase_url', url);
-  localStorage.setItem('supabase_key', key);
-
-  initSupabase();
-  showToastNotice('Server Supabase collegato con successo!');
-  showSettingsView('main');
-});
-
-disconnectCloudBtn.addEventListener('click', () => {
-  localStorage.removeItem('supabase_url');
-  localStorage.removeItem('supabase_key');
-  supabaseUrl = '';
-  supabaseKey = '';
-  supabaseClient = null;
-  supabaseUrlInput.value = '';
-  supabaseKeyInput.value = '';
-  if (cloudStatusDot) cloudStatusDot.classList.remove('online');
-  showToastNotice('Server Supabase scollegato.');
-  showSettingsView('main');
-});
-
-// CRUD Categorie
-function renderManageCategoriesList() {
-  manageCatList.innerHTML = '';
-
-  appData.categories.forEach(cat => {
-    const li = document.createElement('li');
-    li.className = 'manage-cat-item';
-    const color = getCategoryColor(cat);
-
-    li.innerHTML = `
-      <div class="cat-item-left">
-        <span class="cat-color-dot" style="background-color: ${color};"></span>
-        <span class="cat-name-display">${escapeHtml(cat)}</span>
-      </div>
-      <div class="cat-actions">
-        <button class="icon-btn edit-cat-btn" title="Rinomina">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-          </svg>
-        </button>
-        ${cat !== 'Generale' ? `
-        <button class="icon-btn delete-cat-btn" title="Elimina">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-          </svg>
-        </button>` : ''}
-      </div>
-    `;
-
-    li.querySelector('.edit-cat-btn').addEventListener('click', () => {
-      const newName = prompt(`Rinomina la categoria "${cat}" in:`, cat);
-      if (newName && newName.trim() && newName.trim() !== cat) {
-        const cleanName = newName.trim();
-        const idx = appData.categories.indexOf(cat);
-        if (idx !== -1) appData.categories[idx] = cleanName;
-        appData.items.forEach(i => {
-          if (i.category === cat) {
-            i.category = cleanName;
-            syncItemToSupabase(i);
-          }
-        });
-        if (activeCategory === cat) activeCategory = cleanName;
-
-        saveData();
-        syncCategoriesToSupabase();
-        updateCategoryDropdown();
-        renderManageCategoriesList();
-        renderList();
-      }
-    });
-
-    const delBtn = li.querySelector('.delete-cat-btn');
-    if (delBtn) {
-      delBtn.addEventListener('click', () => {
-        if (confirm(`Eliminare la categoria "${cat}"? I volumi associati torneranno a "Generale".`)) {
-          appData.categories = appData.categories.filter(c => c !== cat);
-          appData.items.forEach(i => {
-            if (i.category === cat) {
-              i.category = 'Generale';
-              syncItemToSupabase(i);
-            }
-          });
-          if (activeCategory === cat) activeCategory = 'Generale';
-
-          saveData();
-          syncCategoriesToSupabase();
-          updateCategoryDropdown();
-          renderManageCategoriesList();
-          renderList();
-        }
-      });
-    }
-
-    manageCatList.appendChild(li);
   });
 }
 
-addCatManageBtn.addEventListener('click', () => {
-  const newName = newCatManageInput.value.trim();
-  if (!newName) return;
+function openMoltModal(name, counts, month) {
+  if (READONLY) return;
+  const key = name.toLowerCase(), v = Object.assign({ p: 10, a: 10, c: 10 }, molt[key]);
+  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'moltOv';
+  const calc = () => {
+    const gp = +document.getElementById('mp').value || 0, ga = +document.getElementById('ma').value || 0, gc = +document.getElementById('mc').value || 0;
+    return counts.p * gp + counts.a * ga + counts.c * gc;
+  };
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Moltiplicatori">
+    <h3>${esc(name)}</h3>
+    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="mp">Partite (${counts.p}) ×</label><input id="mp" type="number" min="0" value="${v.p}"></div>
+    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="ma">Aperture (${counts.a}) ×</label><input id="ma" type="number" min="0" value="${v.a}"></div>
+    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="mc">Chiusure (${counts.c}) ×</label><input id="mc" type="number" min="0" value="${v.c}"></div>
+    <div style="display:flex;justify-content:space-between;font-weight:600;margin:10px 0;padding-top:6px;border-top:1px solid var(--line)"><span>Totale</span><span id="mtot">${counts.p * v.p + counts.a * v.a + counts.c * v.c}</span></div>
+    <div class="mbtns"><button id="mCancel">Annulla</button><button class="primary" id="mSave">Salva</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { document.getElementById('mtot').textContent = calc(); }));
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.getElementById('mCancel').onclick = () => ov.remove();
+  document.getElementById('mSave').onclick = () => {
+    molt[key] = { p: +document.getElementById('mp').value || 0, a: +document.getElementById('ma').value || 0, c: +document.getElementById('mc').value || 0 };
+    saveMolt(); ov.remove(); updateRecap(month); toast('Salvati');
+  };
+  document.getElementById('mp').focus();
+}
 
-  if (appData.categories.includes(newName)) {
-    alert('Questa categoria esiste già.');
-    return;
-  }
+function exportSelectedMonthsJSON(selectedMonths) {
+  const days = {};
+  items.filter(i => selectedMonths.some(m => i.date.startsWith(m))).forEach(i => {
+    (days[i.date] ??= []).push({ partita: i.title || '', tavolo1: i.t1 || '', tavolo2: i.t2 || '', arbitro: i.arb || '', orario: i.time || '' });
+  });
+  const out = Object.keys(days).filter(d => days[d].length).sort().map(d => {
+    const x = dayMeta[d] || {};
+    return {
+      data: d,
+      apertura: { si: x.ap === 'si', nome: x.ap === 'si' ? (x.apNome || '') : null },
+      chiusura: { si: x.ch === 'si', nome: x.ch === 'si' ? (x.chNome || '') : null },
+      partite: days[d]
+    };
+  });
+  if (!out.length) { toast('Nessun dato per i mesi selezionati'); return; }
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  const fileName = selectedMonths.length === 1 ? `partite_${selectedMonths[0]}.json` : `partite_multi_${selectedMonths.length}mesi.json`;
+  a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-  appData.categories.push(newName);
-  newCatManageInput.value = '';
-  saveData();
-  syncCategoriesToSupabase();
-  updateCategoryDropdown();
-  renderManageCategoriesList();
-  renderList();
-});
+function openExportMultiModal() {
+  const months = monthsWithData();
+  if (!months.length) { toast('Nessun mese con partite registrate'); return; }
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'exportMultiOv';
 
-// Esporta JSON
-confirmExportBtn.addEventListener('click', () => {
-  const selectedSets = [];
-  if (exportAcquisti.checked) selectedSets.push('Acquisti');
-  if (exportPosseduti.checked) selectedSets.push('Posseduti');
-  if (exportVoti.checked) selectedSets.push('Voti');
+  const listHtml = months.map(m => `
+    <label class="checkbox-item">
+      <input type="checkbox" name="mExpChk" value="${m}" checked>
+      <span style="font-weight:600">${monthLabel(m)}</span>
+    </label>
+  `).join('');
 
-  if (selectedSets.length === 0) {
-    alert('Seleziona almeno un insieme da esportare.');
-    return;
-  }
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Esporta JSON Mesi">
+    <h3>Esporta Mesi in JSON</h3>
+    <p style="font-size:13px;color:var(--mute);margin:-6px 0 10px">Seleziona i mesi da includere nel file:</p>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button type="button" id="chkAllBtn" class="pill-btn-sm">Seleziona tutti</button>
+      <button type="button" id="chkNoneBtn" class="pill-btn-sm">Deseleziona tutti</button>
+    </div>
+    <div id="mChkWrap" style="display:grid;gap:6px;max-height:220px;overflow-y:auto;padding-right:4px">
+      ${listHtml}
+    </div>
+    <div class="mbtns" style="margin-top:14px">
+      <button id="expCancel">Annulla</button>
+      <button class="primary" id="expDownload">Scarica JSON</button>
+    </div>
+  </div>`;
 
-  const exportedItems = appData.items
-    .filter(item => selectedSets.includes(item.set))
-    .map(item => ({
-      id: item.id,
-      title: item.title,
-      targetSet: item.set,
-      category: item.category || 'Generale',
-      date: item.date || null,
-      number: item.number || null,
-      rating: item.rating !== undefined ? item.rating : null,
-      unplayed: Boolean(item.unplayed),
-      purchased: Boolean(item.purchased),
-      missingGapNotice: item.missingGapNotice || null,
-      readingChapter: item.readingChapter || '',
-      privateComment: item.privateComment || ''
-    }));
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.getElementById('expCancel').onclick = () => ov.remove();
 
-  const exportPayload = {
-    appVersion: '3.5',
-    exportedAt: new Date().toISOString(),
-    exportedBySet: selectedSets,
-    categoriesList: appData.categories,
-    itemsCount: exportedItems.length,
-    items: exportedItems
+  document.getElementById('chkAllBtn').onclick = () => {
+    ov.querySelectorAll('input[name=mExpChk]').forEach(c => c.checked = true);
+  };
+  document.getElementById('chkNoneBtn').onclick = () => {
+    ov.querySelectorAll('input[name=mExpChk]').forEach(c => c.checked = false);
   };
 
-  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
-  const downloadAnchor = document.createElement('a');
-  const now = new Date();
-  const dateFormatted = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  document.getElementById('expDownload').onclick = () => {
+    const selected = Array.from(ov.querySelectorAll('input[name=mExpChk]:checked')).map(c => c.value);
+    if (!selected.length) { toast('Seleziona almeno un mese'); return; }
+    exportSelectedMonthsJSON(selected);
+    ov.remove();
+    toast('File JSON scaricato');
+  };
+}
+
+function copyMonthRecapWhatsApp(m) {
+  const rows = computeRecapRows(m);
+  if (!rows.length) { toast('Nessun dato da riepilogare'); return; }
+  const lbl = monthLabel(m).toUpperCase();
+  let out = `📊 *RIEPILOGO TURNI — ${lbl}*\n\n`;
+  rows.forEach(r => {
+    const v = Object.assign({ p: 10, a: 10, c: 10 }, molt[r.n.toLowerCase()]);
+    const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
+    out += `• *${r.n}*: ${tot}€ (Partite: ${r.p}, Ap/Ch: ${r.a + r.c})\n`;
+  });
+  out += '\n_Generato dall\'app Partite_';
+  try {
+    navigator.clipboard.writeText(out);
+    toast('Riepilogo copiato per WhatsApp!');
+  } catch(e) { prompt('Copia il riepilogo:', out); }
+}
+
+function slotHTML(d, k) {
+  const label = k === 'ap' ? 'Apertura' : 'Chiusura', wk = dayMeta[d] || {}, v = wk[k] || '';
+  return `<div class="slot" data-d="${d}" data-k="${k}"><span class="sl">${label}:</span>
+    <div class="yn" role="group"><button data-yn="si" aria-pressed="${v === 'si'}">Sì</button><button data-yn="no" aria-pressed="${v === 'no'}">No</button></div>
+    ${v === 'si' ? `<input data-wn list="namesList" value="${esc(wk[k+'Nome'])}" placeholder="Nome">` : ''}</div>`;
+}
+
+function computeRecapRows(m) {
+  const rec = {}, add = (n, f) => { n = (n || '').trim(); if (!n) return; const k = n.toLowerCase(); (rec[k] ??= { n, p: 0, a: 0, c: 0 })[f]++; };
+  const dates = new Set();
+  items.filter(i => i.date.startsWith(m) && (!filterCat || i.cat === filterCat)).forEach(i => {
+    dates.add(i.date); const seen = new Set();
+    [i.t1, i.t2, i.arb].forEach(n => { n = (n || '').trim(); const k = n.toLowerCase(); if (!n || seen.has(k)) return; seen.add(k); add(n, 'p'); });
+  });
+  dates.forEach(dt => { const x = dayMeta[dt] || {}; if (x.ap === 'si') add(x.apNome, 'a'); if (x.ch === 'si') add(x.chNome, 'c'); });
+  return Object.values(rec).sort((a, b) => b.p - a.p || b.a - a.a || a.n.localeCompare(b.n));
+}
+
+function recapHTML(m) {
+  const rows = computeRecapRows(m);
+  return `<aside class="recap" data-m="${m}"><h4>Riepilogo del mese</h4>` + (rows.length
+    ? `<table><thead><tr><th>Nome</th><th>Part.</th><th>Ap/Ch</th><th>Totale</th></tr></thead><tbody>${rows.map(r => {
+        const v = Object.assign({ p: 10, a: 10, c: 10 }, molt[r.n.toLowerCase()]);
+        const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
+        return `<tr><td><button class="nb" data-name="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}">${esc(r.n)}</button></td><td>${pv}</td><td>${av}</td><td>${tot}</td></tr>`;
+      }).join('')}</tbody></table>`
+    : '<p>Nessun dato.</p>') + '</aside>';
+}
+
+function updateRecap(m) { const el = document.querySelector(`.recap[data-m="${m}"]`); if (el) el.outerHTML = recapHTML(m); }
+const openClose = d => `<div class="oc">${slotHTML(d, 'ap')}${slotHTML(d, 'ch')}</div>`;
+const uid = () => Math.random().toString(36).slice(2, 10);
+const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const monday = s => { const d = new Date(s + 'T12:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; };
+
+function closeMenus() {
+  document.querySelectorAll('.menuDrop').forEach(d => {
+    if (d.hidden) return;
+    d.hidden = true;
+    const btn = document.getElementById(d.id.replace('Drop', 'Btn'));
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+function initMenu(btnId, dropId) {
+  const btn = $('#' + btnId), drop = $('#' + dropId); if (!btn || !drop) return;
+  btn.onclick = e => {
+    e.stopPropagation();
+    const open = drop.hidden;
+    closeMenus();
+    drop.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  };
+  drop.addEventListener('click', e => { if (e.target.closest('button')) closeMenus(); });
+}
+
+let mem = null;
+function params() { return new URLSearchParams(mem !== null ? mem : location.hash.slice(1)); }
+function writeHash(p) {
+  const s = p.toString();
+  try { history.replaceState(null, '', location.pathname + (s ? '#' + s : '')); mem = null; }
+  catch(e) { mem = s; }
+}
+function setParam(k, v) { const p = params(); v ? p.set(k, v) : p.delete(k); writeHash(p); }
+
+function isU15OrAbove(cat) {
+  if (!cat) return false;
+  const c = cat.toUpperCase().replace(/\s+/g, '');
+  const m = c.match(/^U(\d+)/i);
+  if (m) return parseInt(m[1], 10) >= 15;
+  return /SERIE|DIVIS|PROMOZ|SENIOR|ECCELL/i.test(cat);
+}
+
+// Scheda Partita
+function card(i, hasConflict) {
+  const ghostOn = !READONLY && !!i.ghost;
+  const missingT1 = isMissingT1(i);
+  const t1Val = (i.t1 && i.t1.trim()) ? esc(i.t1) : '<span class="empty-req">Da assegnare</span>';
+  const t2Val = (i.t2 && i.t2.trim()) ? esc(i.t2) : '<span class="empty-opt">—</span>';
+  const arbVal = (i.arb && i.arb.trim()) ? esc(i.arb) : '<span class="empty-opt">—</span>';
+  const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
+  const conflictBadge = hasConflict ? `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>` : '';
+
+  return `<div class="match${ghostOn ? ' ghost' : ''}${missingT1 ? ' missing-t1' : ''}${hasConflict ? ' conflict-match' : ''}" data-id="${i.id}">
+    ${conflictBadge}
+    <div class="m-top">
+      <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita (senza nome)'}</div>
+      <div class="m-actions">
+        ${!READONLY ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Segna svolta">✓</button>` : ''}
+        ${!READONLY ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
+      </div>
+    </div>
+    <div class="m-meta">
+      <div class="m-time">${i.time ? 'Ore ' + i.time : 'Orario n.d.'}</div>
+      ${catHtml}
+      <div class="m-date">${i.date}</div>
+    </div>
+    <div class="m-roster">
+      <div class="m-row"><span class="lbl">Tavolo 1</span><span class="val">${t1Val}</span></div>
+      <div class="m-row"><span class="lbl">Tavolo 2</span><span class="val">${t2Val}</span></div>
+      <div class="m-row"><span class="lbl">Arbitro</span><span class="val">${arbVal}</span></div>
+    </div>
+  </div>`;
+}
+
+// Modale Modifica Partita
+function openEditModal(matchId) {
+  if (READONLY) return;
+  const it = items.find(x => x.id === matchId);
+  if (!it) return;
+
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'editModalOv';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Modifica Partita">
+    <h3>Modifica Partita</h3>
+    <div class="frow"><label for="edDate">Data *</label><input id="edDate" type="date" value="${it.date}"></div>
+    
+    <div class="frow">
+      <label>Orario di Gioco</label>
+      ${buildCustomTimePicker(it.time || '15:30')}
+    </div>
+
+    <div class="frow"><label for="edTitle">Partita (Squadre)</label><input id="edTitle" type="text" value="${esc(it.title)}"></div>
+    <div class="frow"><label for="edCat">Categoria</label><input id="edCat" type="text" list="categoriesList" value="${esc(it.cat)}"></div>
+    
+    <div style="border-top:1px solid var(--line);margin:12px 0 10px;padding-top:8px">
+      <div class="frow"><label for="edT1">Tavolo 1 *</label><input id="edT1" type="text" list="namesList" value="${esc(it.t1)}" placeholder="Nome obbligatorio"></div>
+      <div class="frow"><label for="edT2">Tavolo 2</label><input id="edT2" type="text" list="namesList" value="${esc(it.t2)}" placeholder="Nome"></div>
+      <div class="frow"><label for="edArb">Arbitro</label><input id="edArb" type="text" list="namesList" value="${esc(it.arb)}" placeholder="Nome"></div>
+    </div>
+
+    <div class="mbtns">
+      <button id="edDelete" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b;font-weight:600">Elimina Gara</button>
+      <div style="display:flex;gap:6px">
+        <button id="edCancel">Annulla</button>
+        <button class="primary" id="edSave">Salva</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  bindTimePickerEvents(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.getElementById('edCancel').onclick = () => ov.remove();
+
+  const delBtn = document.getElementById('edDelete');
+  delBtn.onclick = () => {
+    if (delBtn.dataset.arm) {
+      pushUndo();
+      items = items.filter(x => x.id !== matchId);
+      save(); ov.remove(); render();
+      toast('Partita eliminata');
+    } else {
+      delBtn.dataset.arm = '1';
+      delBtn.textContent = 'Confermi eliminazione?';
+      delBtn.style.background = '#dc2626';
+      delBtn.style.color = '#fff';
+      setTimeout(() => {
+        if (delBtn.isConnected) {
+          delete delBtn.dataset.arm;
+          delBtn.textContent = 'Elimina Gara';
+          delBtn.style.background = '#fee2e2';
+          delBtn.style.color = '#991b1b';
+        }
+      }, 3500);
+    }
+  };
+
+  document.getElementById('edSave').onclick = () => {
+    const newDate = document.getElementById('edDate').value;
+    if (!newDate) { toast('La data è obbligatoria'); return; }
+    pushUndo();
+    it.date = newDate;
+    it.time = document.getElementById('finalTimeVal').value;
+    it.title = document.getElementById('edTitle').value.trim();
+    it.cat = document.getElementById('edCat').value.trim();
+    it.t1 = document.getElementById('edT1').value.trim();
+    it.t2 = document.getElementById('edT2').value.trim();
+    it.arb = document.getElementById('edArb').value.trim();
+
+    save(); ov.remove();
+    setParam('m', it.date.slice(0, 7));
+    setParam('s', iso(monday(it.date)));
+    render(it.id);
+    toast('Modifiche salvate');
+  };
+}
+
+function generateWhatsAppText(startDate, endDate, customTitle) {
+  const startStr = iso(startDate), endStr = iso(endDate);
+  const filtered = items.filter(i => i.date >= startStr && i.date <= endStr);
+  if (!filtered.length) { toast('Nessuna partita programmata in questo periodo'); return; }
+
+  const fmtDayHeader = dStr => new Date(dStr + 'T12:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
+  const fmtShort = d => d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+
+  let out = `📅 *${customTitle || `TURNI PARTITE: ${fmtShort(startDate)} – ${fmtShort(endDate)}`}*\n\n`;
+  const daysMap = {};
+  filtered.forEach(i => (daysMap[i.date] ??= []).push(i));
+
+  Object.keys(daysMap).sort().forEach(dayStr => {
+    const arr = daysMap[dayStr];
+    arr.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+    out += `🏀 *${fmtDayHeader(dayStr)}*\n`;
+    arr.forEach(it => {
+      const timeStr = it.time ? `Ore ${it.time} - ` : '';
+      const catStr = it.cat ? `[${it.cat}] ` : '';
+      const title = it.title || 'Partita';
+      const t1 = it.t1 && it.t1.trim() ? it.t1.trim() : '...';
+      const t2 = it.t2 && it.t2.trim() ? it.t2.trim() : '...';
+
+      out += `• ${timeStr}${catStr}${title}\n`;
+      out += `  - Tavolo 1: ${t1}\n`;
+      out += `  - Tavolo 2: ${t2}\n`;
+      if (!isU15OrAbove(it.cat)) {
+        const arb = it.arb && it.arb.trim() ? it.arb.trim() : '...';
+        out += `  - Arbitro: ${arb}\n`;
+      }
+      out += '\n';
+    });
+  });
+
+  out = out.trim();
+  try {
+    navigator.clipboard.writeText(out);
+    toast('Turni copiati per WhatsApp!');
+  } catch(e) { prompt('Copia il testo:', out); }
+}
+
+function copyWhatsAppRollingToday() {
+  const start = new Date();
+  start.setHours(12, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  generateWhatsAppText(start, end);
+}
+
+function copyWhatsAppFromWeek(wIso) {
+  const mon = monday(wIso);
+  const start = new Date(mon);
+  start.setDate(start.getDate() + 2);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  generateWhatsAppText(start, end);
+}
+
+let ready = false;
+function render(focusId) {
+  ready = false;
+  const listEl = $('#list');
+  if (!listEl) return;
+  const idxOf = new Map(items.map((it, i) => [it.id, i]));
+  const p = params(), wantM = p.get('m'), wantW = p.get('s');
   
-  downloadAnchor.setAttribute('href', dataStr);
-  downloadAnchor.setAttribute('download', `collezione_${selectedSets.join('_').toLowerCase()}_${dateFormatted}.json`);
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
+  const filtered = items.filter(i =>
+    (!filterCat || i.cat === filterCat) &&
+    (!filterIncomplete || isMissingT1(i))
+  );
+  const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date));
+  const months = {};
+  sorted.forEach(i => { const m = i.date.slice(0, 7); const w = iso(monday(i.date)); ((months[m] ??= {})[w] ??= []).push(i); });
+  const keys = Object.keys(months).sort();
+  if (!keys.length) {
+    listEl.innerHTML = '<div class="empty">Nessuna partita presente.' + (!READONLY ? ' Tocca “+ Partita” per iniziare.' : '') + '</div>';
+    updateIncompleteBadge();
+    updateConflictBadge();
+    return;
+  }
+  const nowM = iso(new Date()).slice(0, 7);
+  const open = wantM && months[wantM] ? wantM : (months[nowM] ? nowM : keys[keys.length - 1]);
+  const fmt = (d, o) => d.toLocaleDateString('it-IT', o);
 
-  closeSettingsModal();
+  const conflictsMap = findConflictingMatches();
+
+  listEl.innerHTML = keys.map(m => {
+    const label = fmt(new Date(m + '-15T12:00'), { month: 'long', year: 'numeric' });
+    const count = Object.values(months[m]).reduce((n, a) => n + a.length, 0);
+    const wkHtml = Object.keys(months[m]).sort().map(w => {
+      const a = monday(w), b = new Date(a); b.setDate(b.getDate() + 6);
+      const list = months[m][w], isOpen = wantW ? wantW === w : iso(monday(iso(new Date()))) === w;
+      const days = {}; list.forEach(i => (days[i.date] ??= []).push(i));
+      Object.values(days).forEach(arr => arr.sort((a, b) => {
+        if (!a.time && !b.time) return (b.ts ?? idxOf.get(b.id)) - (a.ts ?? idxOf.get(a.id));
+        if (!a.time) return -1;
+        if (!b.time) return 1;
+        return a.time.localeCompare(b.time);
+      }));
+      const dayHtml = Object.keys(days).sort().map(dt => `<div class="day"><h4>${fmt(new Date(dt + 'T12:00'), { weekday: 'short', day: 'numeric', month: 'short' })}</h4>${openClose(dt)}<div class="matches">${days[dt].map(it => card(it, conflictsMap.has(it.id))).join('')}</div></div>`).join('');
+      return `<details class="week${wantW === w ? ' hl' : ''}" id="w-${w}" data-m="${m}" data-w="${w}"${isOpen ? ' open' : ''}><summary><span class="t">Settimana ${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short' })}</span><span class="n">${list.length} ${list.length === 1 ? 'gara' : 'gare'}<button class="waBtn" data-wamsg="${w}" type="button" title="Copia turni (da mercoledì al mercoledì dopo)">📲 WA</button></span></summary>${dayHtml}</details>`;
+    }).join('');
+    return `<details class="month" data-m="${m}"${m === open ? ' open' : ''}><summary><span class="t">${label}<button class="waBtn" data-warecap="${m}" type="button" title="Copia riepilogo del mese per WhatsApp">📲 WA Riepilogo</button></span><span class="n">${count} gare</span></summary><div class="mbody">${recapHTML(m)}<div class="mweeks">${wkHtml}</div></div></details>`;
+  }).join('');
+  setTimeout(() => { ready = true; }, 150);
+  updateIncompleteBadge();
+  updateConflictBadge();
+  if (wantW) { const el = document.getElementById('w-' + wantW); if (el) el.scrollIntoView({ block: 'start' }); }
+  if (focusId) {
+    const el = document.querySelector(`[data-id="${focusId}"]`);
+    if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  }
+}
+
+// Input slot per apertura/chiusura
+document.addEventListener('input', e => {
+  if (READONLY) return;
+  if (e.target.matches('[data-wn]')) {
+    const sl = e.target.closest('.slot'); (dayMeta[sl.dataset.d] ??= {})[sl.dataset.k + 'Nome'] = e.target.value; saveD(); updateRecap(sl.dataset.d.slice(0, 7)); return;
+  }
 });
 
-// Importa JSON
-triggerImportBtn.addEventListener('click', () => {
-  importJsonFileInput.click();
+document.addEventListener('click', e => {
+  const gh = e.target.closest('[data-ghost]');
+  if (gh && !READONLY) {
+    e.stopPropagation();
+    const id = gh.closest('.match').dataset.id;
+    const it = items.find(x => x.id === id); if (!it) return;
+    pushUndo(); it.ghost = !it.ghost; save(); render();
+    return;
+  }
+
+  const editBtn = e.target.closest('[data-edit]');
+  if (editBtn && !READONLY) {
+    e.stopPropagation();
+    const id = editBtn.closest('.match')?.dataset?.id;
+    if (id) openEditModal(id);
+    return;
+  }
+  const matchCard = e.target.closest('.match');
+  if (matchCard && !READONLY && !e.target.closest('button')) {
+    openEditModal(matchCard.dataset.id);
+    return;
+  }
+
+  const warecap = e.target.closest('[data-warecap]');
+  if (warecap) {
+    e.preventDefault(); e.stopPropagation();
+    copyMonthRecapWhatsApp(warecap.dataset.warecap);
+    return;
+  }
+
+  const wa = e.target.closest('[data-wamsg]');
+  if (wa) {
+    e.preventDefault(); e.stopPropagation();
+    copyWhatsAppFromWeek(wa.dataset.wamsg);
+    return;
+  }
+
+  const yn = e.target.closest('[data-yn]');
+  if (yn && !READONLY) {
+    const sl = yn.closest('.slot'), d = sl.dataset.d, k = sl.dataset.k, wk = (dayMeta[d] ??= {});
+    pushUndo(); wk[k] = yn.dataset.yn; if (wk[k] === 'no') delete wk[k + 'Nome']; saveD(); updateRecap(d.slice(0, 7));
+    sl.outerHTML = slotHTML(d, k);
+    if (wk[k] === 'si') { const n = document.querySelector(`.slot[data-d="${d}"][data-k="${k}"] input`); if (n) n.focus(); }
+    return;
+  }
+
+  const nb = e.target.closest('[data-name]');
+  if (nb && !READONLY) { openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m); return; }
 });
 
-importJsonFileInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+document.addEventListener('toggle', e => {
+  if (!ready || !e.target.open) return;
+  if (e.target.matches('details.month')) { setParam('m', e.target.dataset.m); setParam('s', ''); }
+  else if (e.target.matches('details.week')) { setParam('m', e.target.dataset.m); setParam('s', e.target.dataset.w); }
+}, true);
 
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    try {
-      const importedData = JSON.parse(event.target.result);
+function openAddModal() {
+  if (READONLY) return;
+  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'addOv';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Nuova partita">
+    <h3>Nuova partita</h3>
+    <div class="frow"><label for="nDate">Data *</label><input id="nDate" type="date" value="${iso(new Date())}"></div>
+    
+    <div class="frow">
+      <label>Orario di Gioco</label>
+      ${buildCustomTimePicker('15:30')}
+    </div>
 
-      if (!importedData || !Array.isArray(importedData.items)) {
-        alert('Formato file non valido: proprietà "items" mancante.');
-        return;
+    <div class="frow"><label for="nTitle">Partita</label><input id="nTitle" type="text" placeholder="Es. Squadra A – Squadra B"></div>
+    <div class="frow"><label for="nCat">Categoria</label><input id="nCat" type="text" list="categoriesList" placeholder="Es. U17"></div>
+    <div class="frow"><label for="nT1">Tavolo 1</label><input id="nT1" type="text" list="namesList" placeholder="Nome"></div>
+    <div class="frow"><label for="nT2">Tavolo 2</label><input id="nT2" type="text" list="namesList" placeholder="Nome"></div>
+    <div class="frow"><label for="nArb">Arbitro</label><input id="nArb" type="text" list="namesList" placeholder="Nome"></div>
+    <p class="err" id="nErr">Inserisci almeno la data.</p>
+    <div class="mbtns"><button id="nCancel">Annulla</button><button class="primary" id="nSave">Aggiungi</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  bindTimePickerEvents(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.getElementById('nCancel').onclick = () => ov.remove();
+  document.getElementById('nSave').onclick = () => {
+    const date = document.getElementById('nDate').value;
+    if (!date) { document.getElementById('nErr').classList.add('on'); document.getElementById('nDate').focus(); return; }
+    const time = document.getElementById('finalTimeVal').value;
+    const it = { id: uid(), title: document.getElementById('nTitle').value, date, time, cat: document.getElementById('nCat').value,
+      t1: document.getElementById('nT1').value, t2: document.getElementById('nT2').value, arb: document.getElementById('nArb').value, ts: Date.now() };
+    pushUndo(); items.push(it); save(); ov.remove();
+    setParam('m', it.date.slice(0, 7)); setParam('s', iso(monday(it.date))); render(it.id);
+  };
+  document.getElementById('nDate').focus();
+}
+
+// Resoconto Stagionale
+function openResocontoModal() {
+  const months = monthsWithData();
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'resocontoOv';
+
+  const grandTotal = {};
+  let totalSpentGeneral = 0;
+
+  months.forEach(m => {
+    const rows = computeRecapRows(m);
+    rows.forEach(r => {
+      const k = r.n.toLowerCase();
+      const v = Object.assign({ p: 10, a: 10, c: 10 }, molt[k]);
+      const tot = (r.p * v.p) + ((r.a + r.c) * v.a);
+      if (!grandTotal[k]) grandTotal[k] = { n: r.n, p: 0, ac: 0, tot: 0 };
+      grandTotal[k].p += r.p;
+      grandTotal[k].ac += (r.a + r.c);
+      grandTotal[k].tot += tot;
+      totalSpentGeneral += tot;
+    });
+  });
+
+  const grandRows = Object.values(grandTotal).sort((a, b) => b.tot - a.tot || a.n.localeCompare(b.n));
+
+  const grandTableHtml = grandRows.length
+    ? `<table>
+        <thead><tr><th>Nome</th><th>Partite</th><th>Ap/Ch</th><th>Totale Spettante</th></tr></thead>
+        <tbody>
+          ${grandRows.map(r => `<tr><td><strong>${esc(r.n)}</strong></td><td>${r.p}</td><td>${r.ac}</td><td><strong>${r.tot}€</strong></td></tr>`).join('')}
+          <tr style="border-top:2px solid var(--ink);font-weight:700"><td>TOTALE GENERALE</td><td colspan="2"></td><td>${totalSpentGeneral}€</td></tr>
+        </tbody>
+      </table>`
+    : '<p>Nessun dato registrato nella stagione.</p>';
+
+  const monthsBlocksHtml = months.map(m => {
+    const rows = computeRecapRows(m);
+    let monthSum = 0;
+    const table = rows.length
+      ? `<table>
+          <thead><tr><th>Nome</th><th>Part.</th><th>Ap/Ch</th><th>Totale</th></tr></thead>
+          <tbody>
+            ${rows.map(r => {
+              const v = Object.assign({ p: 10, a: 10, c: 10 }, molt[r.n.toLowerCase()]);
+              const tot = (r.p * v.p) + ((r.a + r.c) * v.a);
+              monthSum += tot;
+              return `<tr><td>${esc(r.n)}</td><td>${r.p}</td><td>${r.a + r.c}</td><td>${tot}€</td></tr>`;
+            }).join('')}
+            <tr style="border-top:1px solid var(--line);font-weight:700"><td>Totale Mese</td><td colspan="2"></td><td>${monthSum}€</td></tr>
+          </tbody>
+        </table>`
+      : '<p style="color:var(--mute);font-size:12px">Nessuna partita.</p>';
+
+    return `<details class="res-month-block">
+      <summary style="display:flex;justify-content:space-between;align-items:center">
+        <span>${monthLabel(m)}</span>
+        <button class="waBtn" data-warecap="${m}" type="button">📲 WA</button>
+      </summary>
+      <div style="margin-top:6px">${table}</div>
+    </details>`;
+  }).join('');
+
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Resoconto Generale" style="max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">Resoconto Compensi</h3>
+      <button id="resCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
+    </div>
+    
+    <div class="grand-total-box">
+      <h4>Totale Generale Compensi</h4>
+      ${grandTableHtml}
+    </div>
+
+    <h4 style="margin:14px 0 8px;font:700 16px var(--font-title);color:var(--mute);text-transform:uppercase">Dettaglio Singoli Mesi</h4>
+    <div class="resoconto-months">
+      ${monthsBlocksHtml}
+    </div>
+
+    <div class="mbtns" style="margin-top:16px"><button class="primary" id="resClose">Chiudi</button></div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.getElementById('resClose').onclick = () => ov.remove();
+  document.getElementById('resCloseTop').onclick = () => ov.remove();
+}
+
+function fromExportFormat(arr) {
+  const newItems = [], wi = {};
+  arr.forEach(day => {
+    const d = day && day.data; if (!d) return;
+    wi[d] = {
+      ap: (day.apertura && day.apertura.si) ? 'si' : 'no',
+      apNome: (day.apertura && day.apertura.si) ? (day.apertura.nome || '') : '',
+      ch: (day.chiusura && day.chiusura.si) ? 'si' : 'no',
+      chNome: (day.chiusura && day.chiusura.si) ? (day.chiusura.nome || '') : ''
+    };
+    (day.partite || []).forEach(p => {
+      newItems.push({ id: uid(), date: d, title: p.partita || '', t1: p.tavolo1 || '', t2: p.tavolo2 || '', arb: p.arbitro || '', time: p.orario || '' });
+    });
+  });
+  return { newItems, wi };
+}
+function monthsWithData() {
+  const s = new Set();
+  items.forEach(i => s.add(i.date.slice(0, 7)));
+  Object.keys(dayMeta).forEach(d => s.add(d.slice(0, 7)));
+  return [...s].sort();
+}
+function monthLabel(m) { return new Date(m + '-15T12:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); }
+
+// Parser PDF
+async function pdfToLines(file) {
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  const lines = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    const rows = {};
+    tc.items.forEach(it => {
+      const y = Math.round(it.transform[5] / 3) * 3;
+      (rows[y] = rows[y] || []).push(it);
+    });
+    Object.keys(rows).map(Number).sort((a, b) => b - a).forEach(y => {
+      const txt = rows[y].sort((a, b) => a.transform[4] - b.transform[4]).map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+      if (txt) lines.push(txt);
+    });
+  }
+  return lines;
+}
+
+function normName(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function extractHomeMatches(lines, teamName) {
+  const needle = normName(teamName);
+  const out = [];
+  
+  let detectedCat = '';
+  for (let l of lines.slice(0, 15)) {
+    const m = l.match(/Under\s*(\d{1,2})|U\s*(\d{1,2})|Serie\s*([A-D])|Divisione/i);
+    if (m) {
+      if (m[1] || m[2]) detectedCat = 'U' + (m[1] || m[2]);
+      else if (m[3]) detectedCat = 'Serie ' + m[3].toUpperCase();
+      break;
+    }
+  }
+
+  const dtRegex = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[\s\-–—T]+(\d{1,2}:\d{2}))?\b/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineNorm = normName(lines[i]);
+    
+    if (needle && lineNorm.includes(needle)) {
+      const homeTeam = lines[i].replace(/^\d+\s*/, '').trim();
+      let awayTeam = '';
+      let matchDate = null;
+      let matchTime = '';
+
+      for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
+        const nextLine = lines[j].trim();
+        
+        const dtMatch = nextLine.match(dtRegex);
+        if (dtMatch && !matchDate) {
+          let [, d, mo, y, t] = dtMatch;
+          if (y.length === 2) y = '20' + y;
+          matchDate = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          if (t) matchTime = t;
+        }
+
+        if (!awayTeam && nextLine && !dtMatch && !nextLine.match(/^(Palestra|PALASPORT|PALABURSI|PALAZZETTO|Via|pag\.|00\d{4}|\d+ Giornata)/i)) {
+          if (!nextLine.match(/^\d+[\s\-]+\d+$/) && !nextLine.includes('(')) {
+            awayTeam = nextLine.replace(/^\d+\s*/, '').trim();
+          }
+        }
       }
 
-      let importedCount = 0;
+      if (!matchDate) {
+        const dtMatch = lines[i].match(dtRegex);
+        if (dtMatch) {
+          let [, d, mo, y, t] = dtMatch;
+          if (y.length === 2) y = '20' + y;
+          matchDate = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          if (t) matchTime = t;
+        }
+      }
 
-      if (Array.isArray(importedData.categoriesList)) {
-        importedData.categoriesList.forEach(cat => {
-          if (!appData.categories.includes(cat)) {
-            appData.categories.push(cat);
-          }
+      if (matchDate) {
+        out.push({
+          date: matchDate,
+          time: matchTime,
+          title: (homeTeam + ' - ' + (awayTeam || 'Avversario')).replace(/\s+/g, ' '),
+          cat: detectedCat
         });
-        syncCategoriesToSupabase();
       }
+    }
+  }
 
-      importedData.items.forEach(incoming => {
-        if (!incoming.title) return;
+  const unique = [];
+  const seen = new Set();
+  for (let it of out) {
+    const k = it.date + '_' + it.time + '_' + it.title;
+    if (!seen.has(k)) {
+      seen.add(k);
+      unique.push(it);
+    }
+  }
+  return unique;
+}
 
-        const target = incoming.targetSet || incoming.set || 'Acquisti';
-        const category = incoming.category || 'Generale';
+let pdfCandidates = [];
+function renderPdfPreview() {
+  const wrap = document.getElementById('pdfPreviewWrap'); if (!wrap) return;
+  if (!pdfCandidates.length) { 
+    wrap.innerHTML = '<p style="color:var(--warn);font-size:13px;padding:6px 0">Nessuna gara in casa trovata per la squadra indicata.</p>'; 
+    return; 
+  }
+  wrap.innerHTML = `<p style="color:var(--mute);font-size:12px;margin:4px 0 8px">Trovate ${pdfCandidates.length} gare in casa:</p>` +
+    pdfCandidates.map((c, i) => `<div style="border-bottom:1px solid var(--line);padding:8px 0;display:flex;flex-direction:column;gap:6px">
+    <input data-pf="title" data-pi="${i}" value="${esc(c.title)}" style="font-weight:700">
+    <div style="display:flex;gap:6px">
+      <input data-pf="date" data-pi="${i}" type="date" value="${c.date || ''}" style="flex:1">
+      <input data-pf="time" data-pi="${i}" type="time" value="${c.time || ''}" style="width:95px" title="Orario">
+      <input data-pf="cat" data-pi="${i}" list="categoriesList" value="${esc(c.cat)}" placeholder="Cat." style="width:75px">
+      <button data-pf="rm" data-pi="${i}" style="min-height:34px;padding:0 10px" title="Rimuovi">✕</button>
+    </div>
+  </div>`).join('');
+}
 
-        if (!appData.categories.includes(category)) {
-          appData.categories.push(category);
-        }
+// Logica Annulla
+let undoStack = [];
+function pushUndo() {
+  undoStack.push(JSON.stringify({ items, dayMeta }));
+  if (undoStack.length > 20) undoStack.shift();
+  refreshUndoBtn();
+}
+function refreshUndoBtn() { const b = $('#undoBtn'); if (b) b.disabled = !undoStack.length; }
+function performUndo() {
+  if (READONLY || !undoStack.length) return;
+  const prev = JSON.parse(undoStack.pop());
+  items = prev.items; dayMeta = prev.dayMeta;
+  save(); saveD();
+  refreshUndoBtn(); render();
+  toast('Modifica annullata');
+}
 
-        const exists = appData.items.some(existing => 
-          existing.title.toLowerCase() === incoming.title.toLowerCase() &&
-          existing.set === target &&
-          existing.number === (incoming.number || null)
-        );
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    if (e.shiftKey) return;
+    e.preventDefault();
+    performUndo();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    if (!READONLY) {
+      cloudPushNow().then(() => toast('Modifiche salvate sul cloud'));
+    }
+  }
+});
 
-        if (!exists) {
-          let incomingRating = incoming.rating;
-          if (incomingRating !== null && incomingRating !== undefined && incomingRating <= 5) {
-            incomingRating = incomingRating * 20;
-          }
+function generateMonthPDF(m) {
+  if (!(window.jspdf && window.jspdf.jsPDF)) { toast('Libreria non caricata'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
+  const ml = 40, mr = 40, mt = 48, mb = 40; let y = mt;
+  const nl = (h = 14) => { y += h; if (y > ph - mb) { doc.addPage(); y = mt; } };
 
-          const newItem = {
-            id: incoming.id || Date.now() + Math.floor(Math.random() * 1000),
-            title: incoming.title,
-            set: target,
-            category: category,
-            date: incoming.date || null,
-            number: incoming.number || null,
-            rating: incomingRating !== undefined ? incomingRating : null,
-            unplayed: Boolean(incoming.unplayed),
-            purchased: Boolean(incoming.purchased),
-            missingGapNotice: incoming.missingGapNotice || null,
-            readingChapter: incoming.readingChapter || '',
-            privateComment: incoming.privateComment || ''
-          };
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.text('Partite — ' + monthLabel(m), ml, y);
+  nl(24); doc.setDrawColor(200); doc.line(ml, y, pw - mr, y); nl(16);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('Riepilogo del mese', ml, y); nl(16);
 
-          appData.items.unshift(newItem);
-          syncItemToSupabase(newItem);
-          importedCount++;
-        }
-      });
+  const rows = computeRecapRows(m);
+  doc.setFontSize(10);
+  if (!rows.length) { doc.setFont('helvetica', 'normal'); doc.text('Nessun dato.', ml, y); nl(16); }
+  else {
+    const cols = [{ w: 170, h: 'Nome' }, { w: 90, h: 'Partite' }, { w: 110, h: 'Apert./Chius.' }, { w: 80, h: 'Totale' }];
+    doc.setFont('helvetica', 'bold'); let x = ml; cols.forEach(c => { doc.text(c.h, x, y); x += c.w; }); nl(14);
+    doc.setDrawColor(220); doc.line(ml, y - 10, pw - mr, y - 10);
+    doc.setFont('helvetica', 'normal');
+    rows.forEach(r => {
+      const v = Object.assign({ p: 10, a: 10, c: 10 }, molt[r.n.toLowerCase()]);
+      const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
+      let x = ml;
+      [r.n, String(pv), String(av), String(tot)].forEach((t, i) => { doc.text(t, x, y); x += cols[i].w; });
+      nl(15);
+    });
+  }
+  nl(10);
+  const days = {};
+  items.filter(i => i.date.startsWith(m)).forEach(i => (days[i.date] ??= []).push(i));
+  Object.keys(dayMeta).filter(d => d.startsWith(m)).forEach(d => { if (!days[d]) days[d] = []; });
+  const dateKeys = Object.keys(days).sort();
+  dateKeys.forEach(dt => {
+    const list = days[dt]; if (!list.length) return;
+    const x = dayMeta[dt] || {};
+    doc.setDrawColor(210); doc.line(ml, y, pw - mr, y); nl(16);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text(new Date(dt + 'T12:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }), ml, y);
+    nl(14);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    const ap = x.ap === 'si' ? ('Apertura: sì (' + (x.apNome || '—') + ')') : 'Apertura: no';
+    const ch = x.ch === 'si' ? ('Chiusura: sì (' + (x.chNome || '—') + ')') : 'Chiusura: no';
+    doc.text(ap + '    ' + ch, ml, y); nl(16);
+    list.forEach(it => {
+      doc.setFont('helvetica', 'bold'); doc.text(`• ${it.time ? it.time + ' - ' : ''}${it.title || '(senza titolo)'}`, ml + 6, y); nl(13);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Tavolo 1: ${it.t1 || '—'}    Tavolo 2: ${it.t2 || '—'}    Arbitro: ${it.arb || '—'}`, ml + 16, y);
+      nl(16);
+    });
+    nl(4);
+  });
+  doc.save('partite_' + m + '.pdf');
+  toast('PDF scaricato');
+}
 
-      saveData();
-      updateCategoryDropdown();
-      renderList();
-      closeSettingsModal();
-      importJsonFileInput.value = '';
+// --- GESTIONE LOGIN / PASSWORD ADMIN ---
+function setAuthMode(isAdmin) {
+  READONLY = !isAdmin;
+  document.body.classList.toggle('ro', READONLY);
+  const authBtn = $('#authBtn');
+  if (authBtn) {
+    authBtn.textContent = isAdmin ? '🔓 Esci' : '🔒 Accedi';
+    authBtn.title = isAdmin ? 'Termina sessione amministratore' : 'Accedi con Password per modificare';
+  }
+  const roEl = document.getElementById('roBanner');
+  if (roEl) roEl.style.display = READONLY ? 'block' : 'none';
+  render();
+}
 
-      alert(`Importazione completata con successo! Aggiunti ${importedCount} nuovi elementi.`);
-    } catch (err) {
-      alert('Errore durante la lettura del file JSON: file corrotto o non leggibile.');
+async function verifyPin(entered) {
+  const enteredHash = await sha256hex(entered);
+  const targetHash = pinHash || await sha256hex(DEFAULT_PIN);
+  return enteredHash === targetHash;
+}
+
+function promptLogin() {
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'loginOv';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Accesso Amministratore">
+    <h3>Accesso Gestione</h3>
+    <p style="font-size:13px;color:var(--mute);margin:-6px 0 10px">Inserisci la password per abilitare modifiche e turni.</p>
+    <div class="frow">
+      <label for="loginPin">Password Admin</label>
+      <input id="loginPin" type="password" placeholder="Inserisci Password" autofocus>
+    </div>
+    <p class="err" id="loginErr">Password errata. Riprova.</p>
+    <div class="mbtns">
+      <button id="loginCancel">Annulla</button>
+      <button class="primary" id="loginGo">Sblocca</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+
+  const go = async () => {
+    const val = document.getElementById('loginPin').value;
+    if (await verifyPin(val)) {
+      sessionStorage.setItem('partite_admin_auth', '1');
+      setAuthMode(true);
+      ov.remove();
+      toast('Accesso consentito: modalità modifica attiva');
+    } else {
+      document.getElementById('loginErr').classList.add('on');
+      document.getElementById('loginPin').value = '';
+      document.getElementById('loginPin').focus();
     }
   };
 
-  reader.readAsText(file);
-});
-
-// Ripristino di fabbrica
-cancelResetBtn.addEventListener('click', () => {
-  showSettingsView('main');
-});
-
-confirmFactoryResetBtn.addEventListener('click', async () => {
-  localStorage.clear();
-  appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
-  saveData();
-
-  if (supabaseClient) {
-    try {
-      await supabaseClient.from('items').delete().neq('id', 0);
-      await supabaseClient.from('categories').delete().neq('id', '');
-    } catch (e) {}
-  }
-
-  activeSet = 'Acquisti';
-  activeCategory = 'Generale';
-  activeTimeFilter = 'all';
-  currentSortMode = 'date';
-  searchSeriesQuery = '';
-
-  closeSettingsModal();
-  initApp();
-  alert('Dati ripristinati allo stato iniziale.');
-});
-
-function initApp() {
-  document.querySelectorAll('.segment-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.set === activeSet);
-  });
-
-  updateFilterBarChips();
-  sortIndicatorText.textContent = SORT_LABELS[currentSortMode] || 'Per Data';
-
-  if (isPurchasedSectionOpen) {
-    purchasedList.classList.add('open');
-    chevronIcon.classList.add('open');
-  }
-
-  updateCategoryDropdown();
-  renderList();
-
-  initSupabase();
-  checkAndTriggerTodayNotifications();
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.getElementById('loginCancel').onclick = () => ov.remove();
+  document.getElementById('loginGo').onclick = go;
+  document.getElementById('loginPin').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  document.getElementById('loginPin').focus();
 }
 
-initApp();
+function promptChangePin() {
+  if (READONLY) return;
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'changePinOv';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Cambia Password">
+    <h3>Cambia Password Admin</h3>
+    <div class="frow"><label for="oldPin">Password Attuale</label><input id="oldPin" type="password" autofocus></div>
+    <div class="frow"><label for="newPin">Nuova Password</label><input id="newPin" type="password"></div>
+    <p class="err" id="chPinErr">La password attuale non è corretta.</p>
+    <div class="mbtns">
+      <button id="chPinCancel">Annulla</button>
+      <button class="primary" id="chPinSave">Salva nuova Password</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.getElementById('chPinCancel').onclick = () => ov.remove();
+
+  document.getElementById('chPinSave').onclick = async () => {
+    const oldP = document.getElementById('oldPin').value;
+    const newP = document.getElementById('newPin').value;
+    if (!newP) { toast('Inserisci una nuova password'); return; }
+
+    if (!(await verifyPin(oldP))) {
+      document.getElementById('chPinErr').classList.add('on');
+      return;
+    }
+
+    pinHash = await sha256hex(newP);
+    await cloudPushNow();
+    ov.remove();
+    toast('Nuova password salvata sul cloud');
+  };
+}
+
+// BIND DEGLI EVENTI
+function bindEvents() {
+  const authBtn = $('#authBtn');
+  if (authBtn) {
+    authBtn.onclick = () => {
+      if (READONLY) {
+        promptLogin();
+      } else {
+        sessionStorage.removeItem('partite_admin_auth');
+        setAuthMode(false);
+        toast('Disconnesso: modalità sola lettura');
+      }
+    };
+  }
+
+  const notifyBtn = $('#notifyBtn');
+  if (notifyBtn) {
+    notifyBtn.onclick = async () => {
+      await requestNotificationPermission();
+    };
+  }
+
+  const changePinBtn = $('#changePinBtn');
+  if (changePinBtn) changePinBtn.onclick = promptChangePin;
+
+  const shareLinkBtn = $('#shareLinkBtn');
+  if (shareLinkBtn) {
+    shareLinkBtn.onclick = async () => {
+      const cleanUrl = location.origin + location.pathname;
+      try {
+        await navigator.clipboard.writeText(cleanUrl);
+        toast('Link pulito del calendario copiato!');
+      } catch(e) {
+        prompt('Copia il link:', cleanUrl);
+      }
+    };
+  }
+
+  const themeBtn = $('#themeBtn');
+  if (themeBtn) {
+    themeBtn.onclick = () => {
+      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'themeOv';
+      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Scegli Tema">
+        <h3>Tema / Stile</h3>
+        <div class="frow">
+          <label for="themeSelectModal">Seleziona aspetto grafico</label>
+          <select id="themeSelectModal" style="width:100%;min-height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:6px;font:inherit">
+            <option value="default"${currentTheme === 'default' ? ' selected' : ''}>🎨 Standard (Auto Dark/Light)</option>
+            <option value="synthwave"${currentTheme === 'synthwave' ? ' selected' : ''}>🕹 Synthwave 80s (Arcade Neon)</option>
+            <option value="gazzetta"${currentTheme === 'gazzetta' ? ' selected' : ''}>📰 Gazzetta Rosa (Vintage)</option>
+            <option value="tv"${currentTheme === 'tv' ? ' selected' : ''}>📺 Tabellone TV (Alto Contrasto)</option>
+          </select>
+        </div>
+        <div class="mbtns"><button id="themeClose" class="primary">Fatto</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+      document.getElementById('themeSelectModal').onchange = e => applyTheme(e.target.value);
+      document.getElementById('themeClose').onclick = () => ov.remove();
+    };
+  }
+
+  const qSave = $('#quickSaveBtn');
+  if (qSave) qSave.onclick = async () => {
+    const ok = await cloudPushNow();
+    toast(ok ? 'Salvataggio completato!' : 'Errore durante il salvataggio');
+  };
+
+  const qPull = $('#quickPullBtn');
+  if (qPull) qPull.onclick = async () => {
+    await cloudPullSafe(false);
+    render();
+    toast('Dati aggiornati dal cloud!');
+  };
+
+  const confAlertBtn = $('#conflictAlertBtn');
+  if (confAlertBtn) confAlertBtn.onclick = openConflictsModal;
+
+  const expMulti = $('#exportMultiJsonBtn');
+  if (expMulti) expMulti.onclick = openExportMultiModal;
+
+  const resBtn = $('#resocontoBtn');
+  if (resBtn) resBtn.onclick = openResocontoModal;
+
+  const addBtn = $('#add');
+  if (addBtn) addBtn.onclick = openAddModal;
+
+  const waToday = $('#waTodayBtn');
+  if (waToday) waToday.onclick = () => copyWhatsAppRollingToday();
+
+  const undoB = $('#undoBtn');
+  if (undoB) { undoB.disabled = true; undoB.onclick = performUndo; }
+
+  const todayB = $('#todayBtn');
+  if (todayB) {
+    todayB.onclick = () => {
+      const t = iso(new Date());
+      setParam('m', t.slice(0, 7)); setParam('s', iso(monday(t)));
+      render();
+      setTimeout(() => { const el = document.getElementById('w-' + iso(monday(t))); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 0);
+    };
+  }
+
+  const fCat = $('#filterCat');
+  if (fCat) fCat.onchange = e => { filterCat = e.target.value; render(); };
+
+  const fInc = $('#filterIncomplete');
+  if (fInc) {
+    fInc.onclick = e => {
+      filterIncomplete = !filterIncomplete;
+      e.target.setAttribute('aria-pressed', String(filterIncomplete));
+      render();
+    };
+  }
+
+  const namesB = $('#namesBtn');
+  if (namesB) {
+    namesB.onclick = () => {
+      if (READONLY) return;
+      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'namesOv';
+      const rowsHtml = () => names.length
+        ? names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(n)}</span><button data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px">✕</button></div>`).join('')
+        : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessun nome inserito.</p>';
+      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Nomi">
+        <h3>Elenco nomi</h3>
+        <div id="namesListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:8px">${rowsHtml()}</div>
+        <div class="frow" style="display:flex;gap:6px"><input id="newNameInput" type="text" placeholder="Nuovo nome" style="flex:1"><button class="primary" id="addNameBtn">Aggiungi</button></div>
+        <div class="mbtns"><button id="namesClose">Chiudi</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      const refreshList = () => { document.getElementById('namesListWrap').innerHTML = rowsHtml(); };
+      ov.addEventListener('click', e => {
+        if (e.target === ov) { ov.remove(); return; }
+        const rm = e.target.closest('[data-rmname]');
+        if (rm) { names = names.filter(n => n.toLowerCase() !== rm.dataset.rmname.toLowerCase()); saveNames(); renderNamesList(); refreshList(); return; }
+        if (e.target.id === 'addNameBtn') {
+          const inp = document.getElementById('newNameInput'), v = inp.value.trim();
+          if (v && !names.some(n => n.toLowerCase() === v.toLowerCase())) {
+            names.push(v); names.sort((a, b) => a.localeCompare(b)); saveNames(); renderNamesList(); refreshList();
+          }
+          inp.value = ''; inp.focus();
+        }
+      });
+      document.getElementById('newNameInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addNameBtn').click(); } });
+      document.getElementById('namesClose').onclick = () => ov.remove();
+      document.getElementById('newNameInput').focus();
+    };
+  }
+
+  const catB = $('#catBtn');
+  if (catB) {
+    catB.onclick = () => {
+      if (READONLY) return;
+      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'catOv';
+      const rowsHtml = () => categories.length
+        ? categories.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(c)}</span><button data-rmcat="${esc(c)}" style="min-height:26px;padding:2px 8px;font-size:12px">✕</button></div>`).join('')
+        : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessuna categoria.</p>';
+      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Categorie">
+        <h3>Categorie</h3>
+        <div id="catListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:8px">${rowsHtml()}</div>
+        <div class="frow" style="display:flex;gap:6px"><input id="newCatInput" type="text" placeholder="Es. U17" style="flex:1"><button class="primary" id="addCatBtn">Aggiungi</button></div>
+        <div class="mbtns"><button id="catClose">Chiudi</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      const refreshList = () => { document.getElementById('catListWrap').innerHTML = rowsHtml(); };
+      ov.addEventListener('click', e => {
+        if (e.target === ov) { ov.remove(); return; }
+        const rm = e.target.closest('[data-rmcat]');
+        if (rm) { categories = categories.filter(c => c.toLowerCase() !== rm.dataset.rmcat.toLowerCase()); saveCategories(); renderCategoriesList(); refreshList(); return; }
+        if (e.target.id === 'addCatBtn') {
+          const inp = document.getElementById('newCatInput'), v = inp.value.trim();
+          if (v && !categories.some(c => c.toLowerCase() === v.toLowerCase())) {
+            categories.push(v); categories.sort((a, b) => a.localeCompare(b)); saveCategories(); renderCategoriesList(); refreshList();
+          }
+          inp.value = ''; inp.focus();
+        }
+      });
+      document.getElementById('newCatInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addCatBtn').click(); } });
+      document.getElementById('catClose').onclick = () => ov.remove();
+      document.getElementById('newCatInput').focus();
+    };
+  }
+
+  const prnB = $('#printBtn');
+  if (prnB) {
+    prnB.onclick = () => {
+      const months = monthsWithData();
+      if (!months.length) { toast('Nessuna gara presente'); return; }
+      const cur = params().get('m');
+      const def = months.includes(cur) ? cur : months[months.length - 1];
+      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'printOv';
+      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Stampa PDF">
+        <h3>Stampa PDF</h3>
+        <div class="frow"><label for="pMonth">Mese</label>
+          <select id="pMonth" style="width:100%;min-height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:6px">
+            ${months.map(m => `<option value="${m}"${m === def ? ' selected' : ''}>${monthLabel(m)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="mbtns"><button id="pCancel">Annulla</button><button class="primary" id="pGo">Genera PDF</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+      document.getElementById('pCancel').onclick = () => ov.remove();
+      document.getElementById('pGo').onclick = () => {
+        const m = document.getElementById('pMonth').value; ov.remove();
+        generateMonthPDF(m);
+      };
+    };
+  }
+
+  const impB = $('#importBtn');
+  if (impB) impB.onclick = () => $('#importFile')?.click();
+
+  const impF = $('#importFile');
+  if (impF) {
+    impF.onchange = e => {
+      if (READONLY) return;
+      const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (!Array.isArray(data)) throw new Error();
+          const { newItems, wi } = fromExportFormat(data);
+          pushUndo();
+          const map = new Map(items.map(i => [i.id, i]));
+          newItems.forEach(i => map.set(i.id, i));
+          items = [...map.values()];
+          Object.assign(dayMeta, wi);
+          save(); saveD(); render();
+          toast(`${newItems.length} partite importate con successo!`);
+        } catch(err) { toast('File JSON non valido'); }
+      };
+      reader.readAsText(file);
+    };
+  }
+
+  const pdfBtn = $('#pdfImportBtn');
+  if (pdfBtn) {
+    pdfBtn.onclick = () => {
+      if (READONLY) return;
+      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'pdfOv';
+      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Importa PDF">
+        <h3>Importa da PDF</h3>
+        <div class="frow"><label for="pdfFile">File PDF</label><input id="pdfFile" type="file" accept="application/pdf,.pdf"></div>
+        <div class="frow"><label for="pdfTeam">Nome squadra di casa</label><input id="pdfTeam" type="text" placeholder="Es. VIS PERSICETO"></div>
+        <div class="mbtns"><button id="pdfCancel">Annulla</button><button class="primary" id="pdfGo">Estrai</button></div>
+        <div id="pdfPreviewWrap" style="margin-top:10px;max-height:220px;overflow-y:auto"></div>
+        <div class="mbtns" id="pdfConfirmBtns" style="display:none;margin-top:10px"><button id="pdfAddAll" class="primary" style="width:100%">Aggiungi al calendario</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      ov.addEventListener('click', e => {
+        if (e.target === ov) { ov.remove(); return; }
+        const rm = e.target.closest('[data-pf="rm"]');
+        if (rm) { pdfCandidates.splice(+rm.dataset.pi, 1); renderPdfPreview(); return; }
+      });
+      ov.addEventListener('input', e => {
+        const f = e.target.dataset.pf; if (!f || f === 'rm') return;
+        pdfCandidates[+e.target.dataset.pi][f] = e.target.value;
+      });
+      document.getElementById('pdfCancel').onclick = () => ov.remove();
+      document.getElementById('pdfGo').onclick = async () => {
+        const file = document.getElementById('pdfFile').files[0];
+        const team = document.getElementById('pdfTeam').value.trim();
+        if (!file || !team) { toast('Inserisci file e nome squadra'); return; }
+        if (!window.pdfjsLib) { toast('Libreria non caricata'); return; }
+        const btn = document.getElementById('pdfGo'); btn.disabled = true; btn.textContent = 'Estrazione…';
+        try {
+          const lines = await pdfToLines(file);
+          pdfCandidates = extractHomeMatches(lines
