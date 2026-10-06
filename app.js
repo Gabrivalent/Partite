@@ -2,56 +2,58 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function toast(t) { const m = $('#msg'); if (m) { m.textContent = t; m.classList.add('on'); setTimeout(() => m.classList.remove('on'), 2200); } }
 
-// --- CONFIGURAZIONE CLOUD SUPABASE ---
+// CONFIGURAZIONE SUPABASE
 const SUPABASE_CONFIG = {
   url: 'https://bhyfeoyyuscrsypaiemx.supabase.co',
   key: 'sb_publishable_dQyrFbjusGoZtWr1MHkoiA_VPVngPrC',
   board: 'partite'
 };
 
-// Password di default iniziale (accetta sia lettere che numeri)
 const DEFAULT_PIN = '1234';
-
-// --- STATO AUTENTICAZIONE ---
 let READONLY = true;
 
-// Registrazione Service Worker (PWA)
+// Funzione globale esposta subito nel Window per garantire apertura
+window.handleAuthClick = function() {
+  if (READONLY) {
+    promptLogin();
+  } else {
+    sessionStorage.removeItem('partite_admin_auth');
+    setAuthMode(false);
+    toast('Disconnesso: sola lettura');
+  }
+};
+
+// Registrazione Service Worker senza bloccare
 let swRegistration = null;
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => { swRegistration = reg; })
-      .catch(err => console.log('SW fail:', err));
-  });
+  navigator.serviceWorker.register('./sw.js')
+    .then(reg => { swRegistration = reg; })
+    .catch(() => {});
 }
 
-// --- MODULO NOTIFICHE ---
+// Modulo Notifiche
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
-    toast('Notifiche non supportate da questo browser');
+    toast('Notifiche non supportate');
     return false;
   }
   if (Notification.permission === 'granted') {
-    toast('Notifiche già abilitate');
+    toast('Notifiche già attive');
     return true;
   }
-  if (Notification.permission !== 'denied') {
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      toast('Notifiche abilitate con successo!');
-      return true;
-    }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    toast('Notifiche attivate!');
+    return true;
   }
-  toast('Permesso notifiche negato');
+  toast('Permesso non concesso');
   return false;
 }
 
-// Helper pronto per l'invio delle notifiche
 function dispatchAppNotification(title, options = {}) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const def = {
     icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="110" fill="%231d5fa8"/%3E%3Ccircle cx="256" cy="256" r="160" fill="none" stroke="white" stroke-width="28"/%3E%3C/svg%3E',
-    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Ccircle cx="256" cy="256" r="256" fill="%231d5fa8"/%3E%3C/svg%3E',
     vibrate: [200, 100, 200]
   };
   const cfg = Object.assign(def, options);
@@ -72,7 +74,7 @@ function applyTheme(themeName) {
 }
 if (currentTheme !== 'default') applyTheme(currentTheme);
 
-// Stato & Memoria Locale
+// Dati Locali
 const KEY = 'partite-v1';
 let items = [];
 try { items = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){}
@@ -121,39 +123,31 @@ const saveMolt = () => { saveMoltLocal(); scheduleCloudPush(); };
 const saveNames = () => { saveNamesLocal(); scheduleCloudPush(); };
 const saveCategories = () => { saveCategoriesLocal(); scheduleCloudPush(); };
 
-// Inizializzazione Client Supabase
+// Inizializzazione protetta Supabase
 let sb = null;
 try {
   if (window.supabase && SUPABASE_CONFIG.url && SUPABASE_CONFIG.key) {
     sb = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
   }
-} catch(e) { sb = null; }
+} catch(e) {
+  sb = null;
+  console.warn("Supabase init bypassed:", e);
+}
 
-let syncOrangeUntil = 0;
 function setSyncVisualState(state, tooltip) {
   const dot = document.getElementById('syncDot');
   const wrap = document.getElementById('syncIndicatorWrap');
   if (!wrap || !dot) return;
   wrap.style.display = 'inline-flex';
-
   if (state === 'orange') {
-    syncOrangeUntil = Date.now() + 3000;
     dot.className = 'sync-dot sync-orange';
-    dot.title = tooltip || 'Sincronizzazione in corso…';
+    dot.title = tooltip || 'Sincronizzazione…';
   } else if (state === 'green') {
-    const remaining = syncOrangeUntil - Date.now();
-    if (remaining > 0) {
-      setTimeout(() => {
-        dot.className = 'sync-dot sync-green';
-        dot.title = tooltip || (sb ? 'Sincronizzato sul cloud' : 'Salvataggio locale');
-      }, remaining);
-    } else {
-      dot.className = 'sync-dot sync-green';
-      dot.title = tooltip || (sb ? 'Sincronizzato sul cloud' : 'Salvataggio locale');
-    }
+    dot.className = 'sync-dot sync-green';
+    dot.title = tooltip || (sb ? 'Sincronizzato' : 'Memoria locale');
   } else if (state === 'red') {
     dot.className = 'sync-dot sync-red';
-    dot.title = tooltip || 'Errore o cloud non raggiungibile';
+    dot.title = tooltip || 'Cloud non raggiungibile';
   }
 }
 
@@ -164,12 +158,15 @@ async function sha256hex(s) {
 
 async function cloudFetchRaw() {
   if (!sb) return null;
-  const { data, error } = await sb.from('partite_board').select('data').eq('id', SUPABASE_CONFIG.board).maybeSingle();
-  if (error) throw error;
-  return data && data.data ? data.data : null;
+  try {
+    const { data, error } = await sb.from('partite_board').select('data').eq('id', SUPABASE_CONFIG.board).maybeSingle();
+    if (error) return null;
+    return data && data.data ? data.data : null;
+  } catch(e) { return null; }
 }
 
 function applyCloudData(raw) {
+  if (!raw) return;
   items = Array.isArray(raw.items) ? raw.items : [];
   dayMeta = raw.dayMeta && typeof raw.dayMeta === 'object' ? raw.dayMeta : {};
   molt = raw.molt && typeof raw.molt === 'object' ? raw.molt : {};
@@ -184,7 +181,7 @@ function applyCloudData(raw) {
 
 async function cloudPushNow() {
   if (!sb || READONLY) return false;
-  setSyncVisualState('orange', 'Salvataggio in corso…');
+  setSyncVisualState('orange');
   try {
     const { error } = await sb.from('partite_board').upsert({
       id: SUPABASE_CONFIG.board,
@@ -193,10 +190,10 @@ async function cloudPushNow() {
     });
     if (error) throw error;
     isDirty = false;
-    setSyncVisualState('green', 'Modifiche salvate sul cloud');
+    setSyncVisualState('green');
     return true;
   } catch (err) {
-    setSyncVisualState('red', 'Errore salvataggio: dati salvati solo in locale');
+    setSyncVisualState('red');
     return false;
   }
 }
@@ -209,29 +206,25 @@ function scheduleCloudPush() {
 
 async function cloudPullSafe(silent) {
   if (!sb) return false;
-  if (isDirty && !READONLY) {
-    await cloudPushNow();
-  }
-  if (!silent) setSyncVisualState('orange', 'Download aggiornamenti…');
+  if (isDirty && !READONLY) await cloudPushNow();
+  if (!silent) setSyncVisualState('orange');
   try {
     const raw = await cloudFetchRaw();
     if (raw) {
       applyCloudData(raw);
-      setSyncVisualState('green', 'Sincronizzato');
+      setSyncVisualState('green');
       return true;
     }
-    setSyncVisualState('green', 'Pronto');
+    setSyncVisualState('green');
     return false;
   } catch(e) {
-    setSyncVisualState('red', 'Errore connessione');
+    setSyncVisualState('red');
     return false;
   }
 }
 
 setInterval(() => {
-  if (isDirty && sb && !READONLY) {
-    cloudPushNow();
-  }
+  if (isDirty && sb && !READONLY) cloudPushNow();
 }, 5000);
 
 let filterCat = '';
@@ -264,18 +257,15 @@ function updateIncompleteBadge() {
   b.textContent = count ? `(${count})` : '';
 }
 
-// Conflitti orari
 function findConflictingMatches() {
   const conflicts = new Map();
   const groups = {};
-  
   items.forEach(it => {
     if (it.date && it.time && it.time.trim()) {
       const key = `${it.date}_${it.time.trim()}`;
       (groups[key] ??= []).push(it);
     }
   });
-
   Object.values(groups).forEach(list => {
     if (list.length > 1) {
       list.forEach(m => {
@@ -284,7 +274,6 @@ function findConflictingMatches() {
       });
     }
   });
-
   return conflicts;
 }
 
@@ -296,7 +285,7 @@ function updateConflictBadge() {
   if (count > 0) {
     btn.style.display = 'inline-flex';
     btn.textContent = `❗ ${count}`;
-    btn.title = `${count} partite in conflitto di orario! Clicca per visualizzarle.`;
+    btn.title = `${count} partite in conflitto di orario!`;
   } else {
     btn.style.display = 'none';
   }
@@ -322,23 +311,23 @@ function openConflictsModal() {
   Object.keys(grouped).sort().forEach(dt => {
     const arr = Array.from(grouped[dt]);
     listHtml += `<div style="margin-bottom:12px;border:1px solid #ef4444;border-radius:8px;padding:8px;background:var(--bg)">
-      <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px">⚠️ Conflitto: ${dt} (${arr.length} gare simultanee)</div>`;
+      <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px">⚠️ Conflitto: ${dt} (${arr.length} gare)</div>`;
     arr.forEach(it => {
       listHtml += `<div class="conflict-list-item" data-goto="${it.id}">
         <strong>${esc(it.title || 'Partita senza titolo')}</strong>
         <span style="font-size:12px;color:var(--mute)">Cat: ${esc(it.cat || 'n.d.')} | T1: ${esc(it.t1 || 'Vuoto')}</span>
-        <span style="font-size:11px;color:var(--acc);font-weight:600">Tocca per andare alla partita ➔</span>
+        <span style="font-size:11px;color:var(--acc);font-weight:600">Vai alla partita ➔</span>
       </div>`;
     });
     listHtml += `</div>`;
   });
 
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Conflitti di Orario" style="max-height:90vh;overflow-y:auto">
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Conflitti" style="max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <h3 style="margin:0;color:#ef4444">Conflitti di Orario</h3>
       <button id="confCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
     </div>
-    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le seguenti gare si sovrappongono esattamente allo stesso giorno e orario:</p>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Partite sovrapposte allo stesso orario:</p>
     <div>${listHtml}</div>
     <div class="mbtns" style="margin-top:14px"><button class="primary" id="confClose">Chiudi</button></div>
   </div>`;
@@ -362,7 +351,6 @@ function openConflictsModal() {
   document.getElementById('confCloseTop').onclick = () => ov.remove();
 }
 
-// Time Picker
 const COMMON_TIMES = ['09:00', '11:00', '11:15', '11:30', '15:00', '15:30', '17:00', '17:30', '18:00', '20:30', '21:00'];
 function buildCustomTimePicker(initialVal) {
   let [h, m] = (initialVal || '15:30').split(':');
@@ -389,10 +377,7 @@ function buildCustomTimePicker(initialVal) {
         <select id="pickMin">${minsOpts}</select>
         <input type="hidden" id="finalTimeVal" value="${initialVal || '15:30'}">
       </div>
-      <div style="font-size:11px;color:var(--mute);text-align:center;font-weight:600">Oppure seleziona un orario frequente:</div>
-      <div class="time-chips" id="timeChipsWrap">
-        ${chipsHtml}
-      </div>
+      <div class="time-chips">${chipsHtml}</div>
     </div>
   `;
 }
@@ -465,19 +450,18 @@ function exportSelectedMonthsJSON(selectedMonths) {
       partite: days[d]
     };
   });
-  if (!out.length) { toast('Nessun dato per i mesi selezionati'); return; }
+  if (!out.length) { toast('Nessun dato presente'); return; }
   const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url;
-  const fileName = selectedMonths.length === 1 ? `partite_${selectedMonths[0]}.json` : `partite_multi_${selectedMonths.length}mesi.json`;
-  a.download = fileName;
+  a.download = `partite_${selectedMonths.join('_')}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function openExportMultiModal() {
   const months = monthsWithData();
-  if (!months.length) { toast('Nessun mese con partite registrate'); return; }
+  if (!months.length) { toast('Nessun mese con partite'); return; }
   const ov = document.createElement('div');
   ov.className = 'ov';
   ov.id = 'exportMultiOv';
@@ -489,14 +473,13 @@ function openExportMultiModal() {
     </label>
   `).join('');
 
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Esporta JSON Mesi">
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Esporta Mesi">
     <h3>Esporta Mesi in JSON</h3>
-    <p style="font-size:13px;color:var(--mute);margin:-6px 0 10px">Seleziona i mesi da includere nel file:</p>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button type="button" id="chkAllBtn" class="pill-btn-sm">Seleziona tutti</button>
-      <button type="button" id="chkNoneBtn" class="pill-btn-sm">Deseleziona tutti</button>
+      <button type="button" id="chkAllBtn" class="pill-btn-sm">Tutti</button>
+      <button type="button" id="chkNoneBtn" class="pill-btn-sm">Nessuno</button>
     </div>
-    <div id="mChkWrap" style="display:grid;gap:6px;max-height:220px;overflow-y:auto;padding-right:4px">
+    <div id="mChkWrap" style="display:grid;gap:6px;max-height:220px;overflow-y:auto">
       ${listHtml}
     </div>
     <div class="mbtns" style="margin-top:14px">
@@ -508,38 +491,30 @@ function openExportMultiModal() {
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
   document.getElementById('expCancel').onclick = () => ov.remove();
-
-  document.getElementById('chkAllBtn').onclick = () => {
-    ov.querySelectorAll('input[name=mExpChk]').forEach(c => c.checked = true);
-  };
-  document.getElementById('chkNoneBtn').onclick = () => {
-    ov.querySelectorAll('input[name=mExpChk]').forEach(c => c.checked = false);
-  };
+  document.getElementById('chkAllBtn').onclick = () => ov.querySelectorAll('input[name=mExpChk]').forEach(c => c.checked = true);
+  document.getElementById('chkNoneBtn').onclick = () => ov.querySelectorAll('input[name=mExpChk]').forEach(c => c.checked = false);
 
   document.getElementById('expDownload').onclick = () => {
     const selected = Array.from(ov.querySelectorAll('input[name=mExpChk]:checked')).map(c => c.value);
-    if (!selected.length) { toast('Seleziona almeno un mese'); return; }
+    if (!selected.length) { toast('Seleziona un mese'); return; }
     exportSelectedMonthsJSON(selected);
     ov.remove();
-    toast('File JSON scaricato');
   };
 }
 
 function copyMonthRecapWhatsApp(m) {
   const rows = computeRecapRows(m);
-  if (!rows.length) { toast('Nessun dato da riepilogare'); return; }
-  const lbl = monthLabel(m).toUpperCase();
-  let out = `📊 *RIEPILOGO TURNI — ${lbl}*\n\n`;
+  if (!rows.length) { toast('Nessun dato presente'); return; }
+  let out = `📊 *RIEPILOGO TURNI — ${monthLabel(m).toUpperCase()}*\n\n`;
   rows.forEach(r => {
     const v = Object.assign({ p: 10, a: 10, c: 10 }, molt[r.n.toLowerCase()]);
     const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
     out += `• *${r.n}*: ${tot}€ (Partite: ${r.p}, Ap/Ch: ${r.a + r.c})\n`;
   });
-  out += '\n_Generato dall\'app Partite_';
   try {
     navigator.clipboard.writeText(out);
     toast('Riepilogo copiato per WhatsApp!');
-  } catch(e) { prompt('Copia il riepilogo:', out); }
+  } catch(e) { prompt('Copia il testo:', out); }
 }
 
 function slotHTML(d, k) {
@@ -614,7 +589,6 @@ function isU15OrAbove(cat) {
   return /SERIE|DIVIS|PROMOZ|SENIOR|ECCELL/i.test(cat);
 }
 
-// Scheda Partita
 function card(i, hasConflict) {
   const ghostOn = !READONLY && !!i.ghost;
   const missingT1 = isMissingT1(i);
@@ -646,7 +620,6 @@ function card(i, hasConflict) {
   </div>`;
 }
 
-// Modale Modifica Partita
 function openEditModal(matchId) {
   if (READONLY) return;
   const it = items.find(x => x.id === matchId);
@@ -658,23 +631,16 @@ function openEditModal(matchId) {
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Modifica Partita">
     <h3>Modifica Partita</h3>
     <div class="frow"><label for="edDate">Data *</label><input id="edDate" type="date" value="${it.date}"></div>
-    
-    <div class="frow">
-      <label>Orario di Gioco</label>
-      ${buildCustomTimePicker(it.time || '15:30')}
-    </div>
-
+    <div class="frow"><label>Orario di Gioco</label>${buildCustomTimePicker(it.time || '15:30')}</div>
     <div class="frow"><label for="edTitle">Partita (Squadre)</label><input id="edTitle" type="text" value="${esc(it.title)}"></div>
     <div class="frow"><label for="edCat">Categoria</label><input id="edCat" type="text" list="categoriesList" value="${esc(it.cat)}"></div>
-    
     <div style="border-top:1px solid var(--line);margin:12px 0 10px;padding-top:8px">
       <div class="frow"><label for="edT1">Tavolo 1 *</label><input id="edT1" type="text" list="namesList" value="${esc(it.t1)}" placeholder="Nome obbligatorio"></div>
       <div class="frow"><label for="edT2">Tavolo 2</label><input id="edT2" type="text" list="namesList" value="${esc(it.t2)}" placeholder="Nome"></div>
       <div class="frow"><label for="edArb">Arbitro</label><input id="edArb" type="text" list="namesList" value="${esc(it.arb)}" placeholder="Nome"></div>
     </div>
-
     <div class="mbtns">
-      <button id="edDelete" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b;font-weight:600">Elimina Gara</button>
+      <button id="edDelete" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b;font-weight:600">Elimina</button>
       <div style="display:flex;gap:6px">
         <button id="edCancel">Annulla</button>
         <button class="primary" id="edSave">Salva</button>
@@ -696,13 +662,13 @@ function openEditModal(matchId) {
       toast('Partita eliminata');
     } else {
       delBtn.dataset.arm = '1';
-      delBtn.textContent = 'Confermi eliminazione?';
+      delBtn.textContent = 'Sicuro?';
       delBtn.style.background = '#dc2626';
       delBtn.style.color = '#fff';
       setTimeout(() => {
         if (delBtn.isConnected) {
           delete delBtn.dataset.arm;
-          delBtn.textContent = 'Elimina Gara';
+          delBtn.textContent = 'Elimina';
           delBtn.style.background = '#fee2e2';
           delBtn.style.color = '#991b1b';
         }
@@ -721,19 +687,18 @@ function openEditModal(matchId) {
     it.t1 = document.getElementById('edT1').value.trim();
     it.t2 = document.getElementById('edT2').value.trim();
     it.arb = document.getElementById('edArb').value.trim();
-
     save(); ov.remove();
     setParam('m', it.date.slice(0, 7));
     setParam('s', iso(monday(it.date)));
     render(it.id);
-    toast('Modifiche salvate');
+    toast('Salvato');
   };
 }
 
 function generateWhatsAppText(startDate, endDate, customTitle) {
   const startStr = iso(startDate), endStr = iso(endDate);
   const filtered = items.filter(i => i.date >= startStr && i.date <= endStr);
-  if (!filtered.length) { toast('Nessuna partita programmata in questo periodo'); return; }
+  if (!filtered.length) { toast('Nessuna partita nel periodo'); return; }
 
   const fmtDayHeader = dStr => new Date(dStr + 'T12:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
   const fmtShort = d => d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
@@ -764,9 +729,8 @@ function generateWhatsAppText(startDate, endDate, customTitle) {
     });
   });
 
-  out = out.trim();
   try {
-    navigator.clipboard.writeText(out);
+    navigator.clipboard.writeText(out.trim());
     toast('Turni copiati per WhatsApp!');
   } catch(e) { prompt('Copia il testo:', out); }
 }
@@ -830,9 +794,9 @@ function render(focusId) {
         return a.time.localeCompare(b.time);
       }));
       const dayHtml = Object.keys(days).sort().map(dt => `<div class="day"><h4>${fmt(new Date(dt + 'T12:00'), { weekday: 'short', day: 'numeric', month: 'short' })}</h4>${openClose(dt)}<div class="matches">${days[dt].map(it => card(it, conflictsMap.has(it.id))).join('')}</div></div>`).join('');
-      return `<details class="week${wantW === w ? ' hl' : ''}" id="w-${w}" data-m="${m}" data-w="${w}"${isOpen ? ' open' : ''}><summary><span class="t">Settimana ${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short' })}</span><span class="n">${list.length} ${list.length === 1 ? 'gara' : 'gare'}<button class="waBtn" data-wamsg="${w}" type="button" title="Copia turni (da mercoledì al mercoledì dopo)">📲 WA</button></span></summary>${dayHtml}</details>`;
+      return `<details class="week${wantW === w ? ' hl' : ''}" id="w-${w}" data-m="${m}" data-w="${w}"${isOpen ? ' open' : ''}><summary><span class="t">Settimana ${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short' })}</span><span class="n">${list.length} ${list.length === 1 ? 'gara' : 'gare'}<button class="waBtn" data-wamsg="${w}" type="button" title="Copia turni">📲 WA</button></span></summary>${dayHtml}</details>`;
     }).join('');
-    return `<details class="month" data-m="${m}"${m === open ? ' open' : ''}><summary><span class="t">${label}<button class="waBtn" data-warecap="${m}" type="button" title="Copia riepilogo del mese per WhatsApp">📲 WA Riepilogo</button></span><span class="n">${count} gare</span></summary><div class="mbody">${recapHTML(m)}<div class="mweeks">${wkHtml}</div></div></details>`;
+    return `<details class="month" data-m="${m}"${m === open ? ' open' : ''}><summary><span class="t">${label}<button class="waBtn" data-warecap="${m}" type="button" title="Copia riepilogo">📲 WA Riepilogo</button></span><span class="n">${count} gare</span></summary><div class="mbody">${recapHTML(m)}<div class="mweeks">${wkHtml}</div></div></details>`;
   }).join('');
   setTimeout(() => { ready = true; }, 150);
   updateIncompleteBadge();
@@ -840,15 +804,14 @@ function render(focusId) {
   if (wantW) { const el = document.getElementById('w-' + wantW); if (el) el.scrollIntoView({ block: 'start' }); }
   if (focusId) {
     const el = document.querySelector(`[data-id="${focusId}"]`);
-    if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 }
 
-// Input slot per apertura/chiusura
 document.addEventListener('input', e => {
   if (READONLY) return;
   if (e.target.matches('[data-wn]')) {
-    const sl = e.target.closest('.slot'); (dayMeta[sl.dataset.d] ??= {})[sl.dataset.k + 'Nome'] = e.target.value; saveD(); updateRecap(sl.dataset.d.slice(0, 7)); return;
+    const sl = e.target.closest('.slot'); (dayMeta[sl.dataset.d] ??= {})[sl.dataset.k + 'Nome'] = e.target.value; saveD(); updateRecap(sl.dataset.d.slice(0, 7));
   }
 });
 
@@ -869,6 +832,7 @@ document.addEventListener('click', e => {
     if (id) openEditModal(id);
     return;
   }
+
   const matchCard = e.target.closest('.match');
   if (matchCard && !READONLY && !e.target.closest('button')) {
     openEditModal(matchCard.dataset.id);
@@ -914,13 +878,8 @@ function openAddModal() {
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Nuova partita">
     <h3>Nuova partita</h3>
     <div class="frow"><label for="nDate">Data *</label><input id="nDate" type="date" value="${iso(new Date())}"></div>
-    
-    <div class="frow">
-      <label>Orario di Gioco</label>
-      ${buildCustomTimePicker('15:30')}
-    </div>
-
-    <div class="frow"><label for="nTitle">Partita</label><input id="nTitle" type="text" placeholder="Es. Squadra A – Squadra B"></div>
+    <div class="frow"><label>Orario di Gioco</label>${buildCustomTimePicker('15:30')}</div>
+    <div class="frow"><label for="nTitle">Partita</label><input id="nTitle" type="text" placeholder="Squadra A – Squadra B"></div>
     <div class="frow"><label for="nCat">Categoria</label><input id="nCat" type="text" list="categoriesList" placeholder="Es. U17"></div>
     <div class="frow"><label for="nT1">Tavolo 1</label><input id="nT1" type="text" list="namesList" placeholder="Nome"></div>
     <div class="frow"><label for="nT2">Tavolo 2</label><input id="nT2" type="text" list="namesList" placeholder="Nome"></div>
@@ -944,7 +903,6 @@ function openAddModal() {
   document.getElementById('nDate').focus();
 }
 
-// Resoconto Stagionale
 function openResocontoModal() {
   const months = monthsWithData();
   const ov = document.createElement('div');
@@ -972,7 +930,7 @@ function openResocontoModal() {
 
   const grandTableHtml = grandRows.length
     ? `<table>
-        <thead><tr><th>Nome</th><th>Partite</th><th>Ap/Ch</th><th>Totale Spettante</th></tr></thead>
+        <thead><tr><th>Nome</th><th>Partite</th><th>Ap/Ch</th><th>Totale</th></tr></thead>
         <tbody>
           ${grandRows.map(r => `<tr><td><strong>${esc(r.n)}</strong></td><td>${r.p}</td><td>${r.ac}</td><td><strong>${r.tot}€</strong></td></tr>`).join('')}
           <tr style="border-top:2px solid var(--ink);font-weight:700"><td>TOTALE GENERALE</td><td colspan="2"></td><td>${totalSpentGeneral}€</td></tr>
@@ -1007,22 +965,17 @@ function openResocontoModal() {
     </details>`;
   }).join('');
 
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Resoconto Generale" style="max-height:90vh;overflow-y:auto">
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Resoconto" style="max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0">Resoconto Compensi</h3>
       <button id="resCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
     </div>
-    
     <div class="grand-total-box">
       <h4>Totale Generale Compensi</h4>
       ${grandTableHtml}
     </div>
-
     <h4 style="margin:14px 0 8px;font:700 16px var(--font-title);color:var(--mute);text-transform:uppercase">Dettaglio Singoli Mesi</h4>
-    <div class="resoconto-months">
-      ${monthsBlocksHtml}
-    </div>
-
+    <div class="resoconto-months">${monthsBlocksHtml}</div>
     <div class="mbtns" style="margin-top:16px"><button class="primary" id="resClose">Chiudi</button></div>
   </div>`;
 
@@ -1056,7 +1009,6 @@ function monthsWithData() {
 }
 function monthLabel(m) { return new Date(m + '-15T12:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); }
 
-// Parser PDF
 async function pdfToLines(file) {
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf = await file.arrayBuffer();
@@ -1085,7 +1037,6 @@ function normName(s) {
 function extractHomeMatches(lines, teamName) {
   const needle = normName(teamName);
   const out = [];
-  
   let detectedCat = '';
   for (let l of lines.slice(0, 15)) {
     const m = l.match(/Under\s*(\d{1,2})|U\s*(\d{1,2})|Serie\s*([A-D])|Divisione/i);
@@ -1095,21 +1046,16 @@ function extractHomeMatches(lines, teamName) {
       break;
     }
   }
-
   const dtRegex = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[\s\-–—T]+(\d{1,2}:\d{2}))?\b/;
-
   for (let i = 0; i < lines.length; i++) {
     const lineNorm = normName(lines[i]);
-    
     if (needle && lineNorm.includes(needle)) {
       const homeTeam = lines[i].replace(/^\d+\s*/, '').trim();
       let awayTeam = '';
       let matchDate = null;
       let matchTime = '';
-
       for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
         const nextLine = lines[j].trim();
-        
         const dtMatch = nextLine.match(dtRegex);
         if (dtMatch && !matchDate) {
           let [, d, mo, y, t] = dtMatch;
@@ -1117,14 +1063,10 @@ function extractHomeMatches(lines, teamName) {
           matchDate = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
           if (t) matchTime = t;
         }
-
         if (!awayTeam && nextLine && !dtMatch && !nextLine.match(/^(Palestra|PALASPORT|PALABURSI|PALAZZETTO|Via|pag\.|00\d{4}|\d+ Giornata)/i)) {
-          if (!nextLine.match(/^\d+[\s\-]+\d+$/) && !nextLine.includes('(')) {
-            awayTeam = nextLine.replace(/^\d+\s*/, '').trim();
-          }
+          if (!nextLine.match(/^\d+[\s\-]+\d+$/) && !nextLine.includes('(')) awayTeam = nextLine.replace(/^\d+\s*/, '').trim();
         }
       }
-
       if (!matchDate) {
         const dtMatch = lines[i].match(dtRegex);
         if (dtMatch) {
@@ -1134,7 +1076,6 @@ function extractHomeMatches(lines, teamName) {
           if (t) matchTime = t;
         }
       }
-
       if (matchDate) {
         out.push({
           date: matchDate,
@@ -1145,7 +1086,6 @@ function extractHomeMatches(lines, teamName) {
       }
     }
   }
-
   const unique = [];
   const seen = new Set();
   for (let it of out) {
@@ -1162,22 +1102,21 @@ let pdfCandidates = [];
 function renderPdfPreview() {
   const wrap = document.getElementById('pdfPreviewWrap'); if (!wrap) return;
   if (!pdfCandidates.length) { 
-    wrap.innerHTML = '<p style="color:var(--warn);font-size:13px;padding:6px 0">Nessuna gara in casa trovata per la squadra indicata.</p>'; 
+    wrap.innerHTML = '<p style="color:var(--warn);font-size:13px;padding:6px 0">Nessuna gara in casa trovata.</p>'; 
     return; 
   }
-  wrap.innerHTML = `<p style="color:var(--mute);font-size:12px;margin:4px 0 8px">Trovate ${pdfCandidates.length} gare in casa:</p>` +
+  wrap.innerHTML = `<p style="color:var(--mute);font-size:12px;margin:4px 0 8px">Trovate ${pdfCandidates.length} gare:</p>` +
     pdfCandidates.map((c, i) => `<div style="border-bottom:1px solid var(--line);padding:8px 0;display:flex;flex-direction:column;gap:6px">
     <input data-pf="title" data-pi="${i}" value="${esc(c.title)}" style="font-weight:700">
     <div style="display:flex;gap:6px">
       <input data-pf="date" data-pi="${i}" type="date" value="${c.date || ''}" style="flex:1">
-      <input data-pf="time" data-pi="${i}" type="time" value="${c.time || ''}" style="width:95px" title="Orario">
+      <input data-pf="time" data-pi="${i}" type="time" value="${c.time || ''}" style="width:95px">
       <input data-pf="cat" data-pi="${i}" list="categoriesList" value="${esc(c.cat)}" placeholder="Cat." style="width:75px">
-      <button data-pf="rm" data-pi="${i}" style="min-height:34px;padding:0 10px" title="Rimuovi">✕</button>
+      <button data-pf="rm" data-pi="${i}" style="min-height:34px;padding:0 10px">✕</button>
     </div>
   </div>`).join('');
 }
 
-// Logica Annulla
 let undoStack = [];
 function pushUndo() {
   undoStack.push(JSON.stringify({ items, dayMeta }));
@@ -1202,9 +1141,7 @@ window.addEventListener('keydown', e => {
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
-    if (!READONLY) {
-      cloudPushNow().then(() => toast('Modifiche salvate sul cloud'));
-    }
+    if (!READONLY) cloudPushNow().then(() => toast('Modifiche salvate'));
   }
 });
 
@@ -1264,10 +1201,12 @@ function generateMonthPDF(m) {
   toast('PDF scaricato');
 }
 
-// --- GESTIONE LOGIN / PASSWORD ADMIN ---
+// GESTIONE LOGIN / PASSWORD ADMIN
 function setAuthMode(isAdmin) {
   READONLY = !isAdmin;
-  document.body.classList.toggle('ro', READONLY);
+  if (document.body) {
+    document.body.classList.toggle('ro', READONLY);
+  }
   const authBtn = $('#authBtn');
   if (authBtn) {
     authBtn.textContent = isAdmin ? '🔓 Esci' : '🔒 Accedi';
@@ -1285,6 +1224,9 @@ async function verifyPin(entered) {
 }
 
 function promptLogin() {
+  const oldOv = document.getElementById('loginOv');
+  if (oldOv) oldOv.remove();
+
   const ov = document.createElement('div');
   ov.className = 'ov';
   ov.id = 'loginOv';
@@ -1293,12 +1235,12 @@ function promptLogin() {
     <p style="font-size:13px;color:var(--mute);margin:-6px 0 10px">Inserisci la password per abilitare modifiche e turni.</p>
     <div class="frow">
       <label for="loginPin">Password Admin</label>
-      <input id="loginPin" type="password" placeholder="Inserisci Password" autofocus>
+      <input id="loginPin" type="password" placeholder="Inserisci Password" autocomplete="current-password" autofocus>
     </div>
     <p class="err" id="loginErr">Password errata. Riprova.</p>
     <div class="mbtns">
-      <button id="loginCancel">Annulla</button>
-      <button class="primary" id="loginGo">Sblocca</button>
+      <button type="button" id="loginCancel">Annulla</button>
+      <button type="button" class="primary" id="loginGo">Sblocca</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
@@ -1309,7 +1251,7 @@ function promptLogin() {
       sessionStorage.setItem('partite_admin_auth', '1');
       setAuthMode(true);
       ov.remove();
-      toast('Accesso consentito: modalità modifica attiva');
+      toast('Accesso consentito');
     } else {
       document.getElementById('loginErr').classList.add('on');
       document.getElementById('loginPin').value = '';
@@ -1321,7 +1263,7 @@ function promptLogin() {
   document.getElementById('loginCancel').onclick = () => ov.remove();
   document.getElementById('loginGo').onclick = go;
   document.getElementById('loginPin').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
-  document.getElementById('loginPin').focus();
+  setTimeout(() => document.getElementById('loginPin')?.focus(), 80);
 }
 
 function promptChangePin() {
@@ -1333,10 +1275,10 @@ function promptChangePin() {
     <h3>Cambia Password Admin</h3>
     <div class="frow"><label for="oldPin">Password Attuale</label><input id="oldPin" type="password" autofocus></div>
     <div class="frow"><label for="newPin">Nuova Password</label><input id="newPin" type="password"></div>
-    <p class="err" id="chPinErr">La password attuale non è corretta.</p>
+    <p class="err" id="chPinErr">Password errata.</p>
     <div class="mbtns">
-      <button id="chPinCancel">Annulla</button>
-      <button class="primary" id="chPinSave">Salva nuova Password</button>
+      <button type="button" id="chPinCancel">Annulla</button>
+      <button type="button" class="primary" id="chPinSave">Salva</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
@@ -1347,7 +1289,7 @@ function promptChangePin() {
   document.getElementById('chPinSave').onclick = async () => {
     const oldP = document.getElementById('oldPin').value;
     const newP = document.getElementById('newPin').value;
-    if (!newP) { toast('Inserisci una nuova password'); return; }
+    if (!newP) { toast('Inserisci una password'); return; }
 
     if (!(await verifyPin(oldP))) {
       document.getElementById('chPinErr').classList.add('on');
@@ -1357,31 +1299,13 @@ function promptChangePin() {
     pinHash = await sha256hex(newP);
     await cloudPushNow();
     ov.remove();
-    toast('Nuova password salvata sul cloud');
+    toast('Password salvata');
   };
 }
 
-// BIND DEGLI EVENTI
 function bindEvents() {
-  const authBtn = $('#authBtn');
-  if (authBtn) {
-    authBtn.onclick = () => {
-      if (READONLY) {
-        promptLogin();
-      } else {
-        sessionStorage.removeItem('partite_admin_auth');
-        setAuthMode(false);
-        toast('Disconnesso: modalità sola lettura');
-      }
-    };
-  }
-
   const notifyBtn = $('#notifyBtn');
-  if (notifyBtn) {
-    notifyBtn.onclick = async () => {
-      await requestNotificationPermission();
-    };
-  }
+  if (notifyBtn) notifyBtn.onclick = () => requestNotificationPermission();
 
   const changePinBtn = $('#changePinBtn');
   if (changePinBtn) changePinBtn.onclick = promptChangePin;
@@ -1392,10 +1316,8 @@ function bindEvents() {
       const cleanUrl = location.origin + location.pathname;
       try {
         await navigator.clipboard.writeText(cleanUrl);
-        toast('Link pulito del calendario copiato!');
-      } catch(e) {
-        prompt('Copia il link:', cleanUrl);
-      }
+        toast('Link copiato!');
+      } catch(e) { prompt('Copia il link:', cleanUrl); }
     };
   }
 
@@ -1406,15 +1328,15 @@ function bindEvents() {
       ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Scegli Tema">
         <h3>Tema / Stile</h3>
         <div class="frow">
-          <label for="themeSelectModal">Seleziona aspetto grafico</label>
-          <select id="themeSelectModal" style="width:100%;min-height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:6px;font:inherit">
-            <option value="default"${currentTheme === 'default' ? ' selected' : ''}>🎨 Standard (Auto Dark/Light)</option>
-            <option value="synthwave"${currentTheme === 'synthwave' ? ' selected' : ''}>🕹 Synthwave 80s (Arcade Neon)</option>
-            <option value="gazzetta"${currentTheme === 'gazzetta' ? ' selected' : ''}>📰 Gazzetta Rosa (Vintage)</option>
-            <option value="tv"${currentTheme === 'tv' ? ' selected' : ''}>📺 Tabellone TV (Alto Contrasto)</option>
+          <label for="themeSelectModal">Aspetto grafico</label>
+          <select id="themeSelectModal">
+            <option value="default"${currentTheme === 'default' ? ' selected' : ''}>🎨 Standard (Auto)</option>
+            <option value="synthwave"${currentTheme === 'synthwave' ? ' selected' : ''}>🕹 Synthwave Neon</option>
+            <option value="gazzetta"${currentTheme === 'gazzetta' ? ' selected' : ''}>📰 Gazzetta Rosa</option>
+            <option value="tv"${currentTheme === 'tv' ? ' selected' : ''}>📺 Tabellone TV</option>
           </select>
         </div>
-        <div class="mbtns"><button id="themeClose" class="primary">Fatto</button></div>
+        <div class="mbtns"><button type="button" id="themeClose" class="primary">Fatto</button></div>
       </div>`;
       document.body.appendChild(ov);
       ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
@@ -1426,14 +1348,14 @@ function bindEvents() {
   const qSave = $('#quickSaveBtn');
   if (qSave) qSave.onclick = async () => {
     const ok = await cloudPushNow();
-    toast(ok ? 'Salvataggio completato!' : 'Errore durante il salvataggio');
+    toast(ok ? 'Salvataggio completato!' : 'Errore salvataggio');
   };
 
   const qPull = $('#quickPullBtn');
   if (qPull) qPull.onclick = async () => {
     await cloudPullSafe(false);
     render();
-    toast('Dati aggiornati dal cloud!');
+    toast('Aggiornato!');
   };
 
   const confAlertBtn = $('#conflictAlertBtn');
@@ -1460,7 +1382,6 @@ function bindEvents() {
       const t = iso(new Date());
       setParam('m', t.slice(0, 7)); setParam('s', iso(monday(t)));
       render();
-      setTimeout(() => { const el = document.getElementById('w-' + iso(monday(t))); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 0);
     };
   }
 
@@ -1482,13 +1403,13 @@ function bindEvents() {
       if (READONLY) return;
       const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'namesOv';
       const rowsHtml = () => names.length
-        ? names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(n)}</span><button data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px">✕</button></div>`).join('')
+        ? names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(n)}</span><button type="button" data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px">✕</button></div>`).join('')
         : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessun nome inserito.</p>';
       ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Nomi">
         <h3>Elenco nomi</h3>
         <div id="namesListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:8px">${rowsHtml()}</div>
-        <div class="frow" style="display:flex;gap:6px"><input id="newNameInput" type="text" placeholder="Nuovo nome" style="flex:1"><button class="primary" id="addNameBtn">Aggiungi</button></div>
-        <div class="mbtns"><button id="namesClose">Chiudi</button></div>
+        <div class="frow" style="display:flex;gap:6px"><input id="newNameInput" type="text" placeholder="Nuovo nome" style="flex:1"><button type="button" class="primary" id="addNameBtn">Aggiungi</button></div>
+        <div class="mbtns"><button type="button" id="namesClose">Chiudi</button></div>
       </div>`;
       document.body.appendChild(ov);
       const refreshList = () => { document.getElementById('namesListWrap').innerHTML = rowsHtml(); };
@@ -1516,13 +1437,13 @@ function bindEvents() {
       if (READONLY) return;
       const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'catOv';
       const rowsHtml = () => categories.length
-        ? categories.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(c)}</span><button data-rmcat="${esc(c)}" style="min-height:26px;padding:2px 8px;font-size:12px">✕</button></div>`).join('')
+        ? categories.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(c)}</span><button type="button" data-rmcat="${esc(c)}" style="min-height:26px;padding:2px 8px;font-size:12px">✕</button></div>`).join('')
         : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessuna categoria.</p>';
       ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Categorie">
         <h3>Categorie</h3>
         <div id="catListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:8px">${rowsHtml()}</div>
-        <div class="frow" style="display:flex;gap:6px"><input id="newCatInput" type="text" placeholder="Es. U17" style="flex:1"><button class="primary" id="addCatBtn">Aggiungi</button></div>
-        <div class="mbtns"><button id="catClose">Chiudi</button></div>
+        <div class="frow" style="display:flex;gap:6px"><input id="newCatInput" type="text" placeholder="Es. U17" style="flex:1"><button type="button" class="primary" id="addCatBtn">Aggiungi</button></div>
+        <div class="mbtns"><button type="button" id="catClose">Chiudi</button></div>
       </div>`;
       document.body.appendChild(ov);
       const refreshList = () => { document.getElementById('catListWrap').innerHTML = rowsHtml(); };
@@ -1555,11 +1476,11 @@ function bindEvents() {
       ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Stampa PDF">
         <h3>Stampa PDF</h3>
         <div class="frow"><label for="pMonth">Mese</label>
-          <select id="pMonth" style="width:100%;min-height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:6px">
+          <select id="pMonth">
             ${months.map(m => `<option value="${m}"${m === def ? ' selected' : ''}>${monthLabel(m)}</option>`).join('')}
           </select>
         </div>
-        <div class="mbtns"><button id="pCancel">Annulla</button><button class="primary" id="pGo">Genera PDF</button></div>
+        <div class="mbtns"><button type="button" id="pCancel">Annulla</button><button type="button" class="primary" id="pGo">Genera PDF</button></div>
       </div>`;
       document.body.appendChild(ov);
       ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
@@ -1591,8 +1512,8 @@ function bindEvents() {
           items = [...map.values()];
           Object.assign(dayMeta, wi);
           save(); saveD(); render();
-          toast(`${newItems.length} partite importate con successo!`);
-        } catch(err) { toast('File JSON non valido'); }
+          toast(`${newItems.length} partite importate`);
+        } catch(err) { toast('File non valido'); }
       };
       reader.readAsText(file);
     };
@@ -1607,9 +1528,9 @@ function bindEvents() {
         <h3>Importa da PDF</h3>
         <div class="frow"><label for="pdfFile">File PDF</label><input id="pdfFile" type="file" accept="application/pdf,.pdf"></div>
         <div class="frow"><label for="pdfTeam">Nome squadra di casa</label><input id="pdfTeam" type="text" placeholder="Es. VIS PERSICETO"></div>
-        <div class="mbtns"><button id="pdfCancel">Annulla</button><button class="primary" id="pdfGo">Estrai</button></div>
+        <div class="mbtns"><button type="button" id="pdfCancel">Annulla</button><button type="button" class="primary" id="pdfGo">Estrai</button></div>
         <div id="pdfPreviewWrap" style="margin-top:10px;max-height:220px;overflow-y:auto"></div>
-        <div class="mbtns" id="pdfConfirmBtns" style="display:none;margin-top:10px"><button id="pdfAddAll" class="primary" style="width:100%">Aggiungi al calendario</button></div>
+        <div class="mbtns" id="pdfConfirmBtns" style="display:none;margin-top:10px"><button type="button" id="pdfAddAll" class="primary" style="width:100%">Aggiungi al calendario</button></div>
       </div>`;
       document.body.appendChild(ov);
       ov.addEventListener('click', e => {
@@ -1625,9 +1546,75 @@ function bindEvents() {
       document.getElementById('pdfGo').onclick = async () => {
         const file = document.getElementById('pdfFile').files[0];
         const team = document.getElementById('pdfTeam').value.trim();
-        if (!file || !team) { toast('Inserisci file e nome squadra'); return; }
+        if (!file || !team) { toast('Dati mancanti'); return; }
         if (!window.pdfjsLib) { toast('Libreria non caricata'); return; }
         const btn = document.getElementById('pdfGo'); btn.disabled = true; btn.textContent = 'Estrazione…';
         try {
           const lines = await pdfToLines(file);
-          pdfCandidates = extractHomeMatches(lines
+          pdfCandidates = extractHomeMatches(lines, team);
+          document.getElementById('pdfConfirmBtns').style.display = pdfCandidates.length ? 'flex' : 'none';
+          renderPdfPreview();
+        } catch(e) { toast('Errore lettura'); }
+        btn.disabled = false; btn.textContent = 'Estrai';
+      };
+      document.getElementById('pdfAddAll').onclick = () => {
+        const valid = pdfCandidates.filter(c => c.date);
+        pushUndo();
+        valid.forEach(c => {
+          items.push({ 
+            id: uid(), 
+            title: c.title, 
+            date: c.date, 
+            time: c.time || '', 
+            cat: c.cat || '', 
+            t1: '', t2: '', arb: '', 
+            ts: Date.now() 
+          });
+        });
+        save(); 
+        ov.remove(); 
+        render();
+        toast(`${valid.length} gare aggiunte`);
+      };
+    };
+  }
+
+  initMenu('menuBtn', 'menuDrop');
+  initMenu('gearBtn', 'gearDrop');
+  document.addEventListener('click', e => { if (!e.target.closest('.menuWrap')) closeMenus(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  bindEvents();
+  renderNamesList();
+  renderCategoriesList();
+
+  const isAuth = sessionStorage.getItem('partite_admin_auth') === '1';
+  setAuthMode(isAuth);
+
+  window.addEventListener('hashchange', () => { mem = null; render(); });
+
+  if (sb) {
+    setSyncVisualState('orange');
+    try {
+      const raw = await cloudFetchRaw();
+      if (raw) {
+        applyCloudData(raw);
+        setSyncVisualState('green');
+      } else {
+        setSyncVisualState('green');
+      }
+    } catch(e) {
+      setSyncVisualState('red');
+    }
+  } else {
+    setSyncVisualState('green', 'Memoria locale attiva');
+  }
+
+  render();
+
+  if (sb) {
+    setInterval(() => cloudPullSafe(true).then(render), 15000);
+  }
+});
