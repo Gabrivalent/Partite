@@ -57,7 +57,7 @@ function dispatchAppNotification(title, bodyText, tag = 'partite-alert') {
     body: bodyText,
     tag: tag,
     icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="110" fill="%231d5fa8"/%3E%3Ccircle cx="256" cy="256" r="160" fill="none" stroke="white" stroke-width="28"/%3E%3C/svg%3E',
-    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="256" fill="%231d5fa8"/%3E%3C/svg%3E',
+    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Ccircle cx="256" cy="256" r="256" fill="%231d5fa8"/%3E%3C/svg%3E',
     vibrate: [200, 100, 200]
   };
   if (swRegistration && swRegistration.showNotification) {
@@ -67,9 +67,8 @@ function dispatchAppNotification(title, bodyText, tag = 'partite-alert') {
   }
 }
 
-// REGOLA ARBITRO ESATTA:
+// REGOLA ARBITRO:
 // L'arbitro NON serve SOLO se la partita NON è amichevole ED è una tra U15, U17 o U19.
-// In tutti gli altri casi l'arbitro SERVE SEMPRE.
 function isRefereeNeeded(cat, isFriendly) {
   if (isFriendly) return true;
   if (!cat) return true;
@@ -85,37 +84,20 @@ function isMissingRequirements(item) {
   const hasT2 = !!(item.t2 && item.t2.trim());
   const hasArb = !!(item.arb && item.arb.trim());
 
-  // Tavolo 1 è sempre obbligatorio
   if (!hasT1) return true;
-
-  // Se amichevole: bastano T1 e Arbitro (T2 non richiesto)
-  if (item.friendly) {
-    return !hasArb;
-  }
-
-  // Se gara normale: Tavolo 2 è obbligatorio
+  if (item.friendly) return !hasArb;
   if (!hasT2) return true;
-
-  // Se gara normale e categoria richiede arbitro societario
-  if (isRefereeNeeded(item.cat, false) && !hasArb) {
-    return true;
-  }
-
+  if (isRefereeNeeded(item.cat, false) && !hasArb) return true;
   return false;
 }
 
-// LOGICA "UN GIORNO PRIMA O MENO":
-// Considera urgenti le gare con data minore o uguale a DOMANI
-// (quindi OGGI e DOMANI, ma NON dopodomani tipo il 9)
 function isWithinOneDayOrLess(dateStr) {
   if (!dateStr) return false;
   const now = new Date();
   const todayIso = iso(now);
-  
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowIso = iso(tomorrow);
-
   return (dateStr === todayIso || dateStr === tomorrowIso);
 }
 
@@ -123,14 +105,12 @@ function getUrgentIncompleteMatches() {
   return items.filter(it => isWithinOneDayOrLess(it.date) && isMissingRequirements(it));
 }
 
-// LOGICA SCHEDULAZIONE NOTIFICHE
 function checkAndTriggerScheduledNotifications() {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const now = new Date();
   const todayIso = iso(now);
   const currentHour = now.getHours();
 
-  // 1. Notifica Mercoledì alle 10:00 (promemoria invio turni)
   if (now.getDay() === 3 && currentHour >= 10) {
     const wedKey = `notif_wed_${todayIso}`;
     if (!localStorage.getItem(wedKey)) {
@@ -143,13 +123,10 @@ function checkAndTriggerScheduledNotifications() {
     }
   }
 
-  // 2. Notifiche Partite Incomplete:
-  // Parte dal giorno prima alle ore 10:00, e poi scatta OGNI ORA finché non viene completata
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowIso = iso(tomorrow);
 
-  // Considera le gare di oggi (tutto il giorno) e quelle di domani (dalle 10:00 in poi)
   const urgentToNotify = items.filter(it => {
     if (!isMissingRequirements(it)) return false;
     if (it.date === todayIso) return true;
@@ -172,7 +149,6 @@ function checkAndTriggerScheduledNotifications() {
 
 setInterval(checkAndTriggerScheduledNotifications, 60000);
 
-// Gestione Temi
 let currentTheme = localStorage.getItem('partite-theme') || 'default';
 function applyTheme(themeName) {
   currentTheme = themeName;
@@ -201,6 +177,7 @@ try { categories = JSON.parse(localStorage.getItem('partite-categorie-v1')) || [
 
 let pinHash = null;
 let isDirty = false;
+let isSaving = false;
 
 const saveLocalOnly = () => {
   try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){}
@@ -241,17 +218,29 @@ try {
   sb = null;
 }
 
+// GESTIONE PALLINO CON 3 SECONDI GARANTITI
+let syncOrangeUntil = 0;
 function setSyncVisualState(state, tooltip) {
   const dot = document.getElementById('syncDot');
   const wrap = document.getElementById('syncIndicatorWrap');
   if (!wrap || !dot) return;
   wrap.style.display = 'inline-flex';
+
   if (state === 'orange') {
+    syncOrangeUntil = Date.now() + 3000;
     dot.className = 'sync-dot sync-orange';
-    dot.title = tooltip || 'Sincronizzazione…';
+    dot.title = tooltip || 'Salvataggio in corso…';
   } else if (state === 'green') {
-    dot.className = 'sync-dot sync-green';
-    dot.title = tooltip || (sb ? 'Sincronizzato' : 'Memoria locale');
+    const remaining = syncOrangeUntil - Date.now();
+    if (remaining > 0) {
+      setTimeout(() => {
+        dot.className = 'sync-dot sync-green';
+        dot.title = tooltip || (sb ? 'Sincronizzato sul cloud' : 'Memoria locale');
+      }, remaining);
+    } else {
+      dot.className = 'sync-dot sync-green';
+      dot.title = tooltip || (sb ? 'Sincronizzato sul cloud' : 'Memoria locale');
+    }
   } else if (state === 'red') {
     dot.className = 'sync-dot sync-red';
     dot.title = tooltip || 'Cloud non raggiungibile';
@@ -287,7 +276,8 @@ function applyCloudData(raw) {
 }
 
 async function cloudPushNow() {
-  if (!sb || READONLY) return false;
+  if (!sb || READONLY || isSaving) return false;
+  isSaving = true;
   setSyncVisualState('orange');
   try {
     const { error } = await sb.from('partite_board').upsert({
@@ -298,9 +288,11 @@ async function cloudPushNow() {
     if (error) throw error;
     isDirty = false;
     setSyncVisualState('green');
+    isSaving = false;
     return true;
   } catch (err) {
     setSyncVisualState('red');
+    isSaving = false;
     return false;
   }
 }
@@ -308,13 +300,18 @@ async function cloudPushNow() {
 let syncTimer = null;
 function scheduleCloudPush() {
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(cloudPushNow, 1200);
+  setSyncVisualState('orange');
+  syncTimer = setTimeout(cloudPushNow, 800);
 }
 
 async function cloudPullSafe(silent) {
   if (!sb) return false;
-  if (isDirty && !READONLY) await cloudPushNow();
-  if (!silent) setSyncVisualState('orange');
+  if (isDirty || isSaving) {
+    if (!READONLY) await cloudPushNow();
+    return false;
+  }
+
+  if (!silent) setSyncVisualState('orange', 'Aggiornamento…');
   try {
     const raw = await cloudFetchRaw();
     if (raw) {
@@ -329,10 +326,6 @@ async function cloudPullSafe(silent) {
     return false;
   }
 }
-
-setInterval(() => {
-  if (isDirty && sb && !READONLY) cloudPushNow();
-}, 5000);
 
 let filterCat = '';
 let filterIncomplete = false;
@@ -360,7 +353,6 @@ function updateIncompleteBadge() {
   b.textContent = count ? `(${count})` : '';
 }
 
-// Conflitti orari
 function findConflictingMatches() {
   const conflicts = new Map();
   const groups = {};
@@ -756,11 +748,9 @@ function card(i, hasConflict, isUrgentIncomplete) {
   const missingReq = isMissingRequirements(i);
   const t1Val = (i.t1 && i.t1.trim()) ? esc(i.t1) : '<span class="empty-req">Da assegnare</span>';
   
-  // Tavolo 2: obbligatorio se non amichevole
   const t2Required = !i.friendly;
   const t2Val = (i.t2 && i.t2.trim()) ? esc(i.t2) : (t2Required ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">—</span>');
 
-  // Arbitro: serve SEMPRE tranne se la gara NON è amichevole ed è una tra U15, U17 o U19
   const arbNeeded = isRefereeNeeded(i.cat, i.friendly);
   const arbVal = (i.arb && i.arb.trim()) ? esc(i.arb) : (arbNeeded ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">Federazione</span>');
 
@@ -1005,7 +995,7 @@ function render(focusId) {
   if (wantW) { const el = document.getElementById('w-' + wantW); if (el) el.scrollIntoView({ block: 'start' }); }
   if (focusId) {
     const el = document.querySelector(`[data-id="${focusId}"]`);
-    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
   }
 }
 
@@ -1588,14 +1578,15 @@ function bindEvents() {
   const qSave = $('#quickSaveBtn');
   if (qSave) qSave.onclick = async () => {
     const ok = await cloudPushNow();
-    toast(ok ? 'Salvataggio completato!' : 'Errore salvataggio');
+    toast(ok ? 'Salvataggio completato sul cloud!' : 'Errore durante il salvataggio');
   };
 
   const qPull = $('#quickPullBtn');
   if (qPull) qPull.onclick = async () => {
+    isDirty = false;
     await cloudPullSafe(false);
     render();
-    toast('Aggiornato!');
+    toast('Dati aggiornati!');
   };
 
   const expMulti = $('#exportMultiJsonBtn');
@@ -1854,6 +1845,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   checkAndTriggerScheduledNotifications();
 
   if (sb) {
-    setInterval(() => cloudPullSafe(true).then(render), 15000);
+    setInterval(() => {
+      if (READONLY) {
+        cloudPullSafe(true).then(render);
+      }
+    }, 15000);
   }
 });
