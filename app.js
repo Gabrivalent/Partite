@@ -57,7 +57,7 @@ function dispatchAppNotification(title, bodyText, tag = 'partite-alert') {
     body: bodyText,
     tag: tag,
     icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="110" fill="%231d5fa8"/%3E%3Ccircle cx="256" cy="256" r="160" fill="none" stroke="white" stroke-width="28"/%3E%3C/svg%3E',
-    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Ccircle cx="256" cy="256" r="256" fill="%231d5fa8"/%3E%3C/svg%3E',
+    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="256" fill="%231d5fa8"/%3E%3C/svg%3E',
     vibrate: [200, 100, 200]
   };
   if (swRegistration && swRegistration.showNotification) {
@@ -67,6 +67,62 @@ function dispatchAppNotification(title, bodyText, tag = 'partite-alert') {
   }
 }
 
+// REGOLA ARBITRO ESATTA:
+// L'arbitro NON serve SOLO se la partita NON è amichevole ED è una tra U15, U17 o U19.
+// In tutti gli altri casi l'arbitro SERVE SEMPRE.
+function isRefereeNeeded(cat, isFriendly) {
+  if (isFriendly) return true;
+  if (!cat) return true;
+  const c = cat.toUpperCase().replace(/\s+/g, '');
+  if (c === 'U15' || c === 'U17' || c === 'U19') {
+    return false;
+  }
+  return true;
+}
+
+function isMissingRequirements(item) {
+  const hasT1 = !!(item.t1 && item.t1.trim());
+  const hasT2 = !!(item.t2 && item.t2.trim());
+  const hasArb = !!(item.arb && item.arb.trim());
+
+  // Tavolo 1 è sempre obbligatorio
+  if (!hasT1) return true;
+
+  // Se amichevole: bastano T1 e Arbitro (T2 non richiesto)
+  if (item.friendly) {
+    return !hasArb;
+  }
+
+  // Se gara normale: Tavolo 2 è obbligatorio
+  if (!hasT2) return true;
+
+  // Se gara normale e categoria richiede arbitro societario
+  if (isRefereeNeeded(item.cat, false) && !hasArb) {
+    return true;
+  }
+
+  return false;
+}
+
+// LOGICA "UN GIORNO PRIMA O MENO":
+// Considera urgenti le gare con data minore o uguale a DOMANI
+// (quindi OGGI e DOMANI, ma NON dopodomani tipo il 9)
+function isWithinOneDayOrLess(dateStr) {
+  if (!dateStr) return false;
+  const now = new Date();
+  const todayIso = iso(now);
+  
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowIso = iso(tomorrow);
+
+  return (dateStr === todayIso || dateStr === tomorrowIso);
+}
+
+function getUrgentIncompleteMatches() {
+  return items.filter(it => isWithinOneDayOrLess(it.date) && isMissingRequirements(it));
+}
+
 // LOGICA SCHEDULAZIONE NOTIFICHE
 function checkAndTriggerScheduledNotifications() {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -74,7 +130,7 @@ function checkAndTriggerScheduledNotifications() {
   const todayIso = iso(now);
   const currentHour = now.getHours();
 
-  // 1. Notifica Mercoledì alle 10:00 (promemoria invio turni giovedì -> mercoledì)
+  // 1. Notifica Mercoledì alle 10:00 (promemoria invio turni)
   if (now.getDay() === 3 && currentHour >= 10) {
     const wedKey = `notif_wed_${todayIso}`;
     if (!localStorage.getItem(wedKey)) {
@@ -87,19 +143,27 @@ function checkAndTriggerScheduledNotifications() {
     }
   }
 
-  // 2. Notifiche Partite Incomplete del giorno dopo (alle 10:00 e poi ogni ora)
+  // 2. Notifiche Partite Incomplete:
+  // Parte dal giorno prima alle ore 10:00, e poi scatta OGNI ORA finché non viene completata
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowIso = iso(tomorrow);
 
-  const incompleteTomorrow = items.filter(it => it.date === tomorrowIso && isMissingRequirements(it));
-  if (incompleteTomorrow.length > 0 && currentHour >= 10) {
-    const hourlyKey = `notif_incomp_${tomorrowIso}_h${currentHour}`;
+  // Considera le gare di oggi (tutto il giorno) e quelle di domani (dalle 10:00 in poi)
+  const urgentToNotify = items.filter(it => {
+    if (!isMissingRequirements(it)) return false;
+    if (it.date === todayIso) return true;
+    if (it.date === tomorrowIso && currentHour >= 10) return true;
+    return false;
+  });
+
+  if (urgentToNotify.length > 0) {
+    const hourlyKey = `notif_urgent_${todayIso}_h${currentHour}`;
     if (!localStorage.getItem(hourlyKey)) {
       dispatchAppNotification(
-        '⚠️ Partite di domani incomplete!',
-        `Ci sono ${incompleteTomorrow.length} partite in programma domani con turni incompleti!`,
-        'urgent-incomplete-tomorrow'
+        '⚠️ Turni partite da completare!',
+        `Ci sono ${urgentToNotify.length} partite imminenti senza tutti i refertisti/arbitri assegnati!`,
+        'urgent-incomplete-imminent'
       );
       localStorage.setItem(hourlyKey, '1');
     }
@@ -289,46 +353,11 @@ function renderCategoriesList() {
   }
 }
 
-// LOGICA CATEGORIE E COMPLETEZZA
-function isU15OrAbove(cat) {
-  if (!cat) return false;
-  const c = cat.toUpperCase().replace(/\s+/g, '');
-  const m = c.match(/^U(\d+)/i);
-  if (m) return parseInt(m[1], 10) >= 15;
-  return /SERIE|DIVIS|PROMOZ|SENIOR|ECCELL/i.test(cat);
-}
-
-function isMissingRequirements(item) {
-  const hasT1 = !!(item.t1 && item.t1.trim());
-  const hasT2 = !!(item.t2 && item.t2.trim());
-  const hasArb = !!(item.arb && item.arb.trim());
-
-  // 1. Amichevole: richiede sempre T1 e Arbitro
-  if (item.friendly) {
-    return !hasT1 || !hasArb;
-  }
-
-  // 2. Sopra o uguale a U15: richiede T1 e T2 (arbitro è federazione)
-  if (isU15OrAbove(item.cat)) {
-    return !hasT1 || !hasT2;
-  }
-
-  // 3. Sotto U15 (non contando U15): richiede T1, T2 e Arbitro
-  return !hasT1 || !hasT2 || !hasArb;
-}
-
 function updateIncompleteBadge() {
   const b = document.getElementById('incCount');
   if (!b) return;
   const count = items.filter(isMissingRequirements).length;
   b.textContent = count ? `(${count})` : '';
-}
-
-function getTomorrowIncompleteMatches() {
-  const t = new Date();
-  t.setDate(t.getDate() + 1);
-  const tomorrowIso = iso(t);
-  return items.filter(it => it.date === tomorrowIso && isMissingRequirements(it));
 }
 
 // Conflitti orari
@@ -358,7 +387,7 @@ function updateAlertStatusBadge() {
 
   const conflictsMap = findConflictingMatches();
   const conflictCount = conflictsMap.size;
-  const tomorrowIncomplete = getTomorrowIncompleteMatches();
+  const urgentIncomplete = getUrgentIncompleteMatches();
 
   if (conflictCount > 0) {
     btn.className = 'alert-btn-standalone status-conflict';
@@ -368,10 +397,10 @@ function updateAlertStatusBadge() {
     return;
   }
 
-  if (tomorrowIncomplete.length > 0) {
+  if (urgentIncomplete.length > 0) {
     btn.className = 'alert-btn-standalone status-urgent-incomplete';
-    btn.textContent = `⚠️ ${tomorrowIncomplete.length}`;
-    btn.title = `${tomorrowIncomplete.length} gara/e di domani ancora con turni incompleti!`;
+    btn.textContent = `⚠️ ${urgentIncomplete.length}`;
+    btn.title = `${urgentIncomplete.length} gara/e a meno di un giorno ancora con turni incompleti!`;
     btn.onclick = openUrgentIncompleteModal;
     return;
   }
@@ -379,7 +408,7 @@ function updateAlertStatusBadge() {
   btn.className = 'alert-btn-standalone status-ok';
   btn.textContent = `✓`;
   btn.title = `Nessun conflitto o urgenza rilevata. Calendario regolare.`;
-  btn.onclick = () => toast('Nessun conflitto o turno incompleto per domani.');
+  btn.onclick = () => toast('Nessun conflitto o turno incompleto nelle prossime 24-48 ore.');
 }
 
 function openConflictsModal() {
@@ -443,8 +472,8 @@ function openConflictsModal() {
 }
 
 function openUrgentIncompleteModal() {
-  const urgentList = getTomorrowIncompleteMatches();
-  if (!urgentList.length) { toast('Nessuna gara urgente per domani'); return; }
+  const urgentList = getUrgentIncompleteMatches();
+  if (!urgentList.length) { toast('Nessuna gara urgente nelle prossime 24-48 ore'); return; }
 
   const ov = document.createElement('div');
   ov.className = 'ov';
@@ -454,21 +483,21 @@ function openUrgentIncompleteModal() {
     let reqs = [];
     if (!it.t1?.trim()) reqs.push('Tavolo 1');
     if (!it.friendly && !it.t2?.trim()) reqs.push('Tavolo 2');
-    if ((it.friendly || !isU15OrAbove(it.cat)) && !it.arb?.trim()) reqs.push('Arbitro');
+    if (isRefereeNeeded(it.cat, it.friendly) && !it.arb?.trim()) reqs.push('Arbitro');
 
     return `<div class="conflict-list-item" style="border-color:#f97316" data-goto="${it.id}">
       <strong>${esc(it.title || 'Partita senza titolo')}</strong>
-      <span style="font-size:12px;color:var(--mute)">Ore: ${esc(it.time || 'n.d.')} | Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''}</span>
+      <span style="font-size:12px;color:var(--mute)">Data: ${esc(it.date)} | Ore: ${esc(it.time || 'n.d.')} | Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''}</span>
       <span style="font-size:11px;color:#f97316;font-weight:700">Mancano: ${reqs.join(', ')} ➔</span>
     </div>`;
   }).join('');
 
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Gare di domani incomplete" style="max-height:90vh;overflow-y:auto">
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Gare imminenti incomplete" style="max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <h3 style="margin:0;color:#f97316">Partite di Domani Incomplete</h3>
+      <h3 style="margin:0;color:#f97316">Partite Imminenti Incomplete</h3>
       <button id="urgCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
     </div>
-    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le seguenti gare di domani richiedono ancora turni di servizio:</p>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le seguenti gare a un giorno o meno richiedono ancora turni di servizio:</p>
     <div style="display:grid;gap:8px">${listHtml}</div>
     <div class="mbtns" style="margin-top:14px"><button class="primary" id="urgClose">Chiudi</button></div>
   </div>`;
@@ -727,20 +756,20 @@ function card(i, hasConflict, isUrgentIncomplete) {
   const missingReq = isMissingRequirements(i);
   const t1Val = (i.t1 && i.t1.trim()) ? esc(i.t1) : '<span class="empty-req">Da assegnare</span>';
   
-  // Tavolo 2 richiesto se non amichevole
+  // Tavolo 2: obbligatorio se non amichevole
   const t2Required = !i.friendly;
   const t2Val = (i.t2 && i.t2.trim()) ? esc(i.t2) : (t2Required ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">—</span>');
 
-  // Arbitro richiesto se amichevole oppure se categoria sotto U15
-  const arbRequired = i.friendly || !isU15OrAbove(i.cat);
-  const arbVal = (i.arb && i.arb.trim()) ? esc(i.arb) : (arbRequired ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">Federazione</span>');
+  // Arbitro: serve SEMPRE tranne se la gara NON è amichevole ed è una tra U15, U17 o U19
+  const arbNeeded = isRefereeNeeded(i.cat, i.friendly);
+  const arbVal = (i.arb && i.arb.trim()) ? esc(i.arb) : (arbNeeded ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">Federazione</span>');
 
   const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
   const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Partita Amichevole">A</span>` : '';
   
   let badgeHtml = '';
   if (hasConflict) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
-  else if (isUrgentIncomplete) badgeHtml = `<div class="urgent-badge">⏰ GARA DI DOMANI INCOMPLETA</div>`;
+  else if (isUrgentIncomplete) badgeHtml = `<div class="urgent-badge">⏰ GARA IMMINENTE INCOMPLETA</div>`;
 
   return `<div class="match${ghostOn ? ' ghost' : ''}${missingReq ? ' missing-t1' : ''}${hasConflict ? ' conflict-match' : ''}${isUrgentIncomplete ? ' urgent-incomplete' : ''}" data-id="${i.id}">
     ${badgeHtml}
@@ -770,6 +799,8 @@ function openEditModal(matchId) {
   const it = items.find(x => x.id === matchId);
   if (!it) return;
 
+  const isFriendly = !!it.friendly;
+
   const ov = document.createElement('div');
   ov.className = 'ov';
   ov.id = 'editModalOv';
@@ -780,11 +811,12 @@ function openEditModal(matchId) {
     <div class="frow"><label for="edTitle">Partita (Squadre)</label><input id="edTitle" type="text" value="${esc(it.title)}"></div>
     <div class="frow"><label for="edCat">Categoria</label><input id="edCat" type="text" list="categoriesList" value="${esc(it.cat)}"></div>
     
-    <div class="frow" style="margin: 8px 0 12px">
-      <label class="checkbox-item" style="padding:4px 8px;font-size:13px">
-        <input id="edFriendly" type="checkbox"${it.friendly ? ' checked' : ''}>
-        <span style="font-weight:700;color:#9c17a3">Partita Amichevole (badge A)</span>
-      </label>
+    <div class="frow" style="display:flex;align-items:center;justify-content:space-between;margin:10px 0">
+      <label style="margin:0;font-size:13px;font-weight:600">Partita Amichevole:</label>
+      <div class="yn" id="edFriendlyYN" role="group">
+        <button type="button" data-val="si" aria-pressed="${isFriendly}">Sì</button>
+        <button type="button" data-val="no" aria-pressed="${!isFriendly}">No</button>
+      </div>
     </div>
 
     <div style="border-top:1px solid var(--line);margin:12px 0 10px;padding-top:8px">
@@ -803,6 +835,16 @@ function openEditModal(matchId) {
 
   document.body.appendChild(ov);
   bindTimePickerEvents(ov);
+
+  let currentFriendlyVal = isFriendly;
+  const ynBtns = ov.querySelectorAll('#edFriendlyYN button');
+  ynBtns.forEach(b => {
+    b.onclick = () => {
+      currentFriendlyVal = (b.dataset.val === 'si');
+      ynBtns.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    };
+  });
+
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
   document.getElementById('edCancel').onclick = () => ov.remove();
 
@@ -837,7 +879,7 @@ function openEditModal(matchId) {
     it.time = document.getElementById('finalTimeVal').value;
     it.title = document.getElementById('edTitle').value.trim();
     it.cat = document.getElementById('edCat').value.trim();
-    it.friendly = document.getElementById('edFriendly').checked;
+    it.friendly = currentFriendlyVal;
     it.t1 = document.getElementById('edT1').value.trim();
     it.t2 = document.getElementById('edT2').value.trim();
     it.arb = document.getElementById('edArb').value.trim();
@@ -877,7 +919,7 @@ function generateWhatsAppText(startDate, endDate, customTitle) {
       if (!it.friendly) {
         out += `  - Tavolo 2: ${t2}\n`;
       }
-      if (it.friendly || !isU15OrAbove(it.cat)) {
+      if (isRefereeNeeded(it.cat, it.friendly)) {
         const arb = it.arb && it.arb.trim() ? it.arb.trim() : '...';
         out += `  - Arbitro: ${arb}\n`;
       }
@@ -935,9 +977,6 @@ function render(focusId) {
   const fmt = (d, o) => d.toLocaleDateString('it-IT', o);
 
   const conflictsMap = findConflictingMatches();
-  const tomorrowObj = new Date();
-  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
-  const tomorrowIso = iso(tomorrowObj);
 
   listEl.innerHTML = keys.map(m => {
     const label = fmt(new Date(m + '-15T12:00'), { month: 'long', year: 'numeric' });
@@ -953,7 +992,7 @@ function render(focusId) {
         return a.time.localeCompare(b.time);
       }));
       const dayHtml = Object.keys(days).sort().map(dt => {
-        const isUrgentDay = dt === tomorrowIso;
+        const isUrgentDay = isWithinOneDayOrLess(dt);
         return `<div class="day"><h4>${fmt(new Date(dt + 'T12:00'), { weekday: 'short', day: 'numeric', month: 'short' })}</h4>${openClose(dt)}<div class="matches">${days[dt].map(it => card(it, conflictsMap.has(it.id), isUrgentDay && isMissingRequirements(it))).join('')}</div></div>`;
       }).join('');
       return `<details class="week${wantW === w ? ' hl' : ''}" id="w-${w}" data-m="${m}" data-w="${w}"${isOpen ? ' open' : ''}><summary><span class="t">Settimana ${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short' })}</span><span class="n">${list.length} ${list.length === 1 ? 'gara' : 'gare'}<button class="waBtn" data-wamsg="${w}" type="button" title="Copia turni">📲 WA</button></span></summary>${dayHtml}</details>`;
@@ -1044,11 +1083,12 @@ function openAddModal() {
     <div class="frow"><label for="nTitle">Partita</label><input id="nTitle" type="text" placeholder="Squadra A – Squadra B"></div>
     <div class="frow"><label for="nCat">Categoria</label><input id="nCat" type="text" list="categoriesList" placeholder="Es. U17"></div>
     
-    <div class="frow" style="margin: 8px 0 12px">
-      <label class="checkbox-item" style="padding:4px 8px;font-size:13px">
-        <input id="nFriendly" type="checkbox">
-        <span style="font-weight:700;color:#9c17a3">Partita Amichevole (badge A)</span>
-      </label>
+    <div class="frow" style="display:flex;align-items:center;justify-content:space-between;margin:10px 0">
+      <label style="margin:0;font-size:13px;font-weight:600">Partita Amichevole:</label>
+      <div class="yn" id="nFriendlyYN" role="group">
+        <button type="button" data-val="si" aria-pressed="false">Sì</button>
+        <button type="button" data-val="no" aria-pressed="true">No</button>
+      </div>
     </div>
 
     <div class="frow"><label for="nT1">Tavolo 1</label><input id="nT1" type="text" list="namesList" placeholder="Nome"></div>
@@ -1059,6 +1099,16 @@ function openAddModal() {
   </div>`;
   document.body.appendChild(ov);
   bindTimePickerEvents(ov);
+
+  let currentFriendlyVal = false;
+  const ynBtns = ov.querySelectorAll('#nFriendlyYN button');
+  ynBtns.forEach(b => {
+    b.onclick = () => {
+      currentFriendlyVal = (b.dataset.val === 'si');
+      ynBtns.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    };
+  });
+
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
   document.getElementById('nCancel').onclick = () => ov.remove();
   document.getElementById('nSave').onclick = () => {
@@ -1071,7 +1121,7 @@ function openAddModal() {
       date, 
       time, 
       cat: document.getElementById('nCat').value,
-      friendly: document.getElementById('nFriendly').checked,
+      friendly: currentFriendlyVal,
       t1: document.getElementById('nT1').value, 
       t2: document.getElementById('nT2').value, 
       arb: document.getElementById('nArb').value, 
