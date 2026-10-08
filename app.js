@@ -1,6 +1,34 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-function toast(t) { const m = $('#msg'); if (m) { m.textContent = t; m.classList.add('on'); setTimeout(() => m.classList.remove('on'), 2200); } }
+
+// MODULO HAPTIC FEEDBACK & TOAST MODERNO
+function triggerHaptic(type = 'light') {
+  // Supporto Telegram Web App nativo
+  if (window.Telegram?.WebApp?.HapticFeedback) {
+    if (type === 'success') window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+    else if (type === 'warning') window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+    else window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+    return;
+  }
+  // Fallback API di vibrazione browser nativo
+  if (navigator.vibrate) {
+    if (type === 'success') navigator.vibrate([30, 40, 40]);
+    else if (type === 'warning') navigator.vibrate([50, 60, 50]);
+    else navigator.vibrate(35);
+  }
+}
+
+let toastTimer = null;
+function toast(t, hapticType = 'light') {
+  triggerHaptic(hapticType);
+  const m = $('#msg');
+  if (m) {
+    m.textContent = t;
+    m.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => m.classList.remove('on'), 2300);
+  }
+}
 
 // CONFIGURAZIONE SUPABASE
 const SUPABASE_CONFIG = {
@@ -34,7 +62,7 @@ if ('serviceWorker' in navigator) {
 // MODULO NOTIFICHE
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
-    toast('Notifiche non supportate');
+    toast('Notifiche non supportate', 'warning');
     return false;
   }
   if (Notification.permission === 'granted') {
@@ -43,11 +71,11 @@ async function requestNotificationPermission() {
   }
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
-    toast('Notifiche attivate con successo!');
+    toast('Notifiche attivate!', 'success');
     checkAndTriggerScheduledNotifications();
     return true;
   }
-  toast('Permesso non concesso');
+  toast('Permesso non concesso', 'warning');
   return false;
 }
 
@@ -57,7 +85,7 @@ function dispatchAppNotification(title, bodyText, tag = 'partite-alert') {
     body: bodyText,
     tag: tag,
     icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="110" fill="%231d5fa8"/%3E%3Ccircle cx="256" cy="256" r="160" fill="none" stroke="white" stroke-width="28"/%3E%3C/svg%3E',
-    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Ccircle cx="256" cy="256" r="256" fill="%231d5fa8"/%3E%3C/svg%3E',
+    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="256" fill="%231d5fa8"/%3E%3C/svg%3E',
     vibrate: [200, 100, 200]
   };
   if (swRegistration && swRegistration.showNotification) {
@@ -67,15 +95,11 @@ function dispatchAppNotification(title, bodyText, tag = 'partite-alert') {
   }
 }
 
-// REGOLA ARBITRO:
-// L'arbitro NON serve SOLO se la partita NON è amichevole ED è una tra U15, U17 o U19.
 function isRefereeNeeded(cat, isFriendly) {
   if (isFriendly) return true;
   if (!cat) return true;
   const c = cat.toUpperCase().replace(/\s+/g, '');
-  if (c === 'U15' || c === 'U17' || c === 'U19') {
-    return false;
-  }
+  if (c === 'U15' || c === 'U17' || c === 'U19') return false;
   return true;
 }
 
@@ -97,8 +121,7 @@ function isWithinOneDayOrLess(dateStr) {
   const todayIso = iso(now);
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowIso = iso(tomorrow);
-  return (dateStr === todayIso || dateStr === tomorrowIso);
+  return (dateStr === todayIso || dateStr === iso(tomorrow));
 }
 
 function getUrgentIncompleteMatches() {
@@ -149,6 +172,7 @@ function checkAndTriggerScheduledNotifications() {
 
 setInterval(checkAndTriggerScheduledNotifications, 60000);
 
+// Gestione Temi
 let currentTheme = localStorage.getItem('partite-theme') || 'default';
 function applyTheme(themeName) {
   currentTheme = themeName;
@@ -177,7 +201,6 @@ try { categories = JSON.parse(localStorage.getItem('partite-categorie-v1')) || [
 
 let pinHash = null;
 let isDirty = false;
-let isSaving = false;
 
 const saveLocalOnly = () => {
   try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){}
@@ -208,7 +231,7 @@ const saveMolt = () => { saveMoltLocal(); scheduleCloudPush(); };
 const saveNames = () => { saveNamesLocal(); scheduleCloudPush(); };
 const saveCategories = () => { saveCategoriesLocal(); scheduleCloudPush(); };
 
-// Inizializzazione protetta Supabase
+// Inizializzazione Client Supabase
 let sb = null;
 try {
   if (window.supabase && SUPABASE_CONFIG.url && SUPABASE_CONFIG.key) {
@@ -218,29 +241,17 @@ try {
   sb = null;
 }
 
-// GESTIONE PALLINO CON 3 SECONDI GARANTITI
-let syncOrangeUntil = 0;
 function setSyncVisualState(state, tooltip) {
   const dot = document.getElementById('syncDot');
   const wrap = document.getElementById('syncIndicatorWrap');
   if (!wrap || !dot) return;
   wrap.style.display = 'inline-flex';
-
   if (state === 'orange') {
-    syncOrangeUntil = Date.now() + 3000;
     dot.className = 'sync-dot sync-orange';
-    dot.title = tooltip || 'Salvataggio in corso…';
+    dot.title = tooltip || 'Sincronizzazione…';
   } else if (state === 'green') {
-    const remaining = syncOrangeUntil - Date.now();
-    if (remaining > 0) {
-      setTimeout(() => {
-        dot.className = 'sync-dot sync-green';
-        dot.title = tooltip || (sb ? 'Sincronizzato sul cloud' : 'Memoria locale');
-      }, remaining);
-    } else {
-      dot.className = 'sync-dot sync-green';
-      dot.title = tooltip || (sb ? 'Sincronizzato sul cloud' : 'Memoria locale');
-    }
+    dot.className = 'sync-dot sync-green';
+    dot.title = tooltip || (sb ? 'Sincronizzato Realtime' : 'Memoria locale');
   } else if (state === 'red') {
     dot.className = 'sync-dot sync-red';
     dot.title = tooltip || 'Cloud non raggiungibile';
@@ -276,8 +287,7 @@ function applyCloudData(raw) {
 }
 
 async function cloudPushNow() {
-  if (!sb || READONLY || isSaving) return false;
-  isSaving = true;
+  if (!sb || READONLY) return false;
   setSyncVisualState('orange');
   try {
     const { error } = await sb.from('partite_board').upsert({
@@ -288,11 +298,9 @@ async function cloudPushNow() {
     if (error) throw error;
     isDirty = false;
     setSyncVisualState('green');
-    isSaving = false;
     return true;
   } catch (err) {
     setSyncVisualState('red');
-    isSaving = false;
     return false;
   }
 }
@@ -300,18 +308,13 @@ async function cloudPushNow() {
 let syncTimer = null;
 function scheduleCloudPush() {
   clearTimeout(syncTimer);
-  setSyncVisualState('orange');
-  syncTimer = setTimeout(cloudPushNow, 800);
+  syncTimer = setTimeout(cloudPushNow, 1200);
 }
 
 async function cloudPullSafe(silent) {
   if (!sb) return false;
-  if (isDirty || isSaving) {
-    if (!READONLY) await cloudPushNow();
-    return false;
-  }
-
-  if (!silent) setSyncVisualState('orange', 'Aggiornamento…');
+  if (isDirty && !READONLY) await cloudPushNow();
+  if (!silent) setSyncVisualState('orange');
   try {
     const raw = await cloudFetchRaw();
     if (raw) {
@@ -326,6 +329,41 @@ async function cloudPullSafe(silent) {
     return false;
   }
 }
+
+// ATTIVAZIONE SINCRONIZZAZIONE REALTIME TRAMITE WEBSOCKET SUPABASE
+function setupSupabaseRealtime() {
+  if (!sb) return;
+  try {
+    sb.channel('realtime_partite_board')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'partite_board', filter: `id=eq.${SUPABASE_CONFIG.board}` },
+        payload => {
+          // Se la modifica è arrivata da un altro dispositivo o dal Bot Telegram
+          if (payload.new && payload.new.data) {
+            // Evita di sovrascrivere se ci sono modifiche locali non ancora salvate
+            if (!isDirty) {
+              applyCloudData(payload.new.data);
+              render();
+              triggerHaptic('light');
+              setSyncVisualState('green', 'Aggiornato in tempo reale');
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setSyncVisualState('green', 'Connesso Realtime');
+        }
+      });
+  } catch (e) {
+    console.warn('Realtime fallback attivo', e);
+  }
+}
+
+setInterval(() => {
+  if (isDirty && sb && !READONLY) cloudPushNow();
+}, 5000);
 
 let filterCat = '';
 let filterIncomplete = false;
@@ -400,7 +438,7 @@ function updateAlertStatusBadge() {
   btn.className = 'alert-btn-standalone status-ok';
   btn.textContent = `✓`;
   btn.title = `Nessun conflitto o urgenza rilevata. Calendario regolare.`;
-  btn.onclick = () => toast('Nessun conflitto o turno incompleto nelle prossime 24-48 ore.');
+  btn.onclick = () => toast('Calendario regolare: nessun conflitto.');
 }
 
 function openConflictsModal() {
@@ -561,6 +599,7 @@ function bindTimePickerEvents(container) {
 
   chips.forEach(chip => {
     chip.onclick = () => {
+      triggerHaptic('light');
       const [newH, newM] = chip.dataset.timeval.split(':');
       pHour.value = newH;
       pMin.value = newM;
@@ -612,7 +651,7 @@ function exportSelectedMonthsJSON(selectedMonths) {
       partite: days[d]
     };
   });
-  if (!out.length) { toast('Nessun dato presente'); return; }
+  if (!out.length) { toast('Nessun dato presente', 'warning'); return; }
   const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url;
@@ -623,7 +662,7 @@ function exportSelectedMonthsJSON(selectedMonths) {
 
 function openExportMultiModal() {
   const months = monthsWithData();
-  if (!months.length) { toast('Nessun mese con partite'); return; }
+  if (!months.length) { toast('Nessun mese con partite', 'warning'); return; }
   const ov = document.createElement('div');
   ov.className = 'ov';
   ov.id = 'exportMultiOv';
@@ -658,7 +697,7 @@ function openExportMultiModal() {
 
   document.getElementById('expDownload').onclick = () => {
     const selected = Array.from(ov.querySelectorAll('input[name=mExpChk]:checked')).map(c => c.value);
-    if (!selected.length) { toast('Seleziona un mese'); return; }
+    if (!selected.length) { toast('Seleziona un mese', 'warning'); return; }
     exportSelectedMonthsJSON(selected);
     ov.remove();
   };
@@ -666,7 +705,7 @@ function openExportMultiModal() {
 
 function copyMonthRecapWhatsApp(m) {
   const rows = computeRecapRows(m);
-  if (!rows.length) { toast('Nessun dato presente'); return; }
+  if (!rows.length) { toast('Nessun dato presente', 'warning'); return; }
   let out = `📊 *RIEPILOGO TURNI — ${monthLabel(m).toUpperCase()}*\n\n`;
   rows.forEach(r => {
     const v = Object.assign({ p: 10, a: 10, c: 10 }, molt[r.n.toLowerCase()]);
@@ -675,7 +714,7 @@ function copyMonthRecapWhatsApp(m) {
   });
   try {
     navigator.clipboard.writeText(out.trim());
-    toast('Riepilogo copiato per WhatsApp!');
+    toast('Riepilogo copiato per WhatsApp!', 'success');
   } catch(e) { prompt('Copia il testo:', out); }
 }
 
@@ -726,6 +765,7 @@ function initMenu(btnId, dropId) {
   const btn = $('#' + btnId), drop = $('#' + dropId); if (!btn || !drop) return;
   btn.onclick = e => {
     e.stopPropagation();
+    triggerHaptic('light');
     const open = drop.hidden;
     closeMenus();
     drop.hidden = !open;
@@ -830,6 +870,7 @@ function openEditModal(matchId) {
   const ynBtns = ov.querySelectorAll('#edFriendlyYN button');
   ynBtns.forEach(b => {
     b.onclick = () => {
+      triggerHaptic('light');
       currentFriendlyVal = (b.dataset.val === 'si');
       ynBtns.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     };
@@ -844,8 +885,9 @@ function openEditModal(matchId) {
       pushUndo();
       items = items.filter(x => x.id !== matchId);
       save(); ov.remove(); render();
-      toast('Partita eliminata');
+      toast('Partita eliminata', 'warning');
     } else {
+      triggerHaptic('warning');
       delBtn.dataset.arm = '1';
       delBtn.textContent = 'Sicuro?';
       delBtn.style.background = '#dc2626';
@@ -863,7 +905,7 @@ function openEditModal(matchId) {
 
   document.getElementById('edSave').onclick = () => {
     const newDate = document.getElementById('edDate').value;
-    if (!newDate) { toast('La data è obbligatoria'); return; }
+    if (!newDate) { toast('La data è obbligatoria', 'warning'); return; }
     pushUndo();
     it.date = newDate;
     it.time = document.getElementById('finalTimeVal').value;
@@ -877,14 +919,14 @@ function openEditModal(matchId) {
     setParam('m', it.date.slice(0, 7));
     setParam('s', iso(monday(it.date)));
     render(it.id);
-    toast('Salvato');
+    toast('Salvato', 'success');
   };
 }
 
 function generateWhatsAppText(startDate, endDate, customTitle) {
   const startStr = iso(startDate), endStr = iso(endDate);
   const filtered = items.filter(i => i.date >= startStr && i.date <= endStr);
-  if (!filtered.length) { toast('Nessuna partita nel periodo'); return; }
+  if (!filtered.length) { toast('Nessuna partita nel periodo', 'warning'); return; }
 
   const fmtDayHeader = dStr => new Date(dStr + 'T12:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
   const fmtShort = d => d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
@@ -919,7 +961,7 @@ function generateWhatsAppText(startDate, endDate, customTitle) {
 
   try {
     navigator.clipboard.writeText(out.trim());
-    toast('Turni copiati per WhatsApp!');
+    toast('Turni copiati per WhatsApp!', 'success');
   } catch(e) { prompt('Copia il testo:', out); }
 }
 
@@ -995,7 +1037,7 @@ function render(focusId) {
   if (wantW) { const el = document.getElementById('w-' + wantW); if (el) el.scrollIntoView({ block: 'start' }); }
   if (focusId) {
     const el = document.querySelector(`[data-id="${focusId}"]`);
-    if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 }
 
@@ -1013,6 +1055,7 @@ document.addEventListener('click', e => {
     const id = gh.closest('.match').dataset.id;
     const it = items.find(x => x.id === id); if (!it) return;
     pushUndo(); it.ghost = !it.ghost; save(); render();
+    triggerHaptic('light');
     return;
   }
 
@@ -1020,12 +1063,13 @@ document.addEventListener('click', e => {
   if (editBtn && !READONLY) {
     e.stopPropagation();
     const id = editBtn.closest('.match')?.dataset?.id;
-    if (id) openEditModal(id);
+    if (id) { triggerHaptic('light'); openEditModal(id); }
     return;
   }
 
   const matchCard = e.target.closest('.match');
   if (matchCard && !READONLY && !e.target.closest('button')) {
+    triggerHaptic('light');
     openEditModal(matchCard.dataset.id);
     return;
   }
@@ -1046,6 +1090,7 @@ document.addEventListener('click', e => {
 
   const yn = e.target.closest('[data-yn]');
   if (yn && !READONLY) {
+    triggerHaptic('light');
     const sl = yn.closest('.slot'), d = sl.dataset.d, k = sl.dataset.k, wk = (dayMeta[d] ??= {});
     pushUndo(); wk[k] = yn.dataset.yn; if (wk[k] === 'no') delete wk[k + 'Nome']; saveD(); updateRecap(d.slice(0, 7));
     sl.outerHTML = slotHTML(d, k);
@@ -1054,7 +1099,11 @@ document.addEventListener('click', e => {
   }
 
   const nb = e.target.closest('[data-name]');
-  if (nb && !READONLY) { openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m); return; }
+  if (nb && !READONLY) { 
+    triggerHaptic('light');
+    openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m); 
+    return; 
+  }
 });
 
 document.addEventListener('toggle', e => {
@@ -1094,6 +1143,7 @@ function openAddModal() {
   const ynBtns = ov.querySelectorAll('#nFriendlyYN button');
   ynBtns.forEach(b => {
     b.onclick = () => {
+      triggerHaptic('light');
       currentFriendlyVal = (b.dataset.val === 'si');
       ynBtns.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     };
@@ -1103,7 +1153,12 @@ function openAddModal() {
   document.getElementById('nCancel').onclick = () => ov.remove();
   document.getElementById('nSave').onclick = () => {
     const date = document.getElementById('nDate').value;
-    if (!date) { document.getElementById('nErr').classList.add('on'); document.getElementById('nDate').focus(); return; }
+    if (!date) { 
+      toast('Inserisci almeno la data', 'warning');
+      document.getElementById('nErr').classList.add('on'); 
+      document.getElementById('nDate').focus(); 
+      return; 
+    }
     const time = document.getElementById('finalTimeVal').value;
     const it = { 
       id: uid(), 
@@ -1119,6 +1174,7 @@ function openAddModal() {
     };
     pushUndo(); items.push(it); save(); ov.remove();
     setParam('m', it.date.slice(0, 7)); setParam('s', iso(monday(it.date))); render(it.id);
+    toast('Partita aggiunta!', 'success');
   };
   document.getElementById('nDate').focus();
 }
@@ -1360,7 +1416,7 @@ function performUndo() {
   items = prev.items; dayMeta = prev.dayMeta;
   save(); saveD();
   refreshUndoBtn(); render();
-  toast('Modifica annullata');
+  toast('Modifica annullata', 'warning');
 }
 
 window.addEventListener('keydown', e => {
@@ -1371,12 +1427,12 @@ window.addEventListener('keydown', e => {
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
-    if (!READONLY) cloudPushNow().then(() => toast('Modifiche salvate'));
+    if (!READONLY) cloudPushNow().then(() => toast('Modifiche salvate', 'success'));
   }
 });
 
 function generateMonthPDF(m) {
-  if (!(window.jspdf && window.jspdf.jsPDF)) { toast('Libreria non caricata'); return; }
+  if (!(window.jspdf && window.jspdf.jsPDF)) { toast('Libreria non caricata', 'warning'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
@@ -1428,10 +1484,9 @@ function generateMonthPDF(m) {
     nl(4);
   });
   doc.save('partite_' + m + '.pdf');
-  toast('PDF scaricato');
+  toast('PDF scaricato', 'success');
 }
 
-// GESTIONE LOGIN / PASSWORD ADMIN
 function setAuthMode(isAdmin) {
   READONLY = !isAdmin;
   if (document.body) {
@@ -1481,8 +1536,9 @@ function promptLogin() {
       sessionStorage.setItem('partite_admin_auth', '1');
       setAuthMode(true);
       ov.remove();
-      toast('Accesso consentito');
+      toast('Accesso consentito', 'success');
     } else {
+      triggerHaptic('warning');
       document.getElementById('loginErr').classList.add('on');
       document.getElementById('loginPin').value = '';
       document.getElementById('loginPin').focus();
@@ -1519,9 +1575,10 @@ function promptChangePin() {
   document.getElementById('chPinSave').onclick = async () => {
     const oldP = document.getElementById('oldPin').value;
     const newP = document.getElementById('newPin').value;
-    if (!newP) { toast('Inserisci una password'); return; }
+    if (!newP) { toast('Inserisci una password', 'warning'); return; }
 
     if (!(await verifyPin(oldP))) {
+      triggerHaptic('warning');
       document.getElementById('chPinErr').classList.add('on');
       return;
     }
@@ -1529,7 +1586,7 @@ function promptChangePin() {
     pinHash = await sha256hex(newP);
     await cloudPushNow();
     ov.remove();
-    toast('Password salvata');
+    toast('Password salvata', 'success');
   };
 }
 
@@ -1546,7 +1603,7 @@ function bindEvents() {
       const cleanUrl = location.origin + location.pathname;
       try {
         await navigator.clipboard.writeText(cleanUrl);
-        toast('Link copiato!');
+        toast('Link copiato!', 'success');
       } catch(e) { prompt('Copia il link:', cleanUrl); }
     };
   }
@@ -1578,15 +1635,14 @@ function bindEvents() {
   const qSave = $('#quickSaveBtn');
   if (qSave) qSave.onclick = async () => {
     const ok = await cloudPushNow();
-    toast(ok ? 'Salvataggio completato sul cloud!' : 'Errore durante il salvataggio');
+    toast(ok ? 'Salvataggio completato!' : 'Errore salvataggio', ok ? 'success' : 'warning');
   };
 
   const qPull = $('#quickPullBtn');
   if (qPull) qPull.onclick = async () => {
-    isDirty = false;
     await cloudPullSafe(false);
     render();
-    toast('Dati aggiornati!');
+    toast('Aggiornato!', 'success');
   };
 
   const expMulti = $('#exportMultiJsonBtn');
@@ -1607,6 +1663,7 @@ function bindEvents() {
   const todayB = $('#todayBtn');
   if (todayB) {
     todayB.onclick = () => {
+      triggerHaptic('light');
       const t = iso(new Date());
       setParam('m', t.slice(0, 7)); setParam('s', iso(monday(t)));
       render();
@@ -1619,6 +1676,7 @@ function bindEvents() {
   const fInc = $('#filterIncomplete');
   if (fInc) {
     fInc.onclick = e => {
+      triggerHaptic('light');
       filterIncomplete = !filterIncomplete;
       e.target.setAttribute('aria-pressed', String(filterIncomplete));
       render();
@@ -1697,7 +1755,7 @@ function bindEvents() {
   if (prnB) {
     prnB.onclick = () => {
       const months = monthsWithData();
-      if (!months.length) { toast('Nessuna gara presente'); return; }
+      if (!months.length) { toast('Nessuna gara presente', 'warning'); return; }
       const cur = params().get('m');
       const def = months.includes(cur) ? cur : months[months.length - 1];
       const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'printOv';
@@ -1740,8 +1798,8 @@ function bindEvents() {
           items = [...map.values()];
           Object.assign(dayMeta, wi);
           save(); saveD(); render();
-          toast(`${newItems.length} partite importate`);
-        } catch(err) { toast('File non valido'); }
+          toast(`${newItems.length} partite importate`, 'success');
+        } catch(err) { toast('File non valido', 'warning'); }
       };
       reader.readAsText(file);
     };
@@ -1774,15 +1832,15 @@ function bindEvents() {
       document.getElementById('pdfGo').onclick = async () => {
         const file = document.getElementById('pdfFile').files[0];
         const team = document.getElementById('pdfTeam').value.trim();
-        if (!file || !team) { toast('Dati mancanti'); return; }
-        if (!window.pdfjsLib) { toast('Libreria non caricata'); return; }
+        if (!file || !team) { toast('Dati mancanti', 'warning'); return; }
+        if (!window.pdfjsLib) { toast('Libreria non caricata', 'warning'); return; }
         const btn = document.getElementById('pdfGo'); btn.disabled = true; btn.textContent = 'Estrazione…';
         try {
           const lines = await pdfToLines(file);
           pdfCandidates = extractHomeMatches(lines, team);
           document.getElementById('pdfConfirmBtns').style.display = pdfCandidates.length ? 'flex' : 'none';
           renderPdfPreview();
-        } catch(e) { toast('Errore lettura'); }
+        } catch(e) { toast('Errore lettura', 'warning'); }
         btn.disabled = false; btn.textContent = 'Estrai';
       };
       document.getElementById('pdfAddAll').onclick = () => {
@@ -1803,7 +1861,7 @@ function bindEvents() {
         save(); 
         ov.remove(); 
         render();
-        toast(`${valid.length} gare aggiunte`);
+        toast(`${valid.length} gare aggiunte`, 'success');
       };
     };
   }
@@ -1815,6 +1873,18 @@ function bindEvents() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  // Inizializza Telegram WebApp se aperto dall'interno di Telegram
+  if (window.Telegram?.WebApp) {
+    try {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+      // Abilita la barra superiore coordinata
+      if (window.Telegram.WebApp.setHeaderColor) {
+        window.Telegram.WebApp.setHeaderColor('#1f2020');
+      }
+    } catch(e) {}
+  }
+
   bindEvents();
   renderNamesList();
   renderCategoriesList();
@@ -1837,18 +1907,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch(e) {
       setSyncVisualState('red');
     }
+    // Avvia la connessione Realtime WebSocket
+    setupSupabaseRealtime();
   } else {
     setSyncVisualState('green', 'Memoria locale attiva');
   }
 
   render();
   checkAndTriggerScheduledNotifications();
-
-  if (sb) {
-    setInterval(() => {
-      if (READONLY) {
-        cloudPullSafe(true).then(render);
-      }
-    }, 15000);
-  }
 });

@@ -390,8 +390,25 @@ body.ro .match{cursor:default}
 .menuDrop button:hover{background:var(--hl)}
 
 .robanner{background:var(--hl);border-radius:8px;padding:6px 10px;font-size:13px;margin-bottom:10px;text-align:center;color:var(--acc);font-weight:600}
-#msg{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);color:var(--ink);padding:8px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:99999999;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.45)}
-#msg.on{opacity:1;transform:translateX(-50%) translateY(-2px)}
+#msg{
+  position:fixed;left:50%;bottom:28px;
+  transform:translateX(-50%) translateY(20px) scale(0.95);
+  background:rgba(26, 27, 28, 0.94);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(255, 255, 255, 0.12);
+  color:#f8fafc;padding:10px 22px;border-radius:999px;
+  opacity:0;pointer-events:none;
+  transition:all .28s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index:99999999;font-weight:600;font-size:13px;
+  box-shadow:0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+  display:inline-flex;align-items:center;gap:8px;white-space:nowrap;
+}
+#msg::before{
+  content:'✨';font-size:14px;
+}
+#msg.on{
+  opacity:1;transform:translateX(-50%) translateY(0) scale(1);
+}
 .empty{text-align:center;color:var(--mute);padding:40px 10px;border:2px dashed var(--line);border-radius:12px}
 
 body.ro .editBtn,body.ro .ghostBtn{display:none!important}
