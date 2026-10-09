@@ -1290,8 +1290,19 @@ document.addEventListener('click', e => {
     e.stopPropagation();
     const id = gh.closest('.match').dataset.id;
     const it = items.find(x => x.id === id); if (!it) return;
-    pushUndo(); it.ghost = !it.ghost; save(); render();
-    triggerHaptic('light');
+
+    if (it.ghost) {
+      // Se era già chiusa, un tap toglie il check e riapre alle modifiche
+      pushUndo();
+      it.ghost = false;
+      save();
+      render();
+      triggerHaptic('light');
+      toast('Check rimosso: modifiche riabilitate', 'warning');
+    } else {
+      // Se non era chiusa, apri il menu rapido Post-Gara Express
+      openQuickCloseModal(id);
+    }
     return;
   }
 
@@ -2224,3 +2235,98 @@ window.addEventListener('DOMContentLoaded', async () => {
   render();
   checkAndTriggerScheduledNotifications();
 });
+// MODAL RAPIDO POST-GARA EXPRESS (1 TAP)
+function openQuickCloseModal(matchId) {
+  const it = items.find(x => x.id === matchId);
+  if (!it) return;
+
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'quickCloseOv';
+
+  let selectedStatus = it.status || '';
+  let homeScore = '';
+  let awayScore = '';
+  if (it.score && String(it.score).includes('-')) {
+    const parts = it.score.split('-');
+    homeScore = parts[0]?.trim() || '';
+    awayScore = parts[1]?.trim() || '';
+  }
+
+  ov.innerHTML = `<div class="modal quick-close-modal" role="dialog" aria-modal="true">
+    <div class="quick-close-header">🏁 Chiudi Partita</div>
+    <div class="quick-close-sub">${esc(it.title || 'Gara')}</div>
+
+    <div class="quick-outcome-grid">
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'vinta' ? 'active' : ''}" data-outcome="vinta">
+        <span style="font-size:16px">🟢</span> Vinta
+      </button>
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'persa' ? 'active' : ''}" data-outcome="persa">
+        <span style="font-size:16px">🔴</span> Persa
+      </button>
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'sospesa' ? 'active' : ''}" data-outcome="sospesa">
+        <span style="font-size:16px">⚪</span> Sosp.
+      </button>
+    </div>
+
+    <div style="font-size:11px;color:var(--mute);margin-bottom:4px">Punti (opzionale): Casa - Ospiti</div>
+    <div class="quick-score-inputs">
+      <input type="number" inputmode="numeric" id="qcHome" placeholder="Casa" value="${esc(homeScore)}">
+      <span style="font-weight:800;font-size:16px">:</span>
+      <input type="number" inputmode="numeric" id="qcAway" placeholder="Ospiti" value="${esc(awayScore)}">
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button type="button" class="primary" id="qcSave" style="width:100%;min-height:38px">✓ Conferma & Chiudi</button>
+      <div style="display:flex;gap:6px">
+        <button type="button" id="qcCancel" style="flex:1">Annulla</button>
+        <button type="button" id="qcOnlyCheck" style="flex:1" title="Metti solo il check senza esito">Solo Check</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  triggerHaptic('light');
+
+  const outcomeBtns = ov.querySelectorAll('.quick-outcome-btn');
+  outcomeBtns.forEach(btn => {
+    btn.onclick = () => {
+      triggerHaptic('light');
+      const val = btn.dataset.outcome;
+      if (selectedStatus === val) {
+        selectedStatus = '';
+        btn.classList.remove('active');
+      } else {
+        selectedStatus = val;
+        outcomeBtns.forEach(b => b.classList.toggle('active', b === btn));
+      }
+    };
+  });
+
+  const finalizeClose = (withDetails = true) => {
+    pushUndo();
+    it.ghost = true;
+    if (withDetails) {
+      const h = ov.querySelector('#qcHome').value.trim();
+      const a = ov.querySelector('#qcAway').value.trim();
+      if (h !== '' && a !== '') {
+        it.score = `${h}-${a}`;
+        if (!selectedStatus) {
+          const hn = Number(h), an = Number(a);
+          if (hn > an) selectedStatus = 'vinta';
+          else if (hn < an) selectedStatus = 'persa';
+        }
+      }
+      it.status = selectedStatus;
+    }
+    save();
+    ov.remove();
+    render();
+    toast('Partita chiusa e svolta ✓', 'success');
+  };
+
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#qcCancel').onclick = () => ov.remove();
+  ov.querySelector('#qcOnlyCheck').onclick = () => finalizeClose(false);
+  ov.querySelector('#qcSave').onclick = () => finalizeClose(true);
+}
