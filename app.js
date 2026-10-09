@@ -1,16 +1,19 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-// MODULO HAPTIC FEEDBACK & TOAST MODERNO
+// Rileva se è aperto un modal/dialogo
+function isModalOpen() {
+  return !!document.querySelector('.ov');
+}
+
+// MODULO HAPTIC & TOAST
 function triggerHaptic(type = 'light') {
-  // Supporto Telegram Web App nativo
   if (window.Telegram?.WebApp?.HapticFeedback) {
     if (type === 'success') window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
     else if (type === 'warning') window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
     else window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
     return;
   }
-  // Fallback API di vibrazione browser nativo
   if (navigator.vibrate) {
     if (type === 'success') navigator.vibrate([30, 40, 40]);
     else if (type === 'warning') navigator.vibrate([50, 60, 50]);
@@ -40,7 +43,6 @@ const SUPABASE_CONFIG = {
 const DEFAULT_PIN = '1234';
 let READONLY = true;
 
-// Gestione click Login
 window.handleAuthClick = function() {
   if (READONLY) {
     promptLogin();
@@ -51,7 +53,6 @@ window.handleAuthClick = function() {
   }
 };
 
-// Registrazione Service Worker
 let swRegistration = null;
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js')
@@ -59,7 +60,6 @@ if ('serviceWorker' in navigator) {
     .catch(() => {});
 }
 
-// MODULO NOTIFICHE
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
     toast('Notifiche non supportate', 'warning');
@@ -126,6 +126,50 @@ function isWithinOneDayOrLess(dateStr) {
 
 function getUrgentIncompleteMatches() {
   return items.filter(it => isWithinOneDayOrLess(it.date) && isMissingRequirements(it));
+}
+
+// CALCOLO ESITO E PUNTEGGIO
+function getMatchOutcome(item) {
+  if (item.status === 'sospesa') return { type: 'suspended', label: 'Sospesa' };
+  if (item.status === 'vinta') return { type: 'win', label: item.score ? `${item.score} (V)` : 'Vinta' };
+  if (item.status === 'persa') return { type: 'loss', label: item.score ? `${item.score} (P)` : 'Persa' };
+
+  if (item.score && String(item.score).includes('-')) {
+    const [h, a] = item.score.split('-').map(x => parseInt(x.trim(), 10));
+    if (!isNaN(h) && !isNaN(a)) {
+      if (h > a) return { type: 'win', label: `${h}-${a}` };
+      if (h < a) return { type: 'loss', label: `${h}-${a}` };
+      return { type: 'suspended', label: `${h}-${a}` };
+    }
+  }
+  return null;
+}
+
+function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb) {
+  if (!date || !timeStr) return [];
+  const assigned = [t1, t2, arb].map(x => (x || '').trim().toLowerCase()).filter(Boolean);
+  if (!assigned.length) return [];
+
+  const [th, tm] = timeStr.split(':').map(Number);
+  const targetMinutes = th * 60 + tm;
+  const conflicts = [];
+
+  items.filter(it => it.id !== targetMatchId && it.date === date && it.time).forEach(it => {
+    const [oh, om] = it.time.split(':').map(Number);
+    const otherMinutes = oh * 60 + om;
+    const diff = Math.abs(targetMinutes - otherMinutes);
+
+    if (diff < 120) {
+      const otherNames = [it.t1, it.t2, it.arb].map(x => (x || '').trim().toLowerCase()).filter(Boolean);
+      assigned.forEach(n => {
+        if (otherNames.includes(n)) {
+          conflicts.push(`⚠️ <b>${n.toUpperCase()}</b> è già impegnato alle ${it.time} (${it.title || 'Altra gara'})`);
+        }
+      });
+    }
+  });
+
+  return [...new Set(conflicts)];
 }
 
 function checkAndTriggerScheduledNotifications() {
@@ -231,7 +275,6 @@ const saveMolt = () => { saveMoltLocal(); scheduleCloudPush(); };
 const saveNames = () => { saveNamesLocal(); scheduleCloudPush(); };
 const saveCategories = () => { saveCategoriesLocal(); scheduleCloudPush(); };
 
-// Inizializzazione Client Supabase
 let sb = null;
 try {
   if (window.supabase && SUPABASE_CONFIG.url && SUPABASE_CONFIG.key) {
@@ -330,7 +373,6 @@ async function cloudPullSafe(silent) {
   }
 }
 
-// ATTIVAZIONE SINCRONIZZAZIONE REALTIME TRAMITE WEBSOCKET SUPABASE
 function setupSupabaseRealtime() {
   if (!sb) return;
   try {
@@ -339,10 +381,8 @@ function setupSupabaseRealtime() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'partite_board', filter: `id=eq.${SUPABASE_CONFIG.board}` },
         payload => {
-          // Se la modifica è arrivata da un altro dispositivo o dal Bot Telegram
           if (payload.new && payload.new.data) {
-            // Evita di sovrascrivere se ci sono modifiche locali non ancora salvate
-            if (!isDirty) {
+            if (!isDirty && !isModalOpen()) {
               applyCloudData(payload.new.data);
               render();
               triggerHaptic('light');
@@ -351,10 +391,8 @@ function setupSupabaseRealtime() {
           }
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setSyncVisualState('green', 'Connesso Realtime');
-        }
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') setSyncVisualState('green', 'Connesso Realtime');
       });
   } catch (e) {
     console.warn('Realtime fallback attivo', e);
@@ -362,11 +400,12 @@ function setupSupabaseRealtime() {
 }
 
 setInterval(() => {
-  if (isDirty && sb && !READONLY) cloudPushNow();
+  if (isDirty && sb && !READONLY && !isModalOpen()) cloudPushNow();
 }, 5000);
 
 let filterCat = '';
 let filterIncomplete = false;
+let searchQuery = '';
 
 function renderNamesList() {
   const dl = document.getElementById('namesList');
@@ -620,9 +659,9 @@ function openMoltModal(name, counts, month) {
   };
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Moltiplicatori">
     <h3>${esc(name)}</h3>
-    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="mp">Partite (${counts.p}) ×</label><input id="mp" type="number" min="0" value="${v.p}"></div>
-    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="ma">Aperture (${counts.a}) ×</label><input id="ma" type="number" min="0" value="${v.a}"></div>
-    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="mc">Chiusure (${counts.c}) ×</label><input id="mc" type="number" min="0" value="${v.c}"></div>
+    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="mp">Partite (${counts.p}) ×</label><input id="mp" type="number" inputmode="numeric" min="0" value="${v.p}"></div>
+    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="ma">Aperture (${counts.a}) ×</label><input id="ma" type="number" inputmode="numeric" min="0" value="${v.a}"></div>
+    <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="mc">Chiusure (${counts.c}) ×</label><input id="mc" type="number" inputmode="numeric" min="0" value="${v.c}"></div>
     <div style="display:flex;justify-content:space-between;font-weight:600;margin:10px 0;padding-top:6px;border-top:1px solid var(--line)"><span>Totale</span><span id="mtot">${counts.p * v.p + counts.a * v.a + counts.c * v.c}</span></div>
     <div class="mbtns"><button id="mCancel">Annulla</button><button class="primary" id="mSave">Salva</button></div>
   </div>`;
@@ -637,10 +676,149 @@ function openMoltModal(name, counts, month) {
   document.getElementById('mp').focus();
 }
 
+// SCHEDA DETTAGLIATA COLLABORATORE (APRIBILE DA GESTIONE NOMI)
+function openPersonHistoryModal(personName) {
+  const normTarget = (personName || '').trim().toLowerCase();
+  if (!normTarget) return;
+
+  const completedMatches = items.filter(it => {
+    return !!it.ghost && [it.t1, it.t2, it.arb].some(n => (n || '').trim().toLowerCase() === normTarget);
+  }).sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+
+  const totalMatchesCount = completedMatches.length;
+  const last3Matches = completedMatches.slice(0, 3);
+
+  let winsCount = 0;
+  let lossCount = 0;
+  let otherCount = 0;
+
+  completedMatches.forEach(it => {
+    const outcome = getMatchOutcome(it);
+    if (outcome?.type === 'win') winsCount++;
+    else if (outcome?.type === 'loss') lossCount++;
+    else otherCount++;
+  });
+
+  const recentListHtml = last3Matches.length
+    ? last3Matches.map(it => {
+        const outcome = getMatchOutcome(it);
+        let pillHtml = '<span class="score-pill suspended">—</span>';
+        if (outcome) {
+          pillHtml = `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>`;
+        }
+        
+        let role = '';
+        if ((it.t1 || '').trim().toLowerCase() === normTarget) role = 'T1';
+        else if ((it.t2 || '').trim().toLowerCase() === normTarget) role = 'T2';
+        else if ((it.arb || '').trim().toLowerCase() === normTarget) role = 'Arb';
+
+        return `<div class="player-recent-item">
+          <div>
+            <div style="font-weight:700">${esc(it.title || 'Partita')}</div>
+            <div style="font-size:11px;color:var(--mute)">${it.date} (${it.time || 'n.d.'}) • Ruolo: <b>${role}</b></div>
+          </div>
+          <div>${pillHtml}</div>
+        </div>`;
+      }).join('')
+    : '<p style="color:var(--mute);font-size:12px;margin:4px 0">Nessuna partita svolta con check ✓.</p>';
+
+  const maxStat = Math.max(winsCount, lossCount, otherCount, 1);
+  const winHeight = Math.round((winsCount / maxStat) * 100);
+  const lossHeight = Math.round((lossCount / maxStat) * 100);
+  const otherHeight = Math.round((otherCount / maxStat) * 100);
+
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'personHistoryOv';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="max-width:390px;padding:12px">
+    <div class="player-card">
+      <div class="player-card-header">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="player-card-avatar">👤</div>
+          <div>
+            <h3 class="player-card-name">${esc(personName)}</h3>
+            <span style="font-size:11px;color:var(--mute);font-weight:600">Scheda Collaboratore</span>
+          </div>
+        </div>
+        <div class="player-card-total-badge">
+          <div class="num">${totalMatchesCount}</div>
+          <div class="lbl">Partite ✓</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--mute);text-transform:uppercase;margin-bottom:6px">Ultime Partite Svolte (3)</div>
+        <div class="player-recent-list">
+          ${recentListHtml}
+        </div>
+      </div>
+
+      <button type="button" class="stats-toggle-btn" id="toggleStatsBtn">
+        <span>📊 Statistiche & Andamento</span>
+        <span id="statsArrow">▼</span>
+      </button>
+
+      <div class="stats-drawer" id="statsDrawer" style="display:none">
+        <div style="font-size:11px;color:var(--mute);font-weight:700;text-transform:uppercase;margin-bottom:4px">Bilancio Risultati Svolti</div>
+        <div class="trend-bars-wrap">
+          <div class="trend-bar-col">
+            <div style="font-size:10px;font-weight:700;color:#22c55e;margin-bottom:2px">${winsCount}</div>
+            <div class="trend-bar-fill win" style="height:${Math.max(winHeight, 8)}%"></div>
+            <div class="trend-bar-label">Vinte</div>
+          </div>
+          <div class="trend-bar-col">
+            <div style="font-size:10px;font-weight:700;color:#ef4444;margin-bottom:2px">${lossCount}</div>
+            <div class="trend-bar-fill loss" style="height:${Math.max(lossHeight, 8)}%"></div>
+            <div class="trend-bar-label">Perse</div>
+          </div>
+          <div class="trend-bar-col">
+            <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:2px">${otherCount}</div>
+            <div class="trend-bar-fill suspended" style="height:${Math.max(otherHeight, 8)}%"></div>
+            <div class="trend-bar-label">Altre/Sosp.</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mute);padding-top:4px">
+          <span>% Vittorie: <b>${totalMatchesCount ? Math.round((winsCount / totalMatchesCount) * 100) : 0}%</b></span>
+          <span>Totale partite valide: <b>${totalMatchesCount}</b></span>
+        </div>
+      </div>
+
+      <div class="mbtns" style="margin-top:12px">
+        <button class="primary" id="phClose" style="width:100%">Chiudi Scheda</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  triggerHaptic('light');
+
+  const toggleBtn = ov.querySelector('#toggleStatsBtn');
+  const drawer = ov.querySelector('#statsDrawer');
+  const arrow = ov.querySelector('#statsArrow');
+  toggleBtn.onclick = () => {
+    triggerHaptic('light');
+    const isHidden = drawer.style.display === 'none';
+    drawer.style.display = isHidden ? 'block' : 'none';
+    arrow.textContent = isHidden ? '▲' : '▼';
+  };
+
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#phClose').onclick = () => ov.remove();
+}
+
 function exportSelectedMonthsJSON(selectedMonths) {
   const days = {};
   items.filter(i => selectedMonths.some(m => i.date.startsWith(m))).forEach(i => {
-    (days[i.date] ??= []).push({ partita: i.title || '', tavolo1: i.t1 || '', tavolo2: i.t2 || '', arbitro: i.arb || '', orario: i.time || '', amichevole: !!i.friendly });
+    (days[i.date] ??= []).push({
+      partita: i.title || '',
+      tavolo1: i.t1 || '',
+      tavolo2: i.t2 || '',
+      arbitro: i.arb || '',
+      orario: i.time || '',
+      amichevole: !!i.friendly,
+      score: i.score || '',
+      status: i.status || ''
+    });
   });
   const out = Object.keys(days).filter(d => days[d].length).sort().map(d => {
     const x = dayMeta[d] || {};
@@ -725,14 +903,19 @@ function slotHTML(d, k) {
     ${v === 'si' ? `<input data-wn list="namesList" value="${esc(wk[k+'Nome'])}" placeholder="Nome">` : ''}</div>`;
 }
 
+// CONTEGGIO COMPENSI: ESCLUSIVAMENTE PARTITE CON IL CHECK ✓ (i.ghost)
 function computeRecapRows(m) {
   const rec = {}, add = (n, f) => { n = (n || '').trim(); if (!n) return; const k = n.toLowerCase(); (rec[k] ??= { n, p: 0, a: 0, c: 0 })[f]++; };
   const dates = new Set();
-  items.filter(i => i.date.startsWith(m) && (!filterCat || i.cat === filterCat)).forEach(i => {
+  items.filter(i => i.date.startsWith(m) && (!filterCat || i.cat === filterCat) && !!i.ghost).forEach(i => {
     dates.add(i.date); const seen = new Set();
     [i.t1, i.t2, i.arb].forEach(n => { n = (n || '').trim(); const k = n.toLowerCase(); if (!n || seen.has(k)) return; seen.add(k); add(n, 'p'); });
   });
-  dates.forEach(dt => { const x = dayMeta[dt] || {}; if (x.ap === 'si') add(x.apNome, 'a'); if (x.ch === 'si') add(x.chNome, 'c'); });
+  Object.keys(dayMeta).filter(dt => dt.startsWith(m)).forEach(dt => {
+    const x = dayMeta[dt] || {};
+    if (x.ap === 'si') add(x.apNome, 'a');
+    if (x.ch === 'si') add(x.chNome, 'c');
+  });
   return Object.values(rec).sort((a, b) => b.p - a.p || b.a - a.a || a.n.localeCompare(b.n));
 }
 
@@ -744,7 +927,7 @@ function recapHTML(m) {
         const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
         return `<tr><td><button class="nb" data-name="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}">${esc(r.n)}</button></td><td>${pv}</td><td>${av}</td><td>${tot}</td></tr>`;
       }).join('')}</tbody></table>`
-    : '<p>Nessun dato.</p>') + '</aside>';
+    : '<p>Nessun dato (partite con check ✓).</p>') + '</aside>';
 }
 
 function updateRecap(m) { const el = document.querySelector(`.recap[data-m="${m}"]`); if (el) el.outerHTML = recapHTML(m); }
@@ -797,6 +980,9 @@ function card(i, hasConflict, isUrgentIncomplete) {
   const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
   const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Partita Amichevole">A</span>` : '';
   
+  const outcome = getMatchOutcome(i);
+  const scoreHtml = outcome ? `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>` : '';
+
   let badgeHtml = '';
   if (hasConflict) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
   else if (isUrgentIncomplete) badgeHtml = `<div class="urgent-badge">⏰ GARA IMMINENTE INCOMPLETA</div>`;
@@ -806,14 +992,15 @@ function card(i, hasConflict, isUrgentIncomplete) {
     <div class="m-top">
       <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita (senza nome)'}</div>
       <div class="m-actions">
-        ${!READONLY ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Segna svolta">✓</button>` : ''}
-        ${!READONLY ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
+        ${!READONLY ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Segna svolta (Check)">✓</button>` : ''}
+        ${!READONLY && !i.ghost ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
       </div>
     </div>
     <div class="m-meta">
       <div class="m-time">${i.time ? 'Ore ' + i.time : 'Orario n.d.'}</div>
       ${catHtml}
       ${friendlyHtml}
+      ${scoreHtml}
       <div class="m-date">${i.date}</div>
     </div>
     <div class="m-roster">
@@ -829,6 +1016,13 @@ function openEditModal(matchId) {
   const it = items.find(x => x.id === matchId);
   if (!it) return;
 
+  // Blocco sicurezza: modifica disabilitata se la gara ha il check
+  if (it.ghost) {
+    triggerHaptic('warning');
+    toast('Togli prima il check ✓ per modificare la partita', 'warning');
+    return;
+  }
+
   const isFriendly = !!it.friendly;
 
   const ov = document.createElement('div');
@@ -841,6 +1035,22 @@ function openEditModal(matchId) {
     <div class="frow"><label for="edTitle">Partita (Squadre)</label><input id="edTitle" type="text" value="${esc(it.title)}"></div>
     <div class="frow"><label for="edCat">Categoria</label><input id="edCat" type="text" list="categoriesList" value="${esc(it.cat)}"></div>
     
+    <div class="frow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <label for="edScore">Punteggio (Casa-Ospite)</label>
+        <input id="edScore" type="text" placeholder="Es. 72-65" value="${esc(it.score || '')}">
+      </div>
+      <div>
+        <label for="edStatus">Esito Rapido</label>
+        <select id="edStatus">
+          <option value="" ${!it.status ? 'selected' : ''}>Automatico (da punti)</option>
+          <option value="vinta" ${it.status === 'vinta' ? 'selected' : ''}>🟢 Vinta</option>
+          <option value="persa" ${it.status === 'persa' ? 'selected' : ''}>🔴 Persa</option>
+          <option value="sospesa" ${it.status === 'sospesa' ? 'selected' : ''}>⚪ Sospesa</option>
+        </select>
+      </div>
+    </div>
+
     <div class="frow" style="display:flex;align-items:center;justify-content:space-between;margin:10px 0">
       <label style="margin:0;font-size:13px;font-weight:600">Partita Amichevole:</label>
       <div class="yn" id="edFriendlyYN" role="group">
@@ -854,6 +1064,7 @@ function openEditModal(matchId) {
       <div class="frow"><label for="edT2">Tavolo 2</label><input id="edT2" type="text" list="namesList" value="${esc(it.t2)}" placeholder="Nome"></div>
       <div class="frow"><label for="edArb">Arbitro</label><input id="edArb" type="text" list="namesList" value="${esc(it.arb)}" placeholder="Nome"></div>
     </div>
+    <div id="edConflictBox" style="display:none"></div>
     <div class="mbtns">
       <button id="edDelete" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b;font-weight:600">Elimina</button>
       <div style="display:flex;gap:6px">
@@ -906,15 +1117,33 @@ function openEditModal(matchId) {
   document.getElementById('edSave').onclick = () => {
     const newDate = document.getElementById('edDate').value;
     if (!newDate) { toast('La data è obbligatoria', 'warning'); return; }
+    const time = document.getElementById('finalTimeVal').value;
+    const t1 = document.getElementById('edT1').value.trim();
+    const t2 = document.getElementById('edT2').value.trim();
+    const arb = document.getElementById('edArb').value.trim();
+
+    const conflicts = checkPersonRosterConflicts(matchId, newDate, time, t1, t2, arb);
+    if (conflicts.length && !document.getElementById('edSave').dataset.confirmed) {
+      triggerHaptic('warning');
+      const box = document.getElementById('edConflictBox');
+      box.className = 'person-conflict-alert';
+      box.innerHTML = conflicts.join('<br>') + '<br><small>Tocca di nuovo Salva per forzare.</small>';
+      box.style.display = 'block';
+      document.getElementById('edSave').dataset.confirmed = '1';
+      return;
+    }
+
     pushUndo();
     it.date = newDate;
-    it.time = document.getElementById('finalTimeVal').value;
+    it.time = time;
     it.title = document.getElementById('edTitle').value.trim();
     it.cat = document.getElementById('edCat').value.trim();
     it.friendly = currentFriendlyVal;
-    it.t1 = document.getElementById('edT1').value.trim();
-    it.t2 = document.getElementById('edT2').value.trim();
-    it.arb = document.getElementById('edArb').value.trim();
+    it.score = document.getElementById('edScore').value.trim();
+    it.status = document.getElementById('edStatus').value;
+    it.t1 = t1;
+    it.t2 = t2;
+    it.arb = arb;
     save(); ov.remove();
     setParam('m', it.date.slice(0, 7));
     setParam('s', iso(monday(it.date)));
@@ -990,16 +1219,23 @@ function render(focusId) {
   const idxOf = new Map(items.map((it, i) => [it.id, i]));
   const p = params(), wantM = p.get('m'), wantW = p.get('s');
   
-  const filtered = items.filter(i =>
-    (!filterCat || i.cat === filterCat) &&
-    (!filterIncomplete || isMissingRequirements(i))
-  );
+  const qLower = searchQuery.toLowerCase().trim();
+  const filtered = items.filter(i => {
+    if (filterCat && i.cat !== filterCat) return false;
+    if (filterIncomplete && !isMissingRequirements(i)) return false;
+    if (qLower) {
+      const matchText = [i.title, i.cat, i.t1, i.t2, i.arb, i.date, i.time].join(' ').toLowerCase();
+      if (!matchText.includes(qLower)) return false;
+    }
+    return true;
+  });
+
   const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date));
   const months = {};
   sorted.forEach(i => { const m = i.date.slice(0, 7); const w = iso(monday(i.date)); ((months[m] ??= {})[w] ??= []).push(i); });
   const keys = Object.keys(months).sort();
   if (!keys.length) {
-    listEl.innerHTML = '<div class="empty">Nessuna partita presente.' + (!READONLY ? ' Tocca “+ Partita” per iniziare.' : '') + '</div>';
+    listEl.innerHTML = '<div class="empty">Nessuna partita trovata.' + (!READONLY ? ' Tocca “+ Partita” per iniziare.' : '') + '</div>';
     updateIncompleteBadge();
     updateAlertStatusBadge();
     return;
@@ -1063,12 +1299,25 @@ document.addEventListener('click', e => {
   if (editBtn && !READONLY) {
     e.stopPropagation();
     const id = editBtn.closest('.match')?.dataset?.id;
-    if (id) { triggerHaptic('light'); openEditModal(id); }
+    if (id) {
+      const it = items.find(x => x.id === id);
+      if (it?.ghost) {
+        toast('Togli prima il check ✓ per modificare', 'warning');
+        return;
+      }
+      triggerHaptic('light'); 
+      openEditModal(id); 
+    }
     return;
   }
 
   const matchCard = e.target.closest('.match');
   if (matchCard && !READONLY && !e.target.closest('button')) {
+    const it = items.find(x => x.id === matchCard.dataset.id);
+    if (it?.ghost) {
+      toast('Partita con check: togli il ✓ per modificarla');
+      return;
+    }
     triggerHaptic('light');
     openEditModal(matchCard.dataset.id);
     return;
@@ -1122,6 +1371,22 @@ function openAddModal() {
     <div class="frow"><label for="nTitle">Partita</label><input id="nTitle" type="text" placeholder="Squadra A – Squadra B"></div>
     <div class="frow"><label for="nCat">Categoria</label><input id="nCat" type="text" list="categoriesList" placeholder="Es. U17"></div>
     
+    <div class="frow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <label for="nScore">Punteggio (Casa-Ospite)</label>
+        <input id="nScore" type="text" placeholder="Es. 72-65">
+      </div>
+      <div>
+        <label for="nStatus">Esito Rapido</label>
+        <select id="nStatus">
+          <option value="" selected>Automatico (da punti)</option>
+          <option value="vinta">🟢 Vinta</option>
+          <option value="persa">🔴 Persa</option>
+          <option value="sospesa">⚪ Sospesa</option>
+        </select>
+      </div>
+    </div>
+
     <div class="frow" style="display:flex;align-items:center;justify-content:space-between;margin:10px 0">
       <label style="margin:0;font-size:13px;font-weight:600">Partita Amichevole:</label>
       <div class="yn" id="nFriendlyYN" role="group">
@@ -1133,6 +1398,7 @@ function openAddModal() {
     <div class="frow"><label for="nT1">Tavolo 1</label><input id="nT1" type="text" list="namesList" placeholder="Nome"></div>
     <div class="frow"><label for="nT2">Tavolo 2</label><input id="nT2" type="text" list="namesList" placeholder="Nome"></div>
     <div class="frow"><label for="nArb">Arbitro</label><input id="nArb" type="text" list="namesList" placeholder="Nome"></div>
+    <div id="nConflictBox" style="display:none"></div>
     <p class="err" id="nErr">Inserisci almeno la data.</p>
     <div class="mbtns"><button id="nCancel">Annulla</button><button class="primary" id="nSave">Aggiungi</button></div>
   </div>`;
@@ -1160,6 +1426,21 @@ function openAddModal() {
       return; 
     }
     const time = document.getElementById('finalTimeVal').value;
+    const t1 = document.getElementById('nT1').value.trim();
+    const t2 = document.getElementById('nT2').value.trim();
+    const arb = document.getElementById('nArb').value.trim();
+
+    const conflicts = checkPersonRosterConflicts(null, date, time, t1, t2, arb);
+    if (conflicts.length && !document.getElementById('nSave').dataset.confirmed) {
+      triggerHaptic('warning');
+      const box = document.getElementById('nConflictBox');
+      box.className = 'person-conflict-alert';
+      box.innerHTML = conflicts.join('<br>') + '<br><small>Tocca di nuovo Aggiungi per forzare.</small>';
+      box.style.display = 'block';
+      document.getElementById('nSave').dataset.confirmed = '1';
+      return;
+    }
+
     const it = { 
       id: uid(), 
       title: document.getElementById('nTitle').value, 
@@ -1167,9 +1448,10 @@ function openAddModal() {
       time, 
       cat: document.getElementById('nCat').value,
       friendly: currentFriendlyVal,
-      t1: document.getElementById('nT1').value, 
-      t2: document.getElementById('nT2').value, 
-      arb: document.getElementById('nArb').value, 
+      score: document.getElementById('nScore').value.trim(),
+      status: document.getElementById('nStatus').value,
+      t1, t2, arb, 
+      ghost: false,
       ts: Date.now() 
     };
     pushUndo(); items.push(it); save(); ov.remove();
@@ -1230,7 +1512,7 @@ function openResocontoModal() {
             <tr style="border-top:1px solid var(--line);font-weight:700"><td>Totale Mese</td><td colspan="2"></td><td>${monthSum}€</td></tr>
           </tbody>
         </table>`
-      : '<p style="color:var(--mute);font-size:12px">Nessuna partita.</p>';
+      : '<p style="color:var(--mute);font-size:12px">Nessuna partita con check.</p>';
 
     return `<details class="res-month-block">
       <summary style="display:flex;justify-content:space-between;align-items:center">
@@ -1280,7 +1562,10 @@ function fromExportFormat(arr) {
         t2: p.tavolo2 || '', 
         arb: p.arbitro || '', 
         time: p.orario || '',
-        friendly: !!p.amichevole 
+        friendly: !!p.amichevole,
+        score: p.score || '',
+        status: p.status || '',
+        ghost: false
       });
     });
   });
@@ -1670,6 +1955,14 @@ function bindEvents() {
     };
   }
 
+  const searchInput = $('#searchFilter');
+  if (searchInput) {
+    searchInput.oninput = e => {
+      searchQuery = e.target.value;
+      render();
+    };
+  }
+
   const fCat = $('#filterCat');
   if (fCat) fCat.onchange = e => { filterCat = e.target.value; render(); };
 
@@ -1683,16 +1976,24 @@ function bindEvents() {
     };
   }
 
+  // GESTIONE NOMI: LISTA + PULSANTE SCHEDA STORICO
   const namesB = $('#namesBtn');
   if (namesB) {
     namesB.onclick = () => {
       if (READONLY) return;
       const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'namesOv';
       const rowsHtml = () => names.length
-        ? names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(n)}</span><button type="button" data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px">✕</button></div>`).join('')
+        ? names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)">
+            <span style="font-weight:600;font-size:14px">${esc(n)}</span>
+            <div style="display:flex;gap:6px">
+              <button type="button" data-viewcard="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px" title="Vedi scheda">📊 Scheda</button>
+              <button type="button" data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px" title="Rimuovi">✕</button>
+            </div>
+          </div>`).join('')
         : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessun nome inserito.</p>';
       ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Nomi">
-        <h3>Elenco nomi</h3>
+        <h3>Elenco Collaboratori</h3>
+        <p style="font-size:12px;color:var(--mute);margin:-6px 0 10px">Tocca "📊 Scheda" per visualizzare presenze e andamento.</p>
         <div id="namesListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:8px">${rowsHtml()}</div>
         <div class="frow" style="display:flex;gap:6px"><input id="newNameInput" type="text" placeholder="Nuovo nome" style="flex:1"><button type="button" class="primary" id="addNameBtn">Aggiungi</button></div>
         <div class="mbtns"><button type="button" id="namesClose">Chiudi</button></div>
@@ -1701,6 +2002,13 @@ function bindEvents() {
       const refreshList = () => { document.getElementById('namesListWrap').innerHTML = rowsHtml(); };
       ov.addEventListener('click', e => {
         if (e.target === ov) { ov.remove(); return; }
+
+        const cardBtn = e.target.closest('[data-viewcard]');
+        if (cardBtn) {
+          openPersonHistoryModal(cardBtn.dataset.viewcard);
+          return;
+        }
+
         const rm = e.target.closest('[data-rmname]');
         if (rm) { names = names.filter(n => n.toLowerCase() !== rm.dataset.rmname.toLowerCase()); saveNames(); renderNamesList(); refreshList(); return; }
         if (e.target.id === 'addNameBtn') {
@@ -1854,7 +2162,10 @@ function bindEvents() {
             time: c.time || '', 
             cat: c.cat || '', 
             friendly: false,
+            score: '',
+            status: '',
             t1: '', t2: '', arb: '', 
+            ghost: false,
             ts: Date.now() 
           });
         });
@@ -1873,12 +2184,10 @@ function bindEvents() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
-  // Inizializza Telegram WebApp se aperto dall'interno di Telegram
   if (window.Telegram?.WebApp) {
     try {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
-      // Abilita la barra superiore coordinata
       if (window.Telegram.WebApp.setHeaderColor) {
         window.Telegram.WebApp.setHeaderColor('#1f2020');
       }
@@ -1907,7 +2216,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch(e) {
       setSyncVisualState('red');
     }
-    // Avvia la connessione Realtime WebSocket
     setupSupabaseRealtime();
   } else {
     setSyncVisualState('green', 'Memoria locale attiva');

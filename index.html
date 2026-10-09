@@ -14,7 +14,6 @@
 
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <!-- SDK Ufficiale Telegram Mini App -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body class="ro">
@@ -64,6 +63,9 @@
   </header>
 
   <div class="filterBar">
+    <div class="search-input-wrap">
+      <input type="search" id="searchFilter" placeholder="🔍 Cerca squadre o persone..." autocomplete="off">
+    </div>
     <select id="filterCat"><option value="">Tutte le categorie</option></select>
     <button id="filterIncomplete" type="button" aria-pressed="false">Incomplete <span id="incCount" style="opacity:.75"></span></button>
     <button class="waBtn" id="waTodayBtn" type="button" title="Copia turni dei prossimi 7 giorni">📲 WA Prossimi 7gg</button>
