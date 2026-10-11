@@ -1,19 +1,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-const DEFAULT_PIN = '1234';
 let READONLY = true;
-
-// GESTIONE ACCESSO ADMIN
-window.handleAuthClick = function() {
-  if (READONLY) {
-    promptLogin();
-  } else {
-    sessionStorage.removeItem('partite_admin_auth');
-    setAuthMode(false);
-    toast('Disconnesso: sola lettura');
-  }
-};
 
 function isModalOpen() {
   return !!document.querySelector('.ov');
@@ -242,7 +230,6 @@ try { names = JSON.parse(localStorage.getItem('partite-nomi-v1')) || []; } catch
 let categories = [];
 try { categories = JSON.parse(localStorage.getItem('partite-categorie-v1')) || []; } catch(e){}
 
-let pinHash = null;
 let isDirty = false;
 
 const saveLocalOnly = () => {
@@ -300,11 +287,6 @@ function setSyncVisualState(state, tooltip) {
   }
 }
 
-async function sha256hex(s) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 async function cloudFetchRaw() {
   if (!sb) return null;
   try {
@@ -321,7 +303,6 @@ function applyCloudData(raw) {
   molt = raw.molt && typeof raw.molt === 'object' ? raw.molt : {};
   names = Array.isArray(raw.names) ? raw.names : [];
   categories = Array.isArray(raw.categories) ? raw.categories : [];
-  if (raw.pinHash) pinHash = raw.pinHash;
   isDirty = false;
   saveLocalOnly(); saveDLocalOnly(); saveMoltLocal(); saveNamesLocal(); saveCategoriesLocal();
   isDirty = false;
@@ -334,7 +315,7 @@ async function cloudPushNow() {
   try {
     const { error } = await sb.from('partite_board').upsert({
       id: SUPABASE_CONFIG.board,
-      data: { items, dayMeta, molt, names, categories, pinHash },
+      data: { items, dayMeta, molt, names, categories },
       updated_at: new Date().toISOString()
     });
     if (error) throw error;
@@ -429,7 +410,6 @@ function updateIncompleteBadge() {
   b.textContent = count ? `(${count})` : '';
 }
 
-// OTTIMIZZATO O(N): Rileva match in conflitto con Set
 function findConflictingMatches() {
   const conflicts = new Map();
   const groups = {};
@@ -1061,7 +1041,7 @@ function setParam(k, v) {
   const p = params(); 
   v ? p.set(k, v) : p.delete(k); 
   writeHash(p); 
-  render(); // Centralizzato qui
+  render();
 }
 
 function card(i, hasConflict, isUrgentIncomplete) {
@@ -1944,7 +1924,6 @@ window.addEventListener('keydown', e => {
     e.preventDefault();
     if (!READONLY) cloudPushNow().then(() => toast('Modifiche salvate', 'success'));
   }
-  // Supporto Escape per chiudere tutti i popup
   if (e.key === 'Escape') {
     const modals = document.querySelectorAll('.ov');
     if (modals.length) {
@@ -2019,18 +1998,23 @@ function setAuthMode(isAdmin) {
   const authBtn = $('#authBtn');
   if (authBtn) {
     authBtn.textContent = isAdmin ? '🔓 Esci' : '🔒 Accedi';
-    authBtn.title = isAdmin ? 'Termina sessione amministratore' : 'Accedi con Password per modificare';
+    authBtn.title = isAdmin ? 'Termina sessione amministratore' : 'Accedi come Amministratore per modificare';
   }
   const roEl = document.getElementById('roBanner');
   if (roEl) roEl.style.display = READONLY ? 'block' : 'none';
   render();
 }
 
-async function verifyPin(entered) {
-  const enteredHash = await sha256hex(entered);
-  const targetHash = pinHash || await sha256hex(DEFAULT_PIN);
-  return enteredHash === targetHash;
-}
+// GESTIONE ACCESSO REALE CON SUPABASE AUTH
+window.handleAuthClick = async function() {
+  if (READONLY) {
+    promptLogin();
+  } else {
+    if (sb) await sb.auth.signOut();
+    setAuthMode(false);
+    toast('Disconnesso: sola lettura');
+  }
+};
 
 function promptLogin() {
   const oldOv = document.getElementById('loginOv');
@@ -2041,82 +2025,77 @@ function promptLogin() {
   ov.id = 'loginOv';
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Accesso Amministratore">
     <h3>Accesso Gestione</h3>
-    <p style="font-size:13px;color:var(--mute);margin:-6px 0 10px">Inserisci la password per abilitare modifiche e turni.</p>
+    <p style="font-size:13px;color:var(--mute);margin:-6px 0 10px">Inserisci le credenziali amministratore per sbloccare le modifiche.</p>
+    
     <div class="frow">
-      <label for="loginPin">Password Admin</label>
-      <input id="loginPin" type="password" placeholder="Inserisci Password" autocomplete="current-password" autofocus>
+      <label for="loginEmail">Email</label>
+      <input id="loginEmail" type="email" placeholder="admin@esempio.com" autocomplete="username" autofocus>
     </div>
-    <p class="err" id="loginErr">Password errata. Riprova.</p>
+    
+    <div class="frow">
+      <label for="loginPass">Password</label>
+      <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
+    </div>
+    
+    <p class="err" id="loginErr">Credenziali non valide.</p>
+    
     <div class="mbtns">
       <button type="button" id="loginCancel">Annulla</button>
-      <button type="button" class="primary" id="loginGo">Sblocca</button>
+      <button type="button" class="primary" id="loginGo">Accedi</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
 
   const go = async () => {
-    const val = document.getElementById('loginPin').value;
-    if (await verifyPin(val)) {
-      sessionStorage.setItem('partite_admin_auth', '1');
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPass').value;
+    const btn = document.getElementById('loginGo');
+
+    if (!email || !password) {
+      document.getElementById('loginErr').textContent = 'Inserisci email e password.';
+      document.getElementById('loginErr').classList.add('on');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Verifica in corso…';
+
+    try {
+      if (!sb) throw new Error('Connessione cloud non disponibile');
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      
+      if (error || !data.session) {
+        throw new Error(error?.message || 'Credenziali errate');
+      }
+
       setAuthMode(true);
       ov.remove();
-      toast('Accesso consentito', 'success');
-    } else {
+      toast('Accesso eseguito come Amministratore', 'success');
+    } catch (err) {
       triggerHaptic('warning');
-      document.getElementById('loginErr').classList.add('on');
-      document.getElementById('loginPin').value = '';
-      document.getElementById('loginPin').focus();
+      const errEl = document.getElementById('loginErr');
+      errEl.textContent = 'Email o password errate.';
+      errEl.classList.add('on');
+      btn.disabled = false;
+      btn.textContent = 'Accedi';
     }
   };
 
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
   document.getElementById('loginCancel').onclick = () => ov.remove();
   document.getElementById('loginGo').onclick = go;
-  document.getElementById('loginPin').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
-  setTimeout(() => document.getElementById('loginPin')?.focus(), 80);
-}
-
-function promptChangePin() {
-  if (READONLY) return;
-  const ov = document.createElement('div');
-  ov.className = 'ov';
-  ov.id = 'changePinOv';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Cambia Password">
-    <h3>Cambia Password Admin</h3>
-    <div class="frow"><label for="oldPin">Password Attuale</label><input id="oldPin" type="password" autofocus></div>
-    <div class="frow"><label for="newPin">Nuova Password</label><input id="newPin" type="password"></div>
-    <p class="err" id="chPinErr">Password errata.</p>
-    <div class="mbtns">
-      <button type="button" id="chPinCancel">Annulla</button>
-      <button type="button" class="primary" id="chPinSave">Salva</button>
-    </div>
-  </div>`;
-  document.body.appendChild(ov);
-
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  document.getElementById('chPinCancel').onclick = () => ov.remove();
-
-  document.getElementById('chPinSave').onclick = async () => {
-    const oldP = document.getElementById('oldPin').value;
-    const newP = document.getElementById('newPin').value;
-    if (!newP) { toast('Inserisci una password', 'warning'); return; }
-
-    if (!(await verifyPin(oldP))) {
-      triggerHaptic('warning');
-      document.getElementById('chPinErr').classList.add('on');
-      return;
-    }
-
-    pinHash = await sha256hex(newP);
-    await cloudPushNow();
-    ov.remove();
-    toast('Password salvata', 'success');
-  };
+  
+  document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
 
 function bindEvents() {
   const authBtn = $('#authBtn');
-// Gestione apertura/chiusura drawer su mobile
+  if (authBtn) {
+    authBtn.onclick = () => window.handleAuthClick();
+  }
+
+  // Gestione apertura/chiusura drawer su mobile
   const navToggleBtn = $('#navToggleBtn');
   const navSidebar = $('#navSidebar');
   const navBackdrop = $('#navBackdrop');
@@ -2143,7 +2122,6 @@ function bindEvents() {
     navBackdrop.onclick = closeSidebarMobile;
   }
 
-  // Chiudi automaticamente la sidebar su mobile quando si seleziona una settimana o un mese
   document.addEventListener('click', e => {
     if (e.target.closest('[data-pickm]') || e.target.closest('[data-navw]')) {
       if (window.innerWidth < 860) {
@@ -2151,15 +2129,9 @@ function bindEvents() {
       }
     }
   });
-  if (authBtn) {
-    authBtn.onclick = () => window.handleAuthClick();
-  }
 
   const notifyBtn = $('#notifyBtn');
   if (notifyBtn) notifyBtn.onclick = () => requestNotificationPermission();
-
-  const changePinBtn = $('#changePinBtn');
-  if (changePinBtn) changePinBtn.onclick = promptChangePin;
 
   const shareLinkBtn = $('#shareLinkBtn');
   if (shareLinkBtn) {
@@ -2255,7 +2227,6 @@ function bindEvents() {
     };
   }
 
-  // GESTIONE NOMI E SCHEDA PERSONALE
   const namesB = $('#namesBtn');
   if (namesB) {
     namesB.onclick = () => {
@@ -2476,8 +2447,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderNamesList();
   renderCategoriesList();
 
-  const isAuth = sessionStorage.getItem('partite_admin_auth') === '1';
-  setAuthMode(isAuth);
+  // Controllo sessione reale all'avvio con Supabase Auth
+  if (sb) {
+    const { data: { session } } = await sb.auth.getSession();
+    setAuthMode(!!session);
+
+    sb.auth.onAuthStateChange((_event, session) => {
+      setAuthMode(!!session);
+    });
+  } else {
+    setAuthMode(false);
+  }
 
   window.addEventListener('hashchange', () => { 
     mem = null; 

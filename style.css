@@ -737,3 +737,25 @@ body.ro .match { cursor: default; }
     opacity: 1;
   }
 }
+
+/* Nasconde l'intero calendario e la sidebar se non autenticato */
+body.ro .layout-main {
+  display: none !important;
+}
+
+body.ro .filterBar {
+  display: none !important;
+}
+
+/* Mostra il banner di login a tutto schermo o ben evidente */
+body.ro .robanner {
+  margin: 40px auto;
+  max-width: 480px;
+  padding: 24px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  font-size: 15px;
+  line-height: 1.6;
+}
