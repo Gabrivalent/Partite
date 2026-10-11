@@ -33,7 +33,7 @@
     <div class="top-actions">
       <input type="file" id="importFile" accept="application/json,.json" hidden>
       
-      <button id="authBtn" type="button" class="auth-btn" onclick="handleAuthClick()">🔒 Accedi</button>
+      <button id="authBtn" type="button" class="auth-btn">🔒 Accedi</button>
       <button id="add" type="button" class="primary auth-only">+ Partita</button>
       <button id="todayBtn" type="button" title="Vai a oggi">Oggi</button>
       <button id="undoBtn" type="button" class="auth-only" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
@@ -72,13 +72,27 @@
   </div>
 </div>
 
-<main>
+<!-- Banner sola lettura posizionato fuori dalla griglia -->
+<div class="robanner" id="roBanner">Modalità sola lettura: tocca "Accedi" per abilitare le modifiche.</div>
+
+<main class="layout-main">
   <datalist id="namesList"></datalist>
   <datalist id="categoriesList"></datalist>
-  <div class="robanner" id="roBanner">Modalità sola lettura: tocca "Accedi" per abilitare le modifiche.</div>
 
-  <div id="list"></div>
+  <!-- COLONNA SINISTRA: ALBERO DI NAVIGAZIONE ANNO / MESE / SETTIMANE -->
+  <aside class="nav-sidebar" id="navSidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">📅 Calendario</span>
+    </div>
+    <div id="navTree" class="nav-tree"></div>
+  </aside>
+
+  <!-- COLONNA DESTRA / CENTRALE: CONTENUTO DEL SINGOLO MESE SELEZIONATO -->
+  <section class="content-area">
+    <div id="list"></div>
+  </section>
 </main>
+
 <div id="msg" role="status"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

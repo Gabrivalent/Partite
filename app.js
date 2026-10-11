@@ -1,7 +1,20 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-// Rileva se è aperto un modal/dialogo
+const DEFAULT_PIN = '1234';
+let READONLY = true;
+
+// GESTIONE ACCESSO ADMIN
+window.handleAuthClick = function() {
+  if (READONLY) {
+    promptLogin();
+  } else {
+    sessionStorage.removeItem('partite_admin_auth');
+    setAuthMode(false);
+    toast('Disconnesso: sola lettura');
+  }
+};
+
 function isModalOpen() {
   return !!document.querySelector('.ov');
 }
@@ -38,19 +51,6 @@ const SUPABASE_CONFIG = {
   url: 'https://bhyfeoyyuscrsypaiemx.supabase.co',
   key: 'sb_publishable_dQyrFbjusGoZtWr1MHkoiA_VPVngPrC',
   board: 'partite'
-};
-
-const DEFAULT_PIN = '1234';
-let READONLY = true;
-
-window.handleAuthClick = function() {
-  if (READONLY) {
-    promptLogin();
-  } else {
-    sessionStorage.removeItem('partite_admin_auth');
-    setAuthMode(false);
-    toast('Disconnesso: sola lettura');
-  }
 };
 
 let swRegistration = null;
@@ -99,8 +99,7 @@ function isRefereeNeeded(cat, isFriendly) {
   if (isFriendly) return true;
   if (!cat) return true;
   const c = cat.toUpperCase().replace(/\s+/g, '');
-  if (c === 'U15' || c === 'U17' || c === 'U19') return false;
-  return true;
+  return !(c === 'U15' || c === 'U17' || c === 'U19');
 }
 
 function isMissingRequirements(item) {
@@ -216,7 +215,7 @@ function checkAndTriggerScheduledNotifications() {
 
 setInterval(checkAndTriggerScheduledNotifications, 60000);
 
-// Gestione Temi
+// GESTIONE TEMI
 let currentTheme = localStorage.getItem('partite-theme') || 'default';
 function applyTheme(themeName) {
   currentTheme = themeName;
@@ -226,7 +225,7 @@ function applyTheme(themeName) {
 }
 if (currentTheme !== 'default') applyTheme(currentTheme);
 
-// Stato & Memoria
+// STATO & MEMORIA LOCALE
 const KEY = 'partite-v1';
 let items = [];
 try { items = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){}
@@ -430,6 +429,7 @@ function updateIncompleteBadge() {
   b.textContent = count ? `(${count})` : '';
 }
 
+// OTTIMIZZATO O(N): Rileva match in conflitto con Set
 function findConflictingMatches() {
   const conflicts = new Map();
   const groups = {};
@@ -532,7 +532,6 @@ function openConflictsModal() {
       if (targetMatch) {
         setParam('m', targetMatch.date.slice(0, 7));
         setParam('s', iso(monday(targetMatch.date)));
-        render(targetId);
       }
     }
   });
@@ -582,7 +581,6 @@ function openUrgentIncompleteModal() {
       if (targetMatch) {
         setParam('m', targetMatch.date.slice(0, 7));
         setParam('s', iso(monday(targetMatch.date)));
-        render(targetId);
       }
     }
   });
@@ -676,7 +674,7 @@ function openMoltModal(name, counts, month) {
   document.getElementById('mp').focus();
 }
 
-// SCHEDA DETTAGLIATA COLLABORATORE (APRIBILE DA GESTIONE NOMI)
+// SCHEDA COLLABORATORE PERSONALE
 function openPersonHistoryModal(personName) {
   const normTarget = (personName || '').trim().toLowerCase();
   if (!normTarget) return;
@@ -806,6 +804,102 @@ function openPersonHistoryModal(personName) {
   ov.querySelector('#phClose').onclick = () => ov.remove();
 }
 
+// POST-GARA EXPRESS (POPOVER A 1 TAP SU ✓)
+function openQuickCloseModal(matchId) {
+  const it = items.find(x => x.id === matchId);
+  if (!it) return;
+
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'quickCloseOv';
+
+  let selectedStatus = it.status || '';
+  let homeScore = '';
+  let awayScore = '';
+  if (it.score && String(it.score).includes('-')) {
+    const parts = it.score.split('-');
+    homeScore = parts[0]?.trim() || '';
+    awayScore = parts[1]?.trim() || '';
+  }
+
+  ov.innerHTML = `<div class="modal quick-close-modal" role="dialog" aria-modal="true">
+    <div class="quick-close-header">🏁 Chiudi Partita</div>
+    <div class="quick-close-sub">${esc(it.title || 'Gara')}</div>
+
+    <div class="quick-outcome-grid">
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'vinta' ? 'active' : ''}" data-outcome="vinta">
+        <span style="font-size:16px">🟢</span> Vinta
+      </button>
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'persa' ? 'active' : ''}" data-outcome="persa">
+        <span style="font-size:16px">🔴</span> Persa
+      </button>
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'sospesa' ? 'active' : ''}" data-outcome="sospesa">
+        <span style="font-size:16px">⚪</span> Sosp.
+      </button>
+    </div>
+
+    <div style="font-size:11px;color:var(--mute);margin-bottom:4px">Punti (opzionale): Casa - Ospiti</div>
+    <div class="quick-score-inputs">
+      <input type="number" inputmode="numeric" id="qcHome" placeholder="Casa" value="${esc(homeScore)}">
+      <span style="font-weight:800;font-size:16px">:</span>
+      <input type="number" inputmode="numeric" id="qcAway" placeholder="Ospiti" value="${esc(awayScore)}">
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button type="button" class="primary" id="qcSave" style="width:100%;min-height:38px">✓ Conferma & Chiudi</button>
+      <div style="display:flex;gap:6px">
+        <button type="button" id="qcCancel" style="flex:1">Annulla</button>
+        <button type="button" id="qcOnlyCheck" style="flex:1" title="Metti solo il check senza esito">Solo Check</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  triggerHaptic('light');
+
+  const outcomeBtns = ov.querySelectorAll('.quick-outcome-btn');
+  outcomeBtns.forEach(btn => {
+    btn.onclick = () => {
+      triggerHaptic('light');
+      const val = btn.dataset.outcome;
+      if (selectedStatus === val) {
+        selectedStatus = '';
+        btn.classList.remove('active');
+      } else {
+        selectedStatus = val;
+        outcomeBtns.forEach(b => b.classList.toggle('active', b === btn));
+      }
+    };
+  });
+
+  const finalizeClose = (withDetails = true) => {
+    pushUndo();
+    it.ghost = true;
+    if (withDetails) {
+      const h = ov.querySelector('#qcHome').value.trim();
+      const a = ov.querySelector('#qcAway').value.trim();
+      if (h !== '' && a !== '') {
+        it.score = `${h}-${a}`;
+        if (!selectedStatus) {
+          const hn = Number(h), an = Number(a);
+          if (hn > an) selectedStatus = 'vinta';
+          else if (hn < an) selectedStatus = 'persa';
+        }
+      }
+      it.status = selectedStatus;
+    }
+    save();
+    ov.remove();
+    render();
+    toast('Partita chiusa e svolta ✓', 'success');
+  };
+
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#qcCancel').onclick = () => ov.remove();
+  ov.querySelector('#qcOnlyCheck').onclick = () => finalizeClose(false);
+  ov.querySelector('#qcSave').onclick = () => finalizeClose(true);
+}
+
 function exportSelectedMonthsJSON(selectedMonths) {
   const days = {};
   items.filter(i => selectedMonths.some(m => i.date.startsWith(m))).forEach(i => {
@@ -903,7 +997,6 @@ function slotHTML(d, k) {
     ${v === 'si' ? `<input data-wn list="namesList" value="${esc(wk[k+'Nome'])}" placeholder="Nome">` : ''}</div>`;
 }
 
-// CONTEGGIO COMPENSI: ESCLUSIVAMENTE PARTITE CON IL CHECK ✓ (i.ghost)
 function computeRecapRows(m) {
   const rec = {}, add = (n, f) => { n = (n || '').trim(); if (!n) return; const k = n.toLowerCase(); (rec[k] ??= { n, p: 0, a: 0, c: 0 })[f]++; };
   const dates = new Set();
@@ -964,7 +1057,12 @@ function writeHash(p) {
   try { history.replaceState(null, '', location.pathname + (s ? '#' + s : '')); mem = null; }
   catch(e) { mem = s; }
 }
-function setParam(k, v) { const p = params(); v ? p.set(k, v) : p.delete(k); writeHash(p); }
+function setParam(k, v) { 
+  const p = params(); 
+  v ? p.set(k, v) : p.delete(k); 
+  writeHash(p); 
+  render(); // Centralizzato qui
+}
 
 function card(i, hasConflict, isUrgentIncomplete) {
   const ghostOn = !READONLY && !!i.ghost;
@@ -1016,7 +1114,6 @@ function openEditModal(matchId) {
   const it = items.find(x => x.id === matchId);
   if (!it) return;
 
-  // Blocco sicurezza: modifica disabilitata se la gara ha il check
   if (it.ghost) {
     triggerHaptic('warning');
     toast('Togli prima il check ✓ per modificare la partita', 'warning');
@@ -1147,7 +1244,6 @@ function openEditModal(matchId) {
     save(); ov.remove();
     setParam('m', it.date.slice(0, 7));
     setParam('s', iso(monday(it.date)));
-    render(it.id);
     toast('Salvato', 'success');
   };
 }
@@ -1211,13 +1307,68 @@ function copyWhatsAppFromWeek(wIso) {
   generateWhatsAppText(start, end);
 }
 
+// COSTRUISCE L'ALBERO COLLASSABILE NELLA SIDEBAR SINISTRA
+function renderNavTree(groupedData, activeMonth, activeWeek) {
+  const treeEl = document.getElementById('navTree');
+  if (!treeEl) return;
+
+  const years = {};
+  Object.keys(groupedData).sort().forEach(m => {
+    const y = m.slice(0, 4);
+    (years[y] ??= []).push(m);
+  });
+
+  const fmtMonth = mStr => new Date(mStr + '-15T12:00').toLocaleDateString('it-IT', { month: 'long' });
+
+  let html = '';
+  Object.keys(years).sort().forEach(y => {
+    const monthsArr = years[y];
+    const isYearOpen = monthsArr.includes(activeMonth);
+
+    let monthsHtml = monthsArr.map(m => {
+      const weeksMap = groupedData[m];
+      const isCurMonth = m === activeMonth;
+      const totGareMese = Object.values(weeksMap).reduce((acc, arr) => acc + arr.length, 0);
+
+      const weeksHtml = Object.keys(weeksMap).sort().map(w => {
+        const a = monday(w), b = new Date(a); b.setDate(b.getDate() + 6);
+        const wCount = weeksMap[w].length;
+        const isCurW = w === activeWeek;
+        const wLabel = `${a.getDate()}/${a.getMonth() + 1} - ${b.getDate()}/${b.getMonth() + 1}`;
+
+        return `<button type="button" class="nav-week-link${isCurW ? ' active-week' : ''}" data-navm="${m}" data-navw="${w}">
+          <span>Sett. ${wLabel}</span>
+          <span class="nav-badge-count">(${wCount})</span>
+        </button>`;
+      }).join('');
+
+      return `<details class="nav-month${isCurMonth ? ' active-month' : ''}" data-navm="${m}" ${isCurMonth ? 'open' : ''}>
+        <summary data-pickm="${m}">
+          <span>${fmtMonth(m)}</span>
+          <span class="nav-badge-count" style="margin-left:auto">(${totGareMese})</span>
+        </summary>
+        <div class="nav-weeks-list">
+          ${weeksHtml}
+        </div>
+      </details>`;
+    }).join('');
+
+    html += `<details class="nav-year" ${isYearOpen ? 'open' : ''}>
+      <summary><span>${y}</span></summary>
+      <div>${monthsHtml}</div>
+    </details>`;
+  });
+
+  treeEl.innerHTML = html;
+}
+
 let ready = false;
 function render(focusId) {
   ready = false;
   const listEl = $('#list');
   if (!listEl) return;
   const idxOf = new Map(items.map((it, i) => [it.id, i]));
-  const p = params(), wantM = p.get('m'), wantW = p.get('s');
+  const p = params();
   
   const qLower = searchQuery.toLowerCase().trim();
   const filtered = items.filter(i => {
@@ -1232,45 +1383,91 @@ function render(focusId) {
 
   const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date));
   const months = {};
-  sorted.forEach(i => { const m = i.date.slice(0, 7); const w = iso(monday(i.date)); ((months[m] ??= {})[w] ??= []).push(i); });
+  sorted.forEach(i => { 
+    const m = i.date.slice(0, 7); 
+    const w = iso(monday(i.date)); 
+    ((months[m] ??= {})[w] ??= []).push(i); 
+  });
+  
   const keys = Object.keys(months).sort();
   if (!keys.length) {
     listEl.innerHTML = '<div class="empty">Nessuna partita trovata.' + (!READONLY ? ' Tocca “+ Partita” per iniziare.' : '') + '</div>';
+    const treeEl = document.getElementById('navTree');
+    if (treeEl) treeEl.innerHTML = '<p style="color:var(--mute);font-size:12px;padding:6px">Nessuna gara</p>';
     updateIncompleteBadge();
     updateAlertStatusBadge();
     return;
   }
+
   const nowM = iso(new Date()).slice(0, 7);
-  const open = wantM && months[wantM] ? wantM : (months[nowM] ? nowM : keys[keys.length - 1]);
+  let activeM = p.get('m');
+  if (!activeM || !months[activeM]) {
+    activeM = months[nowM] ? nowM : keys[keys.length - 1];
+    setParam('m', activeM);
+  }
+  const activeW = p.get('s');
+
+  renderNavTree(months, activeM, activeW);
+
   const fmt = (d, o) => d.toLocaleDateString('it-IT', o);
-
   const conflictsMap = findConflictingMatches();
+  const label = fmt(new Date(activeM + '-15T12:00'), { month: 'long', year: 'numeric' });
+  const count = Object.values(months[activeM]).reduce((n, a) => n + a.length, 0);
 
-  listEl.innerHTML = keys.map(m => {
-    const label = fmt(new Date(m + '-15T12:00'), { month: 'long', year: 'numeric' });
-    const count = Object.values(months[m]).reduce((n, a) => n + a.length, 0);
-    const wkHtml = Object.keys(months[m]).sort().map(w => {
-      const a = monday(w), b = new Date(a); b.setDate(b.getDate() + 6);
-      const list = months[m][w], isOpen = wantW ? wantW === w : iso(monday(iso(new Date()))) === w;
-      const days = {}; list.forEach(i => (days[i.date] ??= []).push(i));
-      Object.values(days).forEach(arr => arr.sort((a, b) => {
-        if (!a.time && !b.time) return (b.ts ?? idxOf.get(b.id)) - (a.ts ?? idxOf.get(a.id));
-        if (!a.time) return -1;
-        if (!b.time) return 1;
-        return a.time.localeCompare(b.time);
-      }));
-      const dayHtml = Object.keys(days).sort().map(dt => {
-        const isUrgentDay = isWithinOneDayOrLess(dt);
-        return `<div class="day"><h4>${fmt(new Date(dt + 'T12:00'), { weekday: 'short', day: 'numeric', month: 'short' })}</h4>${openClose(dt)}<div class="matches">${days[dt].map(it => card(it, conflictsMap.has(it.id), isUrgentDay && isMissingRequirements(it))).join('')}</div></div>`;
-      }).join('');
-      return `<details class="week${wantW === w ? ' hl' : ''}" id="w-${w}" data-m="${m}" data-w="${w}"${isOpen ? ' open' : ''}><summary><span class="t">Settimana ${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short' })}</span><span class="n">${list.length} ${list.length === 1 ? 'gara' : 'gare'}<button class="waBtn" data-wamsg="${w}" type="button" title="Copia turni">📲 WA</button></span></summary>${dayHtml}</details>`;
+  const wkHtml = Object.keys(months[activeM]).sort().map(w => {
+    const a = monday(w), b = new Date(a); b.setDate(b.getDate() + 6);
+    const list = months[activeM][w];
+    const isOpen = activeW ? activeW === w : true;
+    const days = {}; 
+    list.forEach(i => (days[i.date] ??= []).push(i));
+    
+    Object.values(days).forEach(arr => arr.sort((a, b) => {
+      if (!a.time && !b.time) return (b.ts ?? idxOf.get(b.id)) - (a.ts ?? idxOf.get(a.id));
+      if (!a.time) return -1;
+      if (!b.time) return 1;
+      return a.time.localeCompare(b.time);
+    }));
+
+    const dayHtml = Object.keys(days).sort().map(dt => {
+      const isUrgentDay = isWithinOneDayOrLess(dt);
+      return `<div class="day">
+        <h4>${fmt(new Date(dt + 'T12:00'), { weekday: 'short', day: 'numeric', month: 'short' })}</h4>
+        ${openClose(dt)}
+        <div class="matches">${days[dt].map(it => card(it, conflictsMap.has(it.id), isUrgentDay && isMissingRequirements(it))).join('')}</div>
+      </div>`;
     }).join('');
-    return `<details class="month" data-m="${m}"${m === open ? ' open' : ''}><summary><span class="t">${label}<button class="waBtn" data-warecap="${m}" type="button" title="Copia riepilogo">📲 WA Riepilogo</button></span><span class="n">${count} gare</span></summary><div class="mbody">${recapHTML(m)}<div class="mweeks">${wkHtml}</div></div></details>`;
+
+    return `<details class="week${activeW === w ? ' hl' : ''}" id="w-${w}" data-m="${activeM}" data-w="${w}"${isOpen ? ' open' : ''}>
+      <summary>
+        <span class="t">Settimana ${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short' })}</span>
+        <span class="n">${list.length} ${list.length === 1 ? 'gara' : 'gare'}<button class="waBtn" data-wamsg="${w}" type="button" title="Copia turni">📲 WA</button></span>
+      </summary>
+      ${dayHtml}
+    </details>`;
   }).join('');
+
+  listEl.innerHTML = `<div class="selected-month-view">
+    <div class="selected-month-header">
+      <h2>
+        ${label}
+        <button class="waBtn" data-warecap="${activeM}" type="button" title="Copia riepilogo">📲 WA Riepilogo</button>
+      </h2>
+      <span style="color:var(--mute);font-weight:600;font-size:14px">${count} gare totali</span>
+    </div>
+    <div class="mbody">
+      ${recapHTML(activeM)}
+      <div class="mweeks">${wkHtml}</div>
+    </div>
+  </div>`;
+
   setTimeout(() => { ready = true; }, 150);
   updateIncompleteBadge();
   updateAlertStatusBadge();
-  if (wantW) { const el = document.getElementById('w-' + wantW); if (el) el.scrollIntoView({ block: 'start' }); }
+
+  if (activeW) {
+    const el = document.getElementById('w-' + activeW);
+    if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
   if (focusId) {
     const el = document.querySelector(`[data-id="${focusId}"]`);
     if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -1285,6 +1482,27 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('click', e => {
+  const pickM = e.target.closest('[data-pickm]');
+  if (pickM) {
+    e.preventDefault();
+    const targetMonth = pickM.dataset.pickm;
+    setParam('m', targetMonth);
+    setParam('s', '');
+    triggerHaptic('light');
+    return;
+  }
+
+  const pickW = e.target.closest('[data-navw]');
+  if (pickW) {
+    e.preventDefault();
+    const targetMonth = pickW.dataset.navm;
+    const targetWeek = pickW.dataset.navw;
+    setParam('m', targetMonth);
+    setParam('s', targetWeek);
+    triggerHaptic('light');
+    return;
+  }
+
   const gh = e.target.closest('[data-ghost]');
   if (gh && !READONLY) {
     e.stopPropagation();
@@ -1292,7 +1510,6 @@ document.addEventListener('click', e => {
     const it = items.find(x => x.id === id); if (!it) return;
 
     if (it.ghost) {
-      // Se era già chiusa, un tap toglie il check e riapre alle modifiche
       pushUndo();
       it.ghost = false;
       save();
@@ -1300,7 +1517,6 @@ document.addEventListener('click', e => {
       triggerHaptic('light');
       toast('Check rimosso: modifiche riabilitate', 'warning');
     } else {
-      // Se non era chiusa, apri il menu rapido Post-Gara Express
       openQuickCloseModal(id);
     }
     return;
@@ -1368,8 +1584,10 @@ document.addEventListener('click', e => {
 
 document.addEventListener('toggle', e => {
   if (!ready || !e.target.open) return;
-  if (e.target.matches('details.month')) { setParam('m', e.target.dataset.m); setParam('s', ''); }
-  else if (e.target.matches('details.week')) { setParam('m', e.target.dataset.m); setParam('s', e.target.dataset.w); }
+  if (e.target.matches('details.week')) { 
+    setParam('m', e.target.dataset.m); 
+    setParam('s', e.target.dataset.w); 
+  }
 }, true);
 
 function openAddModal() {
@@ -1466,7 +1684,7 @@ function openAddModal() {
       ts: Date.now() 
     };
     pushUndo(); items.push(it); save(); ov.remove();
-    setParam('m', it.date.slice(0, 7)); setParam('s', iso(monday(it.date))); render(it.id);
+    setParam('m', it.date.slice(0, 7)); setParam('s', iso(monday(it.date)));
     toast('Partita aggiunta!', 'success');
   };
   document.getElementById('nDate').focus();
@@ -1582,6 +1800,7 @@ function fromExportFormat(arr) {
   });
   return { newItems, wi };
 }
+
 function monthsWithData() {
   const s = new Set();
   items.forEach(i => s.add(i.date.slice(0, 7)));
@@ -1724,6 +1943,15 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
     if (!READONLY) cloudPushNow().then(() => toast('Modifiche salvate', 'success'));
+  }
+  // Supporto Escape per chiudere tutti i popup
+  if (e.key === 'Escape') {
+    const modals = document.querySelectorAll('.ov');
+    if (modals.length) {
+      modals.forEach(m => m.remove());
+    } else {
+      closeMenus();
+    }
   }
 });
 
@@ -1887,6 +2115,11 @@ function promptChangePin() {
 }
 
 function bindEvents() {
+  const authBtn = $('#authBtn');
+  if (authBtn) {
+    authBtn.onclick = () => window.handleAuthClick();
+  }
+
   const notifyBtn = $('#notifyBtn');
   if (notifyBtn) notifyBtn.onclick = () => requestNotificationPermission();
 
@@ -1961,8 +2194,8 @@ function bindEvents() {
     todayB.onclick = () => {
       triggerHaptic('light');
       const t = iso(new Date());
-      setParam('m', t.slice(0, 7)); setParam('s', iso(monday(t)));
-      render();
+      setParam('m', t.slice(0, 7)); 
+      setParam('s', iso(monday(t)));
     };
   }
 
@@ -1987,7 +2220,7 @@ function bindEvents() {
     };
   }
 
-  // GESTIONE NOMI: LISTA + PULSANTE SCHEDA STORICO
+  // GESTIONE NOMI E SCHEDA PERSONALE
   const namesB = $('#namesBtn');
   if (namesB) {
     namesB.onclick = () => {
@@ -2191,7 +2424,6 @@ function bindEvents() {
   initMenu('menuBtn', 'menuDrop');
   initMenu('gearBtn', 'gearDrop');
   document.addEventListener('click', e => { if (!e.target.closest('.menuWrap')) closeMenus(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -2212,7 +2444,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   const isAuth = sessionStorage.getItem('partite_admin_auth') === '1';
   setAuthMode(isAuth);
 
-  window.addEventListener('hashchange', () => { mem = null; render(); });
+  window.addEventListener('hashchange', () => { 
+    mem = null; 
+    render(); 
+  });
 
   if (sb) {
     setSyncVisualState('orange');
@@ -2235,98 +2470,3 @@ window.addEventListener('DOMContentLoaded', async () => {
   render();
   checkAndTriggerScheduledNotifications();
 });
-// MODAL RAPIDO POST-GARA EXPRESS (1 TAP)
-function openQuickCloseModal(matchId) {
-  const it = items.find(x => x.id === matchId);
-  if (!it) return;
-
-  const ov = document.createElement('div');
-  ov.className = 'ov';
-  ov.id = 'quickCloseOv';
-
-  let selectedStatus = it.status || '';
-  let homeScore = '';
-  let awayScore = '';
-  if (it.score && String(it.score).includes('-')) {
-    const parts = it.score.split('-');
-    homeScore = parts[0]?.trim() || '';
-    awayScore = parts[1]?.trim() || '';
-  }
-
-  ov.innerHTML = `<div class="modal quick-close-modal" role="dialog" aria-modal="true">
-    <div class="quick-close-header">🏁 Chiudi Partita</div>
-    <div class="quick-close-sub">${esc(it.title || 'Gara')}</div>
-
-    <div class="quick-outcome-grid">
-      <button type="button" class="quick-outcome-btn ${selectedStatus === 'vinta' ? 'active' : ''}" data-outcome="vinta">
-        <span style="font-size:16px">🟢</span> Vinta
-      </button>
-      <button type="button" class="quick-outcome-btn ${selectedStatus === 'persa' ? 'active' : ''}" data-outcome="persa">
-        <span style="font-size:16px">🔴</span> Persa
-      </button>
-      <button type="button" class="quick-outcome-btn ${selectedStatus === 'sospesa' ? 'active' : ''}" data-outcome="sospesa">
-        <span style="font-size:16px">⚪</span> Sosp.
-      </button>
-    </div>
-
-    <div style="font-size:11px;color:var(--mute);margin-bottom:4px">Punti (opzionale): Casa - Ospiti</div>
-    <div class="quick-score-inputs">
-      <input type="number" inputmode="numeric" id="qcHome" placeholder="Casa" value="${esc(homeScore)}">
-      <span style="font-weight:800;font-size:16px">:</span>
-      <input type="number" inputmode="numeric" id="qcAway" placeholder="Ospiti" value="${esc(awayScore)}">
-    </div>
-
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <button type="button" class="primary" id="qcSave" style="width:100%;min-height:38px">✓ Conferma & Chiudi</button>
-      <div style="display:flex;gap:6px">
-        <button type="button" id="qcCancel" style="flex:1">Annulla</button>
-        <button type="button" id="qcOnlyCheck" style="flex:1" title="Metti solo il check senza esito">Solo Check</button>
-      </div>
-    </div>
-  </div>`;
-
-  document.body.appendChild(ov);
-  triggerHaptic('light');
-
-  const outcomeBtns = ov.querySelectorAll('.quick-outcome-btn');
-  outcomeBtns.forEach(btn => {
-    btn.onclick = () => {
-      triggerHaptic('light');
-      const val = btn.dataset.outcome;
-      if (selectedStatus === val) {
-        selectedStatus = '';
-        btn.classList.remove('active');
-      } else {
-        selectedStatus = val;
-        outcomeBtns.forEach(b => b.classList.toggle('active', b === btn));
-      }
-    };
-  });
-
-  const finalizeClose = (withDetails = true) => {
-    pushUndo();
-    it.ghost = true;
-    if (withDetails) {
-      const h = ov.querySelector('#qcHome').value.trim();
-      const a = ov.querySelector('#qcAway').value.trim();
-      if (h !== '' && a !== '') {
-        it.score = `${h}-${a}`;
-        if (!selectedStatus) {
-          const hn = Number(h), an = Number(a);
-          if (hn > an) selectedStatus = 'vinta';
-          else if (hn < an) selectedStatus = 'persa';
-        }
-      }
-      it.status = selectedStatus;
-    }
-    save();
-    ov.remove();
-    render();
-    toast('Partita chiusa e svolta ✓', 'success');
-  };
-
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  ov.querySelector('#qcCancel').onclick = () => ov.remove();
-  ov.querySelector('#qcOnlyCheck').onclick = () => finalizeClose(false);
-  ov.querySelector('#qcSave').onclick = () => finalizeClose(true);
-}
