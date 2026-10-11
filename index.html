@@ -20,7 +20,10 @@
 <div class="sticky-top-wrap">
   <header>
     <div class="title-with-sync">
-      <h1>Partite</h1>
+<!-- DENTRO .title-with-sync: inserisci il nuovo pulsante prima dell'h1 -->
+<div class="title-with-sync">
+  <button id="navToggleBtn" type="button" class="nav-toggle-btn" title="Apri Calendario">📅</button>
+        <h1>Partite</h1>
       <button id="conflictAlertBtn" type="button" class="alert-btn-standalone status-ok" title="Stato partite: tutto regolare">✓</button>
 
       <div id="syncIndicatorWrap" class="sync-indicator-wrap">
@@ -76,6 +79,7 @@
 <div class="robanner" id="roBanner">Modalità sola lettura: tocca "Accedi" per abilitare le modifiche.</div>
 
 <main class="layout-main">
+<div id="navBackdrop" class="nav-backdrop"></div>
   <datalist id="namesList"></datalist>
   <datalist id="categoriesList"></datalist>
 

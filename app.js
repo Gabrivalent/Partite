@@ -2116,6 +2116,41 @@ function promptChangePin() {
 
 function bindEvents() {
   const authBtn = $('#authBtn');
+// Gestione apertura/chiusura drawer su mobile
+  const navToggleBtn = $('#navToggleBtn');
+  const navSidebar = $('#navSidebar');
+  const navBackdrop = $('#navBackdrop');
+
+  const closeSidebarMobile = () => {
+    if (navSidebar) navSidebar.classList.remove('open');
+    if (navBackdrop) navBackdrop.classList.remove('open');
+  };
+
+  const openSidebarMobile = () => {
+    triggerHaptic('light');
+    if (navSidebar) navSidebar.classList.add('open');
+    if (navBackdrop) navBackdrop.classList.add('open');
+  };
+
+  if (navToggleBtn) {
+    navToggleBtn.onclick = () => {
+      if (navSidebar?.classList.contains('open')) closeSidebarMobile();
+      else openSidebarMobile();
+    };
+  }
+
+  if (navBackdrop) {
+    navBackdrop.onclick = closeSidebarMobile;
+  }
+
+  // Chiudi automaticamente la sidebar su mobile quando si seleziona una settimana o un mese
+  document.addEventListener('click', e => {
+    if (e.target.closest('[data-pickm]') || e.target.closest('[data-navw]')) {
+      if (window.innerWidth < 860) {
+        closeSidebarMobile();
+      }
+    }
+  });
   if (authBtn) {
     authBtn.onclick = () => window.handleAuthClick();
   }

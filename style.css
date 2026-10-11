@@ -679,3 +679,61 @@ body.ro .match { cursor: default; }
 .trend-bar-fill.loss { background: #ef4444; }
 .trend-bar-fill.suspended { background: #9ca3af; }
 .trend-bar-label { font-size: 9px; color: var(--mute); margin-top: 4px; }
+
+/* Pulsante icona per aprire la sidebar da mobile */
+.nav-toggle-btn {
+  display: none;
+  min-height: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Overlay scuro per chiudere al tap fuori */
+.nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 850;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+/* COMPORTAMENTO SOLO SU SMARTPHONE (< 860px) */
+@media (max-width: 859px) {
+  .nav-toggle-btn {
+    display: inline-flex;
+  }
+
+  .nav-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 82vw;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0 16px 16px 0;
+    z-index: 900;
+    transform: translateX(-105%);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+    padding: 16px 12px 30px;
+  }
+
+  /* Quando è aperta */
+  .nav-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .nav-backdrop.open {
+    display: block;
+    opacity: 1;
+  }
+}
