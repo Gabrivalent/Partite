@@ -13,17 +13,20 @@
   <meta name="apple-mobile-web-app-title" content="Partite">
 
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/modals.css">
+  <link rel="stylesheet" href="css/responsive.css">
+
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body class="ro">
 <div class="sticky-top-wrap">
   <header>
     <div class="title-with-sync">
-<!-- DENTRO .title-with-sync: inserisci il nuovo pulsante prima dell'h1 -->
-<div class="title-with-sync">
-  <button id="navToggleBtn" type="button" class="nav-toggle-btn" title="Apri Calendario">📅</button>
-        <h1>Partite</h1>
+      <button id="navToggleBtn" type="button" class="nav-toggle-btn" title="Apri Calendario">📅</button>
+      <h1>Partite</h1>
       <button id="conflictAlertBtn" type="button" class="alert-btn-standalone status-ok" title="Stato partite: tutto regolare">✓</button>
 
       <div id="syncIndicatorWrap" class="sync-indicator-wrap">
@@ -75,11 +78,8 @@
   </div>
 </div>
 
-<!-- Banner sola lettura posizionato fuori dalla griglia -->
-<div class="robanner" id="roBanner">Modalità sola lettura: tocca "Accedi" per abilitare le modifiche.</div>
-
 <main class="layout-main">
-<div id="navBackdrop" class="nav-backdrop"></div>
+  <div id="navBackdrop" class="nav-backdrop"></div>
   <datalist id="namesList"></datalist>
   <datalist id="categoriesList"></datalist>
 
@@ -99,11 +99,6 @@
 
 <div id="msg" role="status"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="app.js"></script>
-
 <div class="robanner" id="roBanner">
   <div style="font-size: 28px; margin-bottom: 8px;">🔒</div>
   <h3 style="margin: 0 0 8px; color: var(--ink);">Accesso Riservato</h3>
@@ -114,5 +109,10 @@
     Accedi con Account
   </button>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -1,10 +1,16 @@
-const CACHE_NAME = 'partite-cache-v1';
+const CACHE_NAME = 'partite-cache-v2';
 const ASSETS = [
   './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './manifest.json',
+  'index.html',
+  'manifest.json',
+  'css/base.css',
+  'css/components.css',
+  'css/modals.css',
+  'css/responsive.css',
+  'js/config.js',
+  'js/state.js',
+  'js/api.js',
+  'js/main.js',
   'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
