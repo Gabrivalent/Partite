@@ -88,6 +88,7 @@ button.primary:hover { background: var(--acc-hover); border-color: var(--acc-hov
 .alert-btn-standalone.status-ok { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.4); }
 .alert-btn-standalone.status-conflict { background: #ef4444; animation: pulseDanger 1.2s infinite; box-shadow: 0 0 10px rgba(239, 68, 68, 0.7); }
 .alert-btn-standalone.status-urgent-incomplete { background: #f97316; animation: pulseWarning 1.2s infinite; box-shadow: 0 0 10px rgba(249, 115, 22, 0.7); }
+.alert-btn-standalone.status-pending { background: #eab308; color: #111; font-weight: 900; box-shadow: 0 0 10px rgba(234, 179, 8, 0.6); }
 
 @keyframes pulseDanger {
   0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
@@ -208,6 +209,14 @@ body.ro .match { cursor: default; }
 .urgent-badge { background: #431407; border: 1px solid #ea580c; color: #fed7aa; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; }
 .match.ghost { opacity: .55; filter: grayscale(.4); cursor: default !important; }
 
+/* STATO RINVIATA E CANCELLATA */
+.match.postponed { opacity: 0.6; filter: grayscale(1); background: color-mix(in srgb, var(--card) 70%, #000); border-style: dashed; }
+.postponed-badge { background: #374151; border: 1px solid #6b7280; color: #d1d5db; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; }
+
+.match.cancelled { opacity: 0.45; filter: saturate(0.2) brightness(0.7); border: 2px dashed #881337; background: #1a0508; cursor: default !important; }
+.cancelled-badge { background: #4c0519; border: 1px solid #881337; color: #fecdd3; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; }
+.match.cancelled .m-title { text-decoration: line-through; color: #fda4af; }
+
 .m-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .m-title { font: 700 18px var(--font-title); letter-spacing: .3px; color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .m-actions { display: flex; gap: 4px; align-items: center; }
@@ -297,7 +306,6 @@ body.ro .match { cursor: default; }
 .trend-bar-fill.suspended { background: #9ca3af; }
 .trend-bar-label { font-size: 9px; color: var(--mute); margin-top: 4px; }
 
-/* Pulsante icona per aprire la sidebar da mobile */
 .nav-toggle-btn {
   display: none;
   min-height: 32px;

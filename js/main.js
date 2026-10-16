@@ -30,7 +30,6 @@ function isModalOpen() {
   return !!document.querySelector('.ov');
 }
 
-// MODULO HAPTIC & TOAST
 function triggerHaptic(type = 'light') {
   if (window.Telegram?.WebApp?.HapticFeedback) {
     if (type === 'success') window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
@@ -57,19 +56,16 @@ function toast(t, hapticType = 'light') {
   }
 }
 
-// REGISTRAZIONE SERVICE WORKER (percorso relativo compatibile GitHub Pages)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js')
     .then(reg => { state.swRegistration = reg; })
     .catch(() => {});
 }
 
-// APPLICAZIONE TEMA INIZIALE
 if (state.currentTheme !== 'default') {
   applyTheme(state.currentTheme);
 }
 
-// COLLEGAMENTO CALLBACK TRA STATO E API
 registerStateCallbacks({
   onSave: scheduleCloudPush,
   onBadgeUpdate: () => {
@@ -83,7 +79,6 @@ registerCloudCallback(() => {
   renderCategoriesList();
 });
 
-// NOTIFICHE
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
     toast('Notifiche non supportate', 'warning');
@@ -96,30 +91,12 @@ async function requestNotificationPermission() {
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
     toast('Notifiche attivate!', 'success');
-    checkAndTriggerScheduledNotifications();
     return true;
   }
   toast('Permesso non concesso', 'warning');
   return false;
 }
 
-function dispatchAppNotification(title, bodyText, tag = 'partite-alert') {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const cfg = {
-    body: bodyText,
-    tag: tag,
-    icon: APP_ICONS.icon,
-    badge: APP_ICONS.badge,
-    vibrate: [200, 100, 200]
-  };
-  if (state.swRegistration && state.swRegistration.showNotification) {
-    state.swRegistration.showNotification(title, cfg);
-  } else {
-    new Notification(title, cfg);
-  }
-}
-
-// REGOLE DI VALIDAZIONE GARE E ARBITRI
 function isRefereeNeeded(cat, isFriendly) {
   if (isFriendly) return true;
   if (!cat) return true;
@@ -128,6 +105,7 @@ function isRefereeNeeded(cat, isFriendly) {
 }
 
 function isMissingRequirements(item) {
+  if (item.status === 'rinviata' || item.status === 'annullata') return false;
   const hasT1 = !!(item.t1 && item.t1.trim());
   const hasT2 = !!(item.t2 && item.t2.trim());
   const hasArb = !!(item.arb && item.arb.trim());
@@ -156,8 +134,13 @@ function getUrgentIncompleteMatches() {
   return state.items.filter(it => isWithinOneDayOrLess(it.date) && isMissingRequirements(it));
 }
 
-// CALCOLO ESITO E PUNTEGGIO
+function getPendingPostponedMatches() {
+  return state.items.filter(it => it.status === 'rinviata' && !it.postponedDate);
+}
+
 function getMatchOutcome(item) {
+  if (item.status === 'rinviata') return { type: 'suspended', label: item.postponedDate ? `Rinviata (${item.postponedDate})` : 'Rinviata (Da def.)' };
+  if (item.status === 'annullata') return { type: 'loss', label: 'Cancellata' };
   if (item.status === 'sospesa') return { type: 'suspended', label: 'Sospesa' };
   if (item.status === 'vinta') return { type: 'win', label: item.score ? `${item.score} (V)` : 'Vinta' };
   if (item.status === 'persa') return { type: 'loss', label: item.score ? `${item.score} (P)` : 'Persa' };
@@ -182,7 +165,7 @@ function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb) {
   const targetMinutes = th * 60 + tm;
   const conflicts = [];
 
-  state.items.filter(it => it.id !== targetMatchId && it.date === date && it.time).forEach(it => {
+  state.items.filter(it => it.id !== targetMatchId && it.date === date && it.time && it.status !== 'annullata' && it.status !== 'rinviata').forEach(it => {
     const [oh, om] = it.time.split(':').map(Number);
     const otherMinutes = oh * 60 + om;
     const diff = Math.abs(targetMinutes - otherMinutes);
@@ -199,53 +182,6 @@ function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb) {
 
   return [...new Set(conflicts)];
 }
-
-function checkAndTriggerScheduledNotifications() {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const now = new Date();
-  const todayIso = iso(now);
-  const currentHour = now.getHours();
-
-  if (now.getDay() === 3 && currentHour >= 10) {
-    const wedKey = `notif_wed_${todayIso}`;
-    if (!localStorage.getItem(wedKey)) {
-      dispatchAppNotification(
-        '🏀 Promemoria Invio Turni',
-        'È mercoledì! Ricordati di inviare i turni per le partite da domani a mercoledì prossimo.',
-        'wed-rolling-reminder'
-      );
-      localStorage.setItem(wedKey, '1');
-    }
-  }
-
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowIso = iso(tomorrow);
-
-  const urgentToNotify = state.items.filter(it => {
-    if (!isMissingRequirements(it)) return false;
-    if (it.date === todayIso) return true;
-    if (it.date === tomorrowIso && currentHour >= 10) return true;
-    return false;
-  });
-
-  if (urgentToNotify.length > 0) {
-    const hourlyKey = `notif_urgent_${todayIso}_h${currentHour}`;
-    if (!localStorage.getItem(hourlyKey)) {
-      dispatchAppNotification(
-        '⚠️ Turni partite da completare!',
-        `Ci sono ${urgentToNotify.length} partite imminenti senza tutti i refertisti/arbitri assegnati!`,
-        'urgent-incomplete-imminent'
-      );
-      localStorage.setItem(hourlyKey, '1');
-    }
-  }
-}
-
-setInterval(checkAndTriggerScheduledNotifications, 60000);
-setInterval(() => {
-  if (state.isDirty && sb && !state.READONLY && !isModalOpen()) cloudPushNow();
-}, 5000);
 
 function renderNamesList() {
   const dl = document.getElementById('namesList');
@@ -274,6 +210,7 @@ function findConflictingMatches() {
   const conflicts = new Map();
   const groups = {};
   state.items.forEach(it => {
+    if (it.status === 'annullata' || it.status === 'rinviata') return;
     if (it.date && it.time && it.time.trim()) {
       const key = `${it.date}_${it.time.trim()}`;
       (groups[key] ??= []).push(it);
@@ -297,6 +234,7 @@ function updateAlertStatusBadge() {
   const conflictsMap = findConflictingMatches();
   const conflictCount = conflictsMap.size;
   const urgentIncomplete = getUrgentIncompleteMatches();
+  const pendingPostponed = getPendingPostponedMatches();
 
   if (conflictCount > 0) {
     btn.className = 'alert-btn-standalone status-conflict';
@@ -311,6 +249,14 @@ function updateAlertStatusBadge() {
     btn.textContent = `⚠️ ${urgentIncomplete.length}`;
     btn.title = `${urgentIncomplete.length} gara/e a meno di un giorno ancora con turni incompleti!`;
     btn.onclick = openUrgentIncompleteModal;
+    return;
+  }
+
+  if (pendingPostponed.length > 0) {
+    btn.className = 'alert-btn-standalone status-pending';
+    btn.textContent = `⏳ ${pendingPostponed.length}`;
+    btn.title = `${pendingPostponed.length} partita/e rinviata/e senza data di recupero. Clicca per gestire.`;
+    btn.onclick = openPendingModal;
     return;
   }
 
@@ -428,6 +374,51 @@ function openUrgentIncompleteModal() {
   document.getElementById('urgCloseTop').onclick = () => ov.remove();
 }
 
+function openPendingModal() {
+  const pendingList = getPendingPostponedMatches();
+  if (!pendingList.length) { toast('Nessuna partita rinviata in sospeso'); return; }
+
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'pendingOv';
+
+  let listHtml = pendingList.map(it => `
+    <div class="conflict-list-item" style="border-color:#eab308" data-goto="${it.id}">
+      <strong>${esc(it.title || 'Partita senza titolo')}</strong>
+      <span style="font-size:12px;color:var(--mute)">Data originaria: ${esc(it.date)} | Cat: ${esc(it.cat || 'n.d.')}</span>
+      <span style="font-size:11px;color:#eab308;font-weight:700">Rinviata da definire (Clicca per modificare) ➔</span>
+    </div>
+  `).join('');
+
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Partite Rinviate in Sospeso" style="max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="margin:0;color:#eab308">⏳ Partite Rinviate (Da Definire)</h3>
+      <button id="pendCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le seguenti partite sono state rinviate ma non hanno ancora una data di recupero:</p>
+    <div style="display:grid;gap:8px">${listHtml}</div>
+    <div class="mbtns" style="margin-top:14px"><button class="primary" id="pendClose">Chiudi</button></div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => {
+    if (e.target === ov) ov.remove();
+    const itemEl = e.target.closest('[data-goto]');
+    if (itemEl) {
+      const targetId = itemEl.dataset.goto;
+      ov.remove();
+      const targetMatch = state.items.find(x => x.id === targetId);
+      if (targetMatch) {
+        setParam('m', targetMatch.date.slice(0, 7));
+        setParam('s', iso(monday(targetMatch.date)));
+        openEditModal(targetId);
+      }
+    }
+  });
+  document.getElementById('pendClose').onclick = () => ov.remove();
+  document.getElementById('pendCloseTop').onclick = () => ov.remove();
+}
+
 function buildCustomTimePicker(initialVal) {
   let [h, m] = (initialVal || '15:30').split(':');
   if (!h) h = '15';
@@ -513,7 +504,6 @@ function openMoltModal(name, counts, month) {
   document.getElementById('mp').focus();
 }
 
-// SCHEDA COLLABORATORE PERSONALE
 function openPersonHistoryModal(personName) {
   const normTarget = (personName || '').trim().toLowerCase();
   if (!normTarget) return;
@@ -643,7 +633,6 @@ function openPersonHistoryModal(personName) {
   ov.querySelector('#phClose').onclick = () => ov.remove();
 }
 
-// POST-GARA EXPRESS (POPOVER A 1 TAP SU ✓)
 function openQuickCloseModal(matchId) {
   const it = state.items.find(x => x.id === matchId);
   if (!it) return;
@@ -661,11 +650,11 @@ function openQuickCloseModal(matchId) {
     awayScore = parts[1]?.trim() || '';
   }
 
-  ov.innerHTML = `<div class="modal quick-close-modal" role="dialog" aria-modal="true">
-    <div class="quick-close-header">🏁 Chiudi Partita</div>
+  ov.innerHTML = `<div class="modal quick-close-modal" role="dialog" aria-modal="true" style="max-width:350px">
+    <div class="quick-close-header">🏁 Gestione Esito / Stato</div>
     <div class="quick-close-sub">${esc(it.title || 'Gara')}</div>
 
-    <div class="quick-outcome-grid">
+    <div class="quick-outcome-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px">
       <button type="button" class="quick-outcome-btn ${selectedStatus === 'vinta' ? 'active' : ''}" data-outcome="vinta">
         <span style="font-size:16px">🟢</span> Vinta
       </button>
@@ -677,18 +666,35 @@ function openQuickCloseModal(matchId) {
       </button>
     </div>
 
-    <div style="font-size:11px;color:var(--mute);margin-bottom:4px">Punti (opzionale): Casa - Ospiti</div>
-    <div class="quick-score-inputs">
-      <input type="number" inputmode="numeric" id="qcHome" placeholder="Casa" value="${esc(homeScore)}">
-      <span style="font-weight:800;font-size:16px">:</span>
-      <input type="number" inputmode="numeric" id="qcAway" placeholder="Ospiti" value="${esc(awayScore)}">
+    <div class="quick-outcome-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'rinviata' ? 'active' : ''}" data-outcome="rinviata" style="border-color:#6b7280">
+        <span style="font-size:16px">🔄</span> Rinviata
+      </button>
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'annullata' ? 'active' : ''}" data-outcome="annullata" style="border-color:#881337">
+        <span style="font-size:16px">❌</span> Annullata
+      </button>
+    </div>
+
+    <div id="postponedFields" style="display:${selectedStatus === 'rinviata' ? 'block' : 'none'};background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:12px;text-align:left">
+      <label style="font-size:11px;font-weight:700;color:var(--mute);display:block;margin-bottom:3px">Nuova Data Recupero (Opzionale):</label>
+      <input type="date" id="qcPostponedDate" value="${it.postponedDate || ''}" style="margin-bottom:6px">
+      <label style="font-size:11px;font-weight:700;color:var(--mute);display:block;margin-bottom:3px">Nuovo Orario:</label>
+      <input type="time" id="qcPostponedTime" value="${it.postponedTime || it.time || '15:30'}">
+    </div>
+
+    <div id="scoreFields" style="display:${selectedStatus === 'rinviata' || selectedStatus === 'annullata' ? 'none' : 'block'}">
+      <div style="font-size:11px;color:var(--mute);margin-bottom:4px">Punti (opzionale): Casa - Ospiti</div>
+      <div class="quick-score-inputs">
+        <input type="number" inputmode="numeric" id="qcHome" placeholder="Casa" value="${esc(homeScore)}">
+        <span style="font-weight:800;font-size:16px">:</span>
+        <input type="number" inputmode="numeric" id="qcAway" placeholder="Ospiti" value="${esc(awayScore)}">
+      </div>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:6px">
-      <button type="button" class="primary" id="qcSave" style="width:100%;min-height:38px">✓ Conferma & Chiudi</button>
+      <button type="button" class="primary" id="qcSave" style="width:100%;min-height:38px">✓ Conferma</button>
       <div style="display:flex;gap:6px">
         <button type="button" id="qcCancel" style="flex:1">Annulla</button>
-        <button type="button" id="qcOnlyCheck" style="flex:1" title="Metti solo il check senza esito">Solo Check</button>
       </div>
     </div>
   </div>`;
@@ -697,6 +703,9 @@ function openQuickCloseModal(matchId) {
   triggerHaptic('light');
 
   const outcomeBtns = ov.querySelectorAll('.quick-outcome-btn');
+  const postFields = ov.querySelector('#postponedFields');
+  const scoreFields = ov.querySelector('#scoreFields');
+
   outcomeBtns.forEach(btn => {
     btn.onclick = () => {
       triggerHaptic('light');
@@ -708,15 +717,55 @@ function openQuickCloseModal(matchId) {
         selectedStatus = val;
         outcomeBtns.forEach(b => b.classList.toggle('active', b === btn));
       }
+      postFields.style.display = (selectedStatus === 'rinviata') ? 'block' : 'none';
+      scoreFields.style.display = (selectedStatus === 'rinviata' || selectedStatus === 'annullata') ? 'none' : 'block';
     };
   });
 
-  const finalizeClose = (withDetails = true) => {
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#qcCancel').onclick = () => ov.remove();
+
+  ov.querySelector('#qcSave').onclick = () => {
     pushUndo();
-    it.ghost = true;
-    if (withDetails) {
-      const h = ov.querySelector('#qcHome').value.trim();
-      const a = ov.querySelector('#qcAway').value.trim();
+    if (selectedStatus === 'annullata') {
+      it.status = 'annullata';
+      it.ghost = true;
+      it.postponedDate = '';
+      it.postponedTime = '';
+      toast('Partita contrassegnata come cancellata', 'warning');
+    } else if (selectedStatus === 'rinviata') {
+      it.status = 'rinviata';
+      it.ghost = true;
+      const newD = ov.querySelector('#qcPostponedDate').value.trim();
+      const newT = ov.querySelector('#qcPostponedTime').value.trim();
+      it.postponedDate = newD;
+      it.postponedTime = newT;
+
+      if (newD) {
+        const clonedMatch = {
+          id: uid(),
+          title: it.title,
+          date: newD,
+          time: newT || it.time,
+          cat: it.cat,
+          friendly: !!it.friendly,
+          score: '',
+          status: '',
+          t1: '',
+          t2: '',
+          arb: '',
+          ghost: false,
+          ts: Date.now()
+        };
+        state.items.push(clonedMatch);
+        toast('Partita rinviata e clonata alla nuova data!', 'success');
+      } else {
+        toast('Partita rinviata (da definire) -> Segnalata in alto', 'warning');
+      }
+    } else {
+      it.ghost = true;
+      const h = ov.querySelector('#qcHome')?.value.trim() || '';
+      const a = ov.querySelector('#qcAway')?.value.trim() || '';
       if (h !== '' && a !== '') {
         it.score = `${h}-${a}`;
         if (!selectedStatus) {
@@ -726,17 +775,15 @@ function openQuickCloseModal(matchId) {
         }
       }
       it.status = selectedStatus;
+      it.postponedDate = '';
+      it.postponedTime = '';
+      toast('Partita chiusa e svolta ✓', 'success');
     }
+
     save();
     ov.remove();
     render();
-    toast('Partita chiusa e svolta ✓', 'success');
   };
-
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  ov.querySelector('#qcCancel').onclick = () => ov.remove();
-  ov.querySelector('#qcOnlyCheck').onclick = () => finalizeClose(false);
-  ov.querySelector('#qcSave').onclick = () => finalizeClose(true);
 }
 
 function exportSelectedMonthsJSON(selectedMonths) {
@@ -839,7 +886,7 @@ function slotHTML(d, k) {
 function computeRecapRows(m) {
   const rec = {}, add = (n, f) => { n = (n || '').trim(); if (!n) return; const k = n.toLowerCase(); (rec[k] ??= { n, p: 0, a: 0, c: 0 })[f]++; };
   const dates = new Set();
-  state.items.filter(i => i.date.startsWith(m) && (!state.filterCat || i.cat === state.filterCat) && !!i.ghost).forEach(i => {
+  state.items.filter(i => i.date.startsWith(m) && (!state.filterCat || i.cat === state.filterCat) && !!i.ghost && i.status !== 'annullata' && i.status !== 'rinviata').forEach(i => {
     dates.add(i.date); const seen = new Set();
     [i.t1, i.t2, i.arb].forEach(n => { n = (n || '').trim(); const k = n.toLowerCase(); if (!n || seen.has(k)) return; seen.add(k); add(n, 'p'); });
   });
@@ -901,13 +948,14 @@ function setParam(k, v) {
 }
 
 function card(i, hasConflict, isUrgentIncomplete) {
-  const ghostOn = !state.READONLY && !!i.ghost;
+  const isCancelled = i.status === 'annullata';
+  const isPostponed = i.status === 'rinviata';
+  const ghostOn = !state.READONLY && (!!i.ghost || isCancelled || isPostponed);
   const missingReq = isMissingRequirements(i);
+
   const t1Val = (i.t1 && i.t1.trim()) ? esc(i.t1) : '<span class="empty-req">Da assegnare</span>';
-  
   const t2Required = !i.friendly;
   const t2Val = (i.t2 && i.t2.trim()) ? esc(i.t2) : (t2Required ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">—</span>');
-
   const arbNeeded = isRefereeNeeded(i.cat, i.friendly);
   const arbVal = (i.arb && i.arb.trim()) ? esc(i.arb) : (arbNeeded ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">Federazione</span>');
 
@@ -918,16 +966,18 @@ function card(i, hasConflict, isUrgentIncomplete) {
   const scoreHtml = outcome ? `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>` : '';
 
   let badgeHtml = '';
-  if (hasConflict) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
+  if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
+  else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da definire)'}</div>`;
+  else if (hasConflict) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
   else if (isUrgentIncomplete) badgeHtml = `<div class="urgent-badge">⏰ GARA IMMINENTE INCOMPLETA</div>`;
 
-  return `<div class="match${ghostOn ? ' ghost' : ''}${missingReq ? ' missing-t1' : ''}${hasConflict ? ' conflict-match' : ''}${isUrgentIncomplete ? ' urgent-incomplete' : ''}" data-id="${i.id}">
+  return `<div class="match${isCancelled ? ' cancelled' : (isPostponed ? ' postponed' : (ghostOn ? ' ghost' : ''))}${missingReq ? ' missing-t1' : ''}${hasConflict ? ' conflict-match' : ''}${isUrgentIncomplete ? ' urgent-incomplete' : ''}" data-id="${i.id}">
     ${badgeHtml}
     <div class="m-top">
       <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita (senza nome)'}</div>
       <div class="m-actions">
-        ${!state.READONLY ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Segna svolta (Check)">✓</button>` : ''}
-        ${!state.READONLY && !i.ghost ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
+        ${!state.READONLY && !isCancelled ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Gestisci esito / Check">✓</button>` : ''}
+        ${!state.READONLY && !i.ghost && !isCancelled && !isPostponed ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
       </div>
     </div>
     <div class="m-meta">
@@ -950,7 +1000,7 @@ function openEditModal(matchId) {
   const it = state.items.find(x => x.id === matchId);
   if (!it) return;
 
-  if (it.ghost) {
+  if (it.ghost && it.status !== 'rinviata') {
     triggerHaptic('warning');
     toast('Togli prima il check ✓ per modificare la partita', 'warning');
     return;
@@ -980,6 +1030,8 @@ function openEditModal(matchId) {
           <option value="vinta" ${it.status === 'vinta' ? 'selected' : ''}>🟢 Vinta</option>
           <option value="persa" ${it.status === 'persa' ? 'selected' : ''}>🔴 Persa</option>
           <option value="sospesa" ${it.status === 'sospesa' ? 'selected' : ''}>⚪ Sospesa</option>
+          <option value="rinviata" ${it.status === 'rinviata' ? 'selected' : ''}>🔄 Rinviata</option>
+          <option value="annullata" ${it.status === 'annullata' ? 'selected' : ''}>❌ Annullata</option>
         </select>
       </div>
     </div>
@@ -1054,16 +1106,19 @@ function openEditModal(matchId) {
     const t1 = document.getElementById('edT1').value.trim();
     const t2 = document.getElementById('edT2').value.trim();
     const arb = document.getElementById('edArb').value.trim();
+    const newStatus = document.getElementById('edStatus').value;
 
-    const conflicts = checkPersonRosterConflicts(matchId, newDate, time, t1, t2, arb);
-    if (conflicts.length && !document.getElementById('edSave').dataset.confirmed) {
-      triggerHaptic('warning');
-      const box = document.getElementById('edConflictBox');
-      box.className = 'person-conflict-alert';
-      box.innerHTML = conflicts.join('<br>') + '<br><small>Tocca di nuovo Salva per forzare.</small>';
-      box.style.display = 'block';
-      document.getElementById('edSave').dataset.confirmed = '1';
-      return;
+    if (newStatus !== 'annullata' && newStatus !== 'rinviata') {
+      const conflicts = checkPersonRosterConflicts(matchId, newDate, time, t1, t2, arb);
+      if (conflicts.length && !document.getElementById('edSave').dataset.confirmed) {
+        triggerHaptic('warning');
+        const box = document.getElementById('edConflictBox');
+        box.className = 'person-conflict-alert';
+        box.innerHTML = conflicts.join('<br>') + '<br><small>Tocca di nuovo Salva per forzare.</small>';
+        box.style.display = 'block';
+        document.getElementById('edSave').dataset.confirmed = '1';
+        return;
+      }
     }
 
     pushUndo();
@@ -1073,10 +1128,13 @@ function openEditModal(matchId) {
     it.cat = document.getElementById('edCat').value.trim();
     it.friendly = currentFriendlyVal;
     it.score = document.getElementById('edScore').value.trim();
-    it.status = document.getElementById('edStatus').value;
+    it.status = newStatus;
+    if (newStatus === 'rinviata' && !it.postponedDate) it.postponedDate = '';
+    if (newStatus && newStatus !== 'rinviata') it.postponedDate = '';
     it.t1 = t1;
     it.t2 = t2;
     it.arb = arb;
+    if (newStatus === 'rinviata' || newStatus === 'annullata') it.ghost = true;
     save(); ov.remove();
     setParam('m', it.date.slice(0, 7));
     setParam('s', iso(monday(it.date)));
@@ -1086,7 +1144,7 @@ function openEditModal(matchId) {
 
 function generateWhatsAppText(startDate, endDate, customTitle) {
   const startStr = iso(startDate), endStr = iso(endDate);
-  const filtered = state.items.filter(i => i.date >= startStr && i.date <= endStr);
+  const filtered = state.items.filter(i => i.date >= startStr && i.date <= endStr && i.status !== 'annullata');
   if (!filtered.length) { toast('Nessuna partita nel periodo', 'warning'); return; }
 
   const fmtDayHeader = dStr => new Date(dStr + 'T12:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
@@ -1143,7 +1201,6 @@ function copyWhatsAppFromWeek(wIso) {
   generateWhatsAppText(start, end);
 }
 
-// COSTRUISCE L'ALBERO COLLASSABILE NELLA SIDEBAR SINISTRA
 function renderNavTree(groupedData, activeMonth, activeWeek) {
   const treeEl = document.getElementById('navTree');
   if (!treeEl) return;
@@ -1347,9 +1404,10 @@ document.addEventListener('click', e => {
     const id = gh.closest('.match').dataset.id;
     const it = state.items.find(x => x.id === id); if (!it) return;
 
-    if (it.ghost) {
+    if (it.ghost && it.status !== 'rinviata') {
       pushUndo();
       it.ghost = false;
+      it.status = '';
       save();
       render();
       triggerHaptic('light');
@@ -1366,7 +1424,7 @@ document.addEventListener('click', e => {
     const id = editBtn.closest('.match')?.dataset?.id;
     if (id) {
       const it = state.items.find(x => x.id === id);
-      if (it?.ghost) {
+      if (it?.ghost && it.status !== 'rinviata') {
         toast('Togli prima il check ✓ per modificare', 'warning');
         return;
       }
@@ -1379,7 +1437,7 @@ document.addEventListener('click', e => {
   const matchCard = e.target.closest('.match');
   if (matchCard && !state.READONLY && !e.target.closest('button')) {
     const it = state.items.find(x => x.id === matchCard.dataset.id);
-    if (it?.ghost) {
+    if (it?.ghost && it.status !== 'rinviata') {
       toast('Partita con check: togli il ✓ per modificarla');
       return;
     }
@@ -1457,6 +1515,8 @@ function openAddModal() {
           <option value="vinta">🟢 Vinta</option>
           <option value="persa">🔴 Persa</option>
           <option value="sospesa">⚪ Sospesa</option>
+          <option value="rinviata">🔄 Rinviata</option>
+          <option value="annullata">❌ Annullata</option>
         </select>
       </div>
     </div>
@@ -1503,16 +1563,19 @@ function openAddModal() {
     const t1 = document.getElementById('nT1').value.trim();
     const t2 = document.getElementById('nT2').value.trim();
     const arb = document.getElementById('nArb').value.trim();
+    const statusVal = document.getElementById('nStatus').value;
 
-    const conflicts = checkPersonRosterConflicts(null, date, time, t1, t2, arb);
-    if (conflicts.length && !document.getElementById('nSave').dataset.confirmed) {
-      triggerHaptic('warning');
-      const box = document.getElementById('nConflictBox');
-      box.className = 'person-conflict-alert';
-      box.innerHTML = conflicts.join('<br>') + '<br><small>Tocca di nuovo Aggiungi per forzare.</small>';
-      box.style.display = 'block';
-      document.getElementById('nSave').dataset.confirmed = '1';
-      return;
+    if (statusVal !== 'annullata' && statusVal !== 'rinviata') {
+      const conflicts = checkPersonRosterConflicts(null, date, time, t1, t2, arb);
+      if (conflicts.length && !document.getElementById('nSave').dataset.confirmed) {
+        triggerHaptic('warning');
+        const box = document.getElementById('nConflictBox');
+        box.className = 'person-conflict-alert';
+        box.innerHTML = conflicts.join('<br>') + '<br><small>Tocca di nuovo Aggiungi per forzare.</small>';
+        box.style.display = 'block';
+        document.getElementById('nSave').dataset.confirmed = '1';
+        return;
+      }
     }
 
     const it = { 
@@ -1523,9 +1586,9 @@ function openAddModal() {
       cat: document.getElementById('nCat').value,
       friendly: currentFriendlyVal,
       score: document.getElementById('nScore').value.trim(),
-      status: document.getElementById('nStatus').value,
+      status: statusVal,
       t1, t2, arb, 
-      ghost: false,
+      ghost: statusVal === 'rinviata' || statusVal === 'annullata',
       ts: Date.now() 
     };
     pushUndo(); state.items.push(it); save(); ov.remove();
@@ -1819,7 +1882,7 @@ function generateMonthPDF(m) {
   }
   nl(10);
   const days = {};
-  state.items.filter(i => i.date.startsWith(m)).forEach(i => (days[i.date] ??= []).push(i));
+  state.items.filter(i => i.date.startsWith(m) && i.status !== 'annullata').forEach(i => (days[i.date] ??= []).push(i));
   Object.keys(state.dayMeta).filter(d => d.startsWith(m)).forEach(d => { if (!days[d]) days[d] = []; });
   const dateKeys = Object.keys(days).sort();
   dateKeys.forEach(dt => {
@@ -1861,7 +1924,6 @@ function setAuthMode(isAdmin) {
   render();
 }
 
-// GESTIONE ACCESSO REALE CON SUPABASE AUTH
 window.handleAuthClick = async function() {
   if (state.READONLY) {
     promptLogin();
@@ -1951,7 +2013,6 @@ function bindEvents() {
     authBtn.onclick = () => window.handleAuthClick();
   }
 
-  // Gestione apertura/chiusura drawer su mobile
   const navToggleBtn = $('#navToggleBtn');
   const navSidebar = $('#navSidebar');
   const navBackdrop = $('#navBackdrop');
@@ -2311,7 +2372,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderNamesList();
   renderCategoriesList();
 
-  // Controllo sessione reale all'avvio con Supabase Auth
   if (sb) {
     const { data: { session } } = await sb.auth.getSession();
     setAuthMode(!!session);
@@ -2353,5 +2413,4 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   render();
-  checkAndTriggerScheduledNotifications();
 });
