@@ -773,6 +773,7 @@ function exportSelectedMonthsJSON(selectedMonths) {
   state.items.filter(i => selectedMonths.some(m => i.date.startsWith(m))).forEach(i => {
     (days[i.date] ??= []).push({
       partita: i.title || '',
+      cat: i.cat || '',
       tavolo1: i.t1 || '',
       tavolo2: i.t2 || '',
       arbitro: i.arb || '',
@@ -881,7 +882,6 @@ function computeRecapRows(m) {
 }
 
 function recapHTML(m) {
-  // Se siamo in sola lettura (link condiviso), non mostriamo i compensi e la tabella recap
   if (state.READONLY) return '';
 
   const rows = computeRecapRows(m);
@@ -2363,12 +2363,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderNamesList();
   renderCategoriesList();
 
-  // Controllo se l'URL forza la sola lettura (es. #readonly=true)
+  // Controllo se l'URL ha il parametro di sola lettura (#readonly=true)
   const urlParams = params();
   const forceReadonly = urlParams.get('readonly') === 'true';
 
   if (forceReadonly) {
-    setAuthMode(false);
+    state.READONLY = true;
+    if (document.body) document.body.classList.remove('ro'); // Sblocca la visualizzazione eliminando la schermata di login bloccante
   } else if (sb) {
     const { data: { session } } = await sb.auth.getSession();
     setAuthMode(!!session);
