@@ -19,12 +19,12 @@ export const state = {
   mem: null
 };
 
-// Inizializzazione dati da localStorage
+// Inizializzazione dati da localStorage in sicurezza
 try { state.items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || []; } catch(e) {}
 try { state.dayMeta = JSON.parse(localStorage.getItem(STORAGE_KEYS.DAYS)) || {}; } catch(e) {}
 try { state.molt = JSON.parse(localStorage.getItem(STORAGE_KEYS.MOLT)) || {}; } catch(e) {}
 try { state.names = JSON.parse(localStorage.getItem(STORAGE_KEYS.NAMES)) || []; } catch(e) {}
-try { state.categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATEGORIES)) || []; } catch(e) {}
+try { state.categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATEGORIES)) || {}; } catch(e) {}
 
 let onSaveCallback = null;
 let onBadgeUpdateCallback = null;
@@ -35,28 +35,38 @@ export function registerStateCallbacks({ onSave, onBadgeUpdate }) {
 }
 
 export const saveLocalOnly = () => {
-  try { localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(state.items)); } catch(e) {}
+  try {
+    localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(state.items));
+  } catch(e) { console.error('Errore salvataggio items locale', e); }
   if (onBadgeUpdateCallback) onBadgeUpdateCallback();
   state.isDirty = true;
 };
 
 export const saveDLocalOnly = () => {
-  try { localStorage.setItem(STORAGE_KEYS.DAYS, JSON.stringify(state.dayMeta)); } catch(e) {}
+  try {
+    localStorage.setItem(STORAGE_KEYS.DAYS, JSON.stringify(state.dayMeta));
+  } catch(e) { console.error('Errore salvataggio dayMeta locale', e); }
   state.isDirty = true;
 };
 
 export const saveMoltLocal = () => {
-  try { localStorage.setItem(STORAGE_KEYS.MOLT, JSON.stringify(state.molt)); } catch(e) {}
+  try {
+    localStorage.setItem(STORAGE_KEYS.MOLT, JSON.stringify(state.molt));
+  } catch(e) { console.error('Errore salvataggio molt locale', e); }
   state.isDirty = true;
 };
 
 export const saveNamesLocal = () => {
-  try { localStorage.setItem(STORAGE_KEYS.NAMES, JSON.stringify(state.names)); } catch(e) {}
+  try {
+    localStorage.setItem(STORAGE_KEYS.NAMES, JSON.stringify(state.names));
+  } catch(e) { console.error('Errore salvataggio names locale', e); }
   state.isDirty = true;
 };
 
 export const saveCategoriesLocal = () => {
-  try { localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(state.categories)); } catch(e) {}
+  try {
+    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(state.categories));
+  } catch(e) { console.error('Errore salvataggio categories locale', e); }
   state.isDirty = true;
 };
 
