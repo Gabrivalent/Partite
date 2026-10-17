@@ -79,24 +79,6 @@ registerCloudCallback(() => {
   renderCategoriesList();
 });
 
-async function requestNotificationPermission() {
-  if (!('Notification' in window)) {
-    toast('Notifiche non supportate', 'warning');
-    return false;
-  }
-  if (Notification.permission === 'granted') {
-    toast('Notifiche già attive');
-    return true;
-  }
-  const perm = await Notification.requestPermission();
-  if (perm === 'granted') {
-    toast('Notifiche attivate!', 'success');
-    return true;
-  }
-  toast('Permesso non concesso', 'warning');
-  return false;
-}
-
 function isRefereeNeeded(cat, isFriendly) {
   if (isFriendly) return true;
   if (!cat) return true;
@@ -899,6 +881,9 @@ function computeRecapRows(m) {
 }
 
 function recapHTML(m) {
+  // Se siamo in sola lettura (link condiviso), non mostriamo i compensi e la tabella recap
+  if (state.READONLY) return '';
+
   const rows = computeRecapRows(m);
   return `<aside class="recap" data-m="${m}"><h4>Riepilogo del mese</h4>` + (rows.length
     ? `<table><thead><tr><th>Nome</th><th>Part.</th><th>Ap/Ch</th><th>Totale</th></tr></thead><tbody>${rows.map(r => {
@@ -910,7 +895,7 @@ function recapHTML(m) {
 }
 
 function updateRecap(m) { const el = document.querySelector(`.recap[data-m="${m}"]`); if (el) el.outerHTML = recapHTML(m); }
-const openClose = d => `<div class="oc">${slotHTML(d, 'ap')}${slotHTML(d, 'ch')}</div>`;
+const openClose = d => state.READONLY ? '' : `<div class="oc">${slotHTML(d, 'ap')}${slotHTML(d, 'ch')}</div>`;
 
 function closeMenus() {
   document.querySelectorAll('.menuDrop').forEach(d => {
@@ -968,10 +953,10 @@ function card(i, hasConflict, isUrgentIncomplete) {
   let badgeHtml = '';
   if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
   else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da definire)'}</div>`;
-  else if (hasConflict) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
-  else if (isUrgentIncomplete) badgeHtml = `<div class="urgent-badge">⏰ GARA IMMINENTE INCOMPLETA</div>`;
+  else if (hasConflict && !state.READONLY) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
+  else if (isUrgentIncomplete && !state.READONLY) badgeHtml = `<div class="urgent-badge">⏰ GARA IMMINENTE INCOMPLETA</div>`;
 
-  return `<div class="match${isCancelled ? ' cancelled' : (isPostponed ? ' postponed' : (ghostOn ? ' ghost' : ''))}${missingReq ? ' missing-t1' : ''}${hasConflict ? ' conflict-match' : ''}${isUrgentIncomplete ? ' urgent-incomplete' : ''}" data-id="${i.id}">
+  return `<div class="match${isCancelled ? ' cancelled' : (isPostponed ? ' postponed' : (ghostOn ? ' ghost' : ''))}${missingReq && !state.READONLY ? ' missing-t1' : ''}${hasConflict && !state.READONLY ? ' conflict-match' : ''}${isUrgentIncomplete && !state.READONLY ? ' urgent-incomplete' : ''}" data-id="${i.id}">
     ${badgeHtml}
     <div class="m-top">
       <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita (senza nome)'}</div>
@@ -1695,6 +1680,7 @@ function fromExportFormat(arr) {
         id: uid(), 
         date: d, 
         title: p.partita || '', 
+        cat: p.cat || '',
         t1: p.tavolo1 || '', 
         t2: p.tavolo2 || '', 
         arb: p.arbitro || '', 
@@ -1862,25 +1848,28 @@ function generateMonthPDF(m) {
 
   doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.text('Partite — ' + monthLabel(m), ml, y);
   nl(24); doc.setDrawColor(200); doc.line(ml, y, pw - mr, y); nl(16);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('Riepilogo del mese', ml, y); nl(16);
-
-  const rows = computeRecapRows(m);
-  doc.setFontSize(10);
-  if (!rows.length) { doc.setFont('helvetica', 'normal'); doc.text('Nessun dato.', ml, y); nl(16); }
-  else {
-    const cols = [{ w: 170, h: 'Nome' }, { w: 90, h: 'Partite' }, { w: 110, h: 'Apert./Chius.' }, { w: 80, h: 'Totale' }];
-    doc.setFont('helvetica', 'bold'); let x = ml; cols.forEach(c => { doc.text(c.h, x, y); x += c.w; }); nl(14);
-    doc.setDrawColor(220); doc.line(ml, y - 10, pw - mr, y - 10);
-    doc.setFont('helvetica', 'normal');
-    rows.forEach(r => {
-      const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
-      const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
-      let x = ml;
-      [r.n, String(pv), String(av), String(tot)].forEach((t, i) => { doc.text(t, x, y); x += cols[i].w; });
-      nl(15);
-    });
+  
+  if (!state.READONLY) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('Riepilogo del mese', ml, y); nl(16);
+    const rows = computeRecapRows(m);
+    doc.setFontSize(10);
+    if (!rows.length) { doc.setFont('helvetica', 'normal'); doc.text('Nessun dato.', ml, y); nl(16); }
+    else {
+      const cols = [{ w: 170, h: 'Nome' }, { w: 90, h: 'Partite' }, { w: 110, h: 'Apert./Chius.' }, { w: 80, h: 'Totale' }];
+      doc.setFont('helvetica', 'bold'); let x = ml; cols.forEach(c => { doc.text(c.h, x, y); x += c.w; }); nl(14);
+      doc.setDrawColor(220); doc.line(ml, y - 10, pw - mr, y - 10);
+      doc.setFont('helvetica', 'normal');
+      rows.forEach(r => {
+        const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
+        const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
+        let x = ml;
+        [r.n, String(pv), String(av), String(tot)].forEach((t, i) => { doc.text(t, x, y); x += cols[i].w; });
+        nl(15);
+      });
+    }
+    nl(10);
   }
-  nl(10);
+
   const days = {};
   state.items.filter(i => i.date.startsWith(m) && i.status !== 'annullata').forEach(i => (days[i.date] ??= []).push(i));
   Object.keys(state.dayMeta).filter(d => d.startsWith(m)).forEach(d => { if (!days[d]) days[d] = []; });
@@ -1893,9 +1882,11 @@ function generateMonthPDF(m) {
     doc.text(new Date(dt + 'T12:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }), ml, y);
     nl(14);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    const ap = x.ap === 'si' ? ('Apertura: sì (' + (x.apNome || '—') + ')') : 'Apertura: no';
-    const ch = x.ch === 'si' ? ('Chiusura: sì (' + (x.chNome || '—') + ')') : 'Chiusura: no';
-    doc.text(ap + '    ' + ch, ml, y); nl(16);
+    if (!state.READONLY) {
+      const ap = x.ap === 'si' ? ('Apertura: sì (' + (x.apNome || '—') + ')') : 'Apertura: no';
+      const ch = x.ch === 'si' ? ('Chiusura: sì (' + (x.chNome || '—') + ')') : 'Chiusura: no';
+      doc.text(ap + '    ' + ch, ml, y); nl(16);
+    }
     list.forEach(it => {
       doc.setFont('helvetica', 'bold'); doc.text(`• ${it.time ? it.time + ' - ' : ''}${it.title || '(senza titolo)'}${it.friendly ? ' [AMICHEVOLE]' : ''}`, ml + 6, y); nl(13);
       doc.setFont('helvetica', 'normal');
@@ -2053,10 +2044,10 @@ function bindEvents() {
   const shareLinkBtn = $('#shareLinkBtn');
   if (shareLinkBtn) {
     shareLinkBtn.onclick = async () => {
-      const cleanUrl = location.origin + location.pathname;
+      const cleanUrl = location.origin + location.pathname + '#readonly=true';
       try {
         await navigator.clipboard.writeText(cleanUrl);
-        toast('Link copiato!', 'success');
+        toast('Link di sola visualizzazione copiato!', 'success');
       } catch(e) { prompt('Copia il link:', cleanUrl); }
     };
   }
@@ -2372,7 +2363,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderNamesList();
   renderCategoriesList();
 
-  if (sb) {
+  // Controllo se l'URL forza la sola lettura (es. #readonly=true)
+  const urlParams = params();
+  const forceReadonly = urlParams.get('readonly') === 'true';
+
+  if (forceReadonly) {
+    setAuthMode(false);
+  } else if (sb) {
     const { data: { session } } = await sb.auth.getSession();
     setAuthMode(!!session);
 
