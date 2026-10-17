@@ -201,25 +201,34 @@ function updateIncompleteBadge() {
 function findConflictingMatches() {
   const conflicts = new Map();
   const groups = {};
-  state.items.forEach(it => {
-    if (it.status === 'annullata' || it.status === 'rinviata') return;
-    const catUpper = (it.cat || '').toUpperCase().replace(/\s+/g, '');
-    const excludedYears = ['2019', '2018', '2017', '2016', 'U6', 'U7', 'U8', 'U9', 'U10'];
-    if (excludedYears.some(y => catUpper.includes(y))) return;
+  const excludedYears = ['2019', '2018', '2017', '2016', 'U6', 'U7', 'U8', 'U9', 'U10'];
 
-    if (it.date && it.time && it.time.trim()) {
-      const key = `${it.date}_${it.time.trim()}`;
-      (groups[key] ??= []).push(it);
-    }
+  // Filtriamo via le partite annullate, rinviate e quelle delle categorie giovanili escluse
+  const validItems = state.items.filter(it => {
+    if (it.status === 'annullata' || it.status === 'rinviata' || !it.date || !it.time) return false;
+    const catUpper = (it.cat || '').toUpperCase().replace(/\s+/g, '');
+    return !excludedYears.some(y => catUpper.includes(y));
   });
-  Object.values(groups).forEach(list => {
-    if (list.length > 1) {
-      list.forEach(m => {
-        const others = list.filter(o => o.id !== m.id);
-        conflicts.set(m.id, others);
-      });
-    }
+
+  // Controlliamo se ci sono partite a meno di 2 ore di distanza nello stesso giorno
+  validItems.forEach((m) => {
+    const [mh, mm] = m.time.split(':').map(Number);
+    const mMinutes = mh * 60 + mm;
+
+    validItems.forEach((other) => {
+      if (m.id === other.id) return;
+      if (m.date === other.date) {
+        const [oh, om] = other.time.split(':').map(Number);
+        const oMinutes = oh * 60 + om;
+        
+        // Se la differenza è inferiore a 120 minuti (2 ore), c'è conflitto di orario
+        if (Math.abs(mMinutes - oMinutes) < 120) {
+          (conflicts.get(m.id) ??= []).push(other);
+        }
+      }
+    });
   });
+
   return conflicts;
 }
 
