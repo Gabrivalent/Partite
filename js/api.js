@@ -56,18 +56,26 @@ export function registerCloudCallback(cb) {
 
 export function applyCloudData(raw) {
   if (!raw) return;
-  state.items = Array.isArray(raw.items) ? raw.items : [];
+  
+  // Sicurezza: se il cloud è vuoto ma noi abbiamo già dati locali, non sovrascriviamo con il vuoto
+  const cloudItems = Array.isArray(raw.items) ? raw.items : [];
+  if (cloudItems.length === 0 && state.items.length > 0 && !state.isDirty) {
+    return;
+  }
+
+  state.items = cloudItems;
   state.dayMeta = raw.dayMeta && typeof raw.dayMeta === 'object' ? raw.dayMeta : {};
   state.molt = raw.molt && typeof raw.molt === 'object' ? raw.molt : {};
   state.names = Array.isArray(raw.names) ? raw.names : [];
   state.categories = Array.isArray(raw.categories) ? raw.categories : [];
-  state.isDirty = false;
+  
   saveLocalOnly();
   saveDLocalOnly();
   saveMoltLocal();
   saveNamesLocal();
   saveCategoriesLocal();
   state.isDirty = false;
+  
   if (onCloudDataAppliedCallback) onCloudDataAppliedCallback();
 }
 
@@ -99,7 +107,8 @@ export async function cloudPushNow() {
 let syncTimer = null;
 export function scheduleCloudPush() {
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(cloudPushNow, 1200);
+  // Salvataggio automatico in background dopo 1 secondo di inattività
+  syncTimer = setTimeout(cloudPushNow, 1000);
 }
 
 export async function cloudPullSafe(silent) {
