@@ -138,8 +138,15 @@ function getMatchOutcome(item) {
   return null;
 }
 
-function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb) {
+function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb, targetCategory = '') {
   if (!date || !timeStr) return [];
+  
+  const catUpper = (targetCategory || '').toUpperCase().replace(/\s+/g, '');
+  const excludedYears = ['2019', '2018', '2017', '2016', 'U6', 'U7', 'U8', 'U9', 'U10'];
+  if (excludedYears.some(y => catUpper.includes(y))) {
+    return [];
+  }
+
   const assigned = [t1, t2, arb].map(x => (x || '').trim().toLowerCase()).filter(Boolean);
   if (!assigned.length) return [];
 
@@ -148,6 +155,9 @@ function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb) {
   const conflicts = [];
 
   state.items.filter(it => it.id !== targetMatchId && it.date === date && it.time && it.status !== 'annullata' && it.status !== 'rinviata').forEach(it => {
+    const otherCatUpper = (it.cat || '').toUpperCase().replace(/\s+/g, '');
+    if (excludedYears.some(y => otherCatUpper.includes(y))) return;
+
     const [oh, om] = it.time.split(':').map(Number);
     const otherMinutes = oh * 60 + om;
     const diff = Math.abs(targetMinutes - otherMinutes);
@@ -193,6 +203,10 @@ function findConflictingMatches() {
   const groups = {};
   state.items.forEach(it => {
     if (it.status === 'annullata' || it.status === 'rinviata') return;
+    const catUpper = (it.cat || '').toUpperCase().replace(/\s+/g, '');
+    const excludedYears = ['2019', '2018', '2017', '2016', 'U6', 'U7', 'U8', 'U9', 'U10'];
+    if (excludedYears.some(y => catUpper.includes(y))) return;
+
     if (it.date && it.time && it.time.trim()) {
       const key = `${it.date}_${it.time.trim()}`;
       (groups[key] ??= []).push(it);
@@ -1092,9 +1106,10 @@ function openEditModal(matchId) {
     const t2 = document.getElementById('edT2').value.trim();
     const arb = document.getElementById('edArb').value.trim();
     const newStatus = document.getElementById('edStatus').value;
+    const cat = document.getElementById('edCat').value.trim();
 
     if (newStatus !== 'annullata' && newStatus !== 'rinviata') {
-      const conflicts = checkPersonRosterConflicts(matchId, newDate, time, t1, t2, arb);
+      const conflicts = checkPersonRosterConflicts(matchId, newDate, time, t1, t2, arb, cat);
       if (conflicts.length && !document.getElementById('edSave').dataset.confirmed) {
         triggerHaptic('warning');
         const box = document.getElementById('edConflictBox');
@@ -1110,7 +1125,7 @@ function openEditModal(matchId) {
     it.date = newDate;
     it.time = time;
     it.title = document.getElementById('edTitle').value.trim();
-    it.cat = document.getElementById('edCat').value.trim();
+    it.cat = cat;
     it.friendly = currentFriendlyVal;
     it.score = document.getElementById('edScore').value.trim();
     it.status = newStatus;
@@ -1549,9 +1564,10 @@ function openAddModal() {
     const t2 = document.getElementById('nT2').value.trim();
     const arb = document.getElementById('nArb').value.trim();
     const statusVal = document.getElementById('nStatus').value;
+    const cat = document.getElementById('nCat').value.trim();
 
     if (statusVal !== 'annullata' && statusVal !== 'rinviata') {
-      const conflicts = checkPersonRosterConflicts(null, date, time, t1, t2, arb);
+      const conflicts = checkPersonRosterConflicts(null, date, time, t1, t2, arb, cat);
       if (conflicts.length && !document.getElementById('nSave').dataset.confirmed) {
         triggerHaptic('warning');
         const box = document.getElementById('nConflictBox');
@@ -1568,7 +1584,7 @@ function openAddModal() {
       title: document.getElementById('nTitle').value, 
       date, 
       time, 
-      cat: document.getElementById('nCat').value,
+      cat,
       friendly: currentFriendlyVal,
       score: document.getElementById('nScore').value.trim(),
       status: statusVal,
@@ -2363,13 +2379,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderNamesList();
   renderCategoriesList();
 
-  // Controllo se l'URL ha il parametro di sola lettura (#readonly=true)
   const urlParams = params();
   const forceReadonly = urlParams.get('readonly') === 'true';
 
   if (forceReadonly) {
     state.READONLY = true;
-    if (document.body) document.body.classList.remove('ro'); // Sblocca la visualizzazione eliminando la schermata di login bloccante
+    if (document.body) document.body.classList.remove('ro');
   } else if (sb) {
     const { data: { session } } = await sb.auth.getSession();
     setAuthMode(!!session);
