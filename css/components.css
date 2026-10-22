@@ -4,13 +4,13 @@
 .match {
   position: relative;
   background: var(--card);
-  border-radius: 14px;
-  padding: 12px 14px;
+  border-radius: 16px;
+  padding: 16px 18px;
   box-shadow: var(--shadow-sm);
   transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   border-left: 4px solid transparent;
 }
 
@@ -41,11 +41,8 @@
   animation: pulseConflict 2.2s infinite;
 }
 
-/* PARTITA INCOMPLETA: MAGENTA CON LEGGERA TRASPARENZA */
-.match.missing-t1 {
-  border-left: 4px solid rgba(236, 72, 153, 0.85) !important;
-}
-
+/* PARTITA INCOMPLETA: STESSO ARANCIONE DI MENO DI 24 ORE */
+.match.missing-t1,
 .match.urgent-incomplete {
   border-left: 4px solid #f97316 !important;
 }
@@ -57,9 +54,9 @@
 
 /* BADGE DI AVVISO IN TESTA */
 .cancelled-badge, .postponed-badge, .conflict-badge, .urgent-badge {
-  font: 700 11px var(--font-title);
+  font: 700 12px var(--font-title);
   letter-spacing: .5px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 6px;
   align-self: flex-start;
   margin-bottom: 2px;
@@ -69,16 +66,16 @@
 .conflict-badge { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
 .urgent-badge { background: rgba(249, 115, 22, 0.2); color: #fdba74; }
 
-/* HEADER CARD */
+/* HEADER DELLA CARD */
 .m-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
 .m-time-pill {
-  font: 700 15px var(--font-title);
+  font: 700 18px var(--font-title);
   color: var(--date);
   letter-spacing: .4px;
 }
@@ -86,8 +83,8 @@
 .cat-pill {
   background: var(--hl);
   color: var(--ink);
-  font: 700 11px var(--font-title);
-  padding: 2px 7px;
+  font: 700 12.5px var(--font-title);
+  padding: 3px 8px;
   border-radius: 6px;
   text-transform: uppercase;
 }
@@ -95,20 +92,20 @@
 .friendly-badge {
   background: #9c17a3;
   color: #fff;
-  font: 800 10.5px var(--font-title);
-  padding: 1px 6px;
-  border-radius: 4px;
+  font: 800 11.5px var(--font-title);
+  padding: 2px 7px;
+  border-radius: 5px;
 }
 
 .m-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .score-pill {
-  font: 700 12px var(--font-title);
-  padding: 2px 8px;
+  font: 700 13.5px var(--font-title);
+  padding: 3px 10px;
   border-radius: 6px;
 }
 .score-pill.win { background: rgba(34, 197, 94, 0.2); color: #86efac; }
@@ -116,13 +113,13 @@
 .score-pill.suspended { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
 
 .fipBtn, .ghostBtn, .editBtn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: none;
   background: var(--surface);
   color: var(--mute);
-  font-size: 13.5px;
+  font-size: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -145,28 +142,28 @@
   color: #fff;
 }
 
-/* TITOLO SQUADRE */
+/* TITOLO PARTITA E SQUADRE */
 .m-title {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16.5px;
   color: var(--ink);
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
-/* ROSTER COLLABORATORI */
+/* ROSTER TAVOLO E ARBITRO */
 .m-roster {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 2px;
+  gap: 4px;
+  margin-top: 4px;
   border-top: 1px solid var(--divider);
-  padding-top: 6px;
+  padding-top: 8px;
 }
 
 .m-row {
   display: flex;
   justify-content: space-between;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .m-row .lbl {
   color: var(--mute);
@@ -176,9 +173,9 @@
   color: var(--ink);
 }
 
-/* TESTO DA ASSEGNARE IN MAGENTA TRASPARENTE */
+/* TESTO DA ASSEGNARE IN ARANCIONE */
 .m-row .empty-req {
-  color: rgba(244, 114, 182, 0.95);
+  color: #fb923c;
   font-style: italic;
   font-weight: 700;
 }
@@ -189,11 +186,11 @@
 
 /* PULSANTI E BADGE ALERT */
 .alert-btn-standalone {
-  min-height: 30px;
-  padding: 2px 10px;
+  min-height: 34px;
+  padding: 3px 12px;
   border-radius: 999px;
   border: none;
-  font: 700 12px var(--font-title);
+  font: 700 13px var(--font-title);
   letter-spacing: .5px;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
@@ -229,13 +226,13 @@
   color: #fff;
   border: none;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 4px 10px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   box-shadow: var(--shadow-sm);
 }
 .waBtn:hover { background: var(--wa-dark); }
@@ -246,8 +243,8 @@
   border: none;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 12px;
-  padding: 4px 10px;
+  font-size: 13px;
+  padding: 5px 12px;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
 }
@@ -255,13 +252,13 @@
 
 /* VOCI ALBERO CALENDARIO */
 .nav-year, .nav-month {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .nav-year summary, .nav-month summary {
   cursor: pointer;
   font-weight: 700;
-  font-size: 13px;
-  padding: 4px 6px;
+  font-size: 14px;
+  padding: 6px 8px;
   border-radius: 8px;
   list-style: none;
   display: flex;
@@ -281,9 +278,9 @@
 .nav-weeks-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding-left: 10px;
-  margin-top: 2px;
+  gap: 3px;
+  padding-left: 12px;
+  margin-top: 4px;
 }
 .nav-week-link {
   width: 100%;
@@ -291,9 +288,9 @@
   background: transparent;
   color: var(--mute);
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -309,7 +306,7 @@
   font-weight: 700;
 }
 .nav-badge-count {
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.7;
 }
 
@@ -320,11 +317,11 @@
   right: 24px;
   background: var(--surface);
   color: var(--ink);
-  padding: 10px 18px;
+  padding: 12px 20px;
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 14.5px;
   z-index: 1000;
   pointer-events: none;
   opacity: 0;
@@ -338,8 +335,8 @@
 }
 
 .sync-dot {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   display: inline-block;
 }
