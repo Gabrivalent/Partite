@@ -58,7 +58,10 @@ function toast(t, hapticType = 'light') {
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js')
-    .then(reg => { state.swRegistration = reg; })
+    .then(reg => {
+      state.swRegistration = reg;
+      reg.update();
+    })
     .catch(() => {});
 }
 
@@ -77,6 +80,7 @@ registerStateCallbacks({
 registerCloudCallback(() => {
   renderNamesList();
   renderCategoriesList();
+  render();
 });
 
 function isRefereeNeeded(cat, isFriendly) {
@@ -140,7 +144,7 @@ function getMatchOutcome(item) {
 
 function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb, targetCategory = '') {
   if (!date || !timeStr) return [];
-  
+
   const catUpper = (targetCategory || '').toUpperCase().replace(/\s+/g, '');
   const excludedYears = ['2019', '2018', '2017', '2016', 'U6', 'U7', 'U8', 'U9', 'U10'];
   if (excludedYears.some(y => catUpper.includes(y))) {
@@ -217,7 +221,7 @@ function findConflictingMatches() {
       if (m.date === other.date) {
         const [oh, om] = other.time.split(':').map(Number);
         const oMinutes = oh * 60 + om;
-        
+
         if (Math.abs(mMinutes - oMinutes) < 120) {
           if (!conflicts.has(m.id)) {
             conflicts.set(m.id, []);
@@ -229,6 +233,48 @@ function findConflictingMatches() {
   });
 
   return conflicts;
+}
+
+// Raggruppa i conflitti in cluster/componenti connesse
+function getConflictClusters() {
+  const conflictsMap = findConflictingMatches();
+  const visited = new Set();
+  const clusters = [];
+
+  for (const matchId of conflictsMap.keys()) {
+    if (visited.has(matchId)) continue;
+
+    const cluster = [];
+    const queue = [matchId];
+    visited.add(matchId);
+
+    while (queue.length > 0) {
+      const curId = queue.shift();
+      const matchObj = state.items.find(x => x.id === curId);
+      if (matchObj) cluster.push(matchObj);
+
+      const neighbors = conflictsMap.get(curId) || [];
+      for (const n of neighbors) {
+        if (!visited.has(n.id)) {
+          visited.add(n.id);
+          queue.push(n.id);
+        }
+      }
+    }
+
+    if (cluster.length > 1) {
+      cluster.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      clusters.push(cluster);
+    }
+  }
+
+  clusters.sort((a, b) => {
+    const dComp = a[0].date.localeCompare(b[0].date);
+    if (dComp !== 0) return dComp;
+    return (a[0].time || '').localeCompare(b[0].time || '');
+  });
+
+  return clusters;
 }
 
 function updateAlertStatusBadge() {
@@ -243,7 +289,7 @@ function updateAlertStatusBadge() {
   if (conflictCount > 0) {
     btn.className = 'alert-btn-standalone status-conflict';
     btn.textContent = `❗ ${conflictCount}`;
-    btn.title = `${conflictCount} partite in conflitto di orario! Clicca per risolvere.`;
+    btn.title = `${conflictCount} partite in conflitto di orario! Clicca per visualizzare i gruppi.`;
     btn.onclick = openConflictsModal;
     return;
   }
@@ -271,42 +317,53 @@ function updateAlertStatusBadge() {
 }
 
 function openConflictsModal() {
-  const conflictsMap = findConflictingMatches();
-  if (!conflictsMap.size) { toast('Nessun conflitto presente'); return; }
+  const clusters = getConflictClusters();
+  if (!clusters.length) { toast('Nessun conflitto presente'); return; }
 
   const ov = document.createElement('div');
   ov.className = 'ov';
   ov.id = 'conflictOv';
 
-  const grouped = {};
-  conflictsMap.forEach((others, myId) => {
-    const me = state.items.find(x => x.id === myId);
-    if (!me) return;
-    const k = `${me.date} alle ${me.time}`;
-    (grouped[k] ??= new Set()).add(me);
-  });
-
   let listHtml = '';
-  Object.keys(grouped).sort().forEach(dt => {
-    const arr = Array.from(grouped[dt]);
-    listHtml += `<div style="margin-bottom:12px;border:1px solid #ef4444;border-radius:8px;padding:8px;background:var(--bg)">
-      <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px">⚠️ Conflitto: ${dt} (${arr.length} gare simultanee)</div>`;
-    arr.forEach(it => {
+  clusters.forEach((group, idx) => {
+    const firstMatch = group[0];
+    const lastMatch = group[group.length - 1];
+    const dateFormatted = new Date(firstMatch.date + 'T12:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+    const timeRange = firstMatch.time === lastMatch.time ? `ore ${firstMatch.time}` : `tra le ${firstMatch.time} e le ${lastMatch.time}`;
+
+    listHtml += `<div style="margin-bottom:14px;border:1px solid #ef4444;border-radius:10px;padding:10px;background:var(--bg)">
+      <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+        <span>⚠️ Gruppo ${idx + 1}: ${dateFormatted} (${timeRange})</span>
+        <span style="font-size:11px;background:#450a0a;color:#fca5a5;padding:2px 6px;border-radius:4px">${group.length} gare collegate</span>
+      </div>
+      <div style="display:grid;gap:6px">`;
+
+    group.forEach(it => {
+      const rosterList = [
+        it.t1 ? `T1: <b>${esc(it.t1)}</b>` : '',
+        it.t2 ? `T2: <b>${esc(it.t2)}</b>` : '',
+        it.arb ? `Arb: <b>${esc(it.arb)}</b>` : ''
+      ].filter(Boolean).join(' | ');
+
       listHtml += `<div class="conflict-list-item" data-goto="${it.id}">
-        <strong>${esc(it.title || 'Partita senza titolo')}</strong>
-        <span style="font-size:12px;color:var(--mute)">Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''}</span>
-        <span style="font-size:11px;color:var(--acc);font-weight:600">Vai alla partita ➔</span>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong style="font-size:13px">${esc(it.title || 'Partita senza titolo')}</strong>
+          <span style="font-size:12px;font-weight:700;color:var(--ink)">Ore ${esc(it.time || 'n.d.')}</span>
+        </div>
+        <div style="font-size:11px;color:var(--mute)">Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''} ${rosterList ? '• ' + rosterList : ''}</div>
+        <span style="font-size:11px;color:var(--acc);font-weight:600;margin-top:2px">Vai alla partita ➔</span>
       </div>`;
     });
-    listHtml += `</div>`;
+
+    listHtml += `</div></div>`;
   });
 
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Conflitti" style="max-height:90vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <h3 style="margin:0;color:#ef4444">Conflitti di Orario</h3>
+      <h3 style="margin:0;color:#ef4444">Conflitti di Orario Raggruppati</h3>
       <button id="confCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
     </div>
-    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Partite sovrapposte allo stesso orario:</p>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le partite correlate entro 120 minuti sono raggruppate nello stesso blocco:</p>
     <div>${listHtml}</div>
     <div class="mbtns" style="margin-top:14px"><button class="primary" id="confClose">Chiudi</button></div>
   </div>`;
@@ -537,7 +594,7 @@ function openPersonHistoryModal(personName) {
         if (outcome) {
           pillHtml = `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>`;
         }
-        
+
         let role = '';
         if ((it.t1 || '').trim().toLowerCase() === normTarget) role = 'T1';
         else if ((it.t2 || '').trim().toLowerCase() === normTarget) role = 'T2';
@@ -947,10 +1004,10 @@ function writeHash(p) {
   try { history.replaceState(null, '', location.pathname + (s ? '#' + s : '')); state.mem = null; }
   catch(e) { state.mem = s; }
 }
-function setParam(k, v) { 
-  const p = params(); 
-  v ? p.set(k, v) : p.delete(k); 
-  writeHash(p); 
+function setParam(k, v) {
+  const p = params();
+  v ? p.set(k, v) : p.delete(k);
+  writeHash(p);
   render();
 }
 
@@ -968,7 +1025,7 @@ function card(i, hasConflict, isUrgentIncomplete) {
 
   const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
   const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Partita Amichevole">A</span>` : '';
-  
+
   const outcome = getMatchOutcome(i);
   const scoreHtml = outcome ? `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>` : '';
 
@@ -1024,7 +1081,7 @@ function openEditModal(matchId) {
     <div class="frow"><label>Orario di Gioco</label>${buildCustomTimePicker(it.time || '15:30')}</div>
     <div class="frow"><label for="edTitle">Partita (Squadre)</label><input id="edTitle" type="text" value="${esc(it.title)}"></div>
     <div class="frow"><label for="edCat">Categoria</label><input id="edCat" type="text" list="categoriesList" value="${esc(it.cat)}"></div>
-    
+
     <div class="frow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div>
         <label for="edScore">Punteggio (Casa-Ospite)</label>
@@ -1269,7 +1326,7 @@ export function render(focusId) {
   if (!listEl) return;
   const idxOf = new Map(state.items.map((it, i) => [it.id, i]));
   const p = params();
-  
+
   const qLower = state.searchQuery.toLowerCase().trim();
   const filtered = state.items.filter(i => {
     if (state.filterCat && i.cat !== state.filterCat) return false;
@@ -1283,12 +1340,12 @@ export function render(focusId) {
 
   const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date));
   const months = {};
-  sorted.forEach(i => { 
-    const m = i.date.slice(0, 7); 
-    const w = iso(monday(i.date)); 
-    ((months[m] ??= {})[w] ??= []).push(i); 
+  sorted.forEach(i => {
+    const m = i.date.slice(0, 7);
+    const w = iso(monday(i.date));
+    ((months[m] ??= {})[w] ??= []).push(i);
   });
-  
+
   const keys = Object.keys(months).sort();
   if (!keys.length) {
     listEl.innerHTML = '<div class="empty">Nessuna partita trovata.' + (!state.READONLY ? ' Tocca “+ Partita” per iniziare.' : '') + '</div>';
@@ -1318,9 +1375,9 @@ export function render(focusId) {
     const a = monday(w), b = new Date(a); b.setDate(b.getDate() + 6);
     const list = months[activeM][w];
     const isOpen = activeW ? activeW === w : true;
-    const days = {}; 
+    const days = {};
     list.forEach(i => (days[i.date] ??= []).push(i));
-    
+
     Object.values(days).forEach(arr => arr.sort((a, b) => {
       if (!a.time && !b.time) return (b.ts ?? idxOf.get(b.id)) - (a.ts ?? idxOf.get(a.id));
       if (!a.time) return -1;
@@ -1436,8 +1493,8 @@ document.addEventListener('click', e => {
         toast('Togli prima il check ✓ per modificare', 'warning');
         return;
       }
-      triggerHaptic('light'); 
-      openEditModal(id); 
+      triggerHaptic('light');
+      openEditModal(id);
     }
     return;
   }
@@ -1486,18 +1543,18 @@ document.addEventListener('click', e => {
   }
 
   const nb = e.target.closest('[data-name]');
-  if (nb && !state.READONLY) { 
+  if (nb && !state.READONLY) {
     triggerHaptic('light');
-    openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m); 
-    return; 
+    openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m);
+    return;
   }
 });
 
 document.addEventListener('toggle', e => {
   if (!state.ready || !e.target.open) return;
-  if (e.target.matches('details.week')) { 
-    setParam('m', e.target.dataset.m); 
-    setParam('s', e.target.dataset.w); 
+  if (e.target.matches('details.week')) {
+    setParam('m', e.target.dataset.m);
+    setParam('s', e.target.dataset.w);
   }
 }, true);
 
@@ -1510,7 +1567,7 @@ function openAddModal() {
     <div class="frow"><label>Orario di Gioco</label>${buildCustomTimePicker('15:30')}</div>
     <div class="frow"><label for="nTitle">Partita</label><input id="nTitle" type="text" placeholder="Squadra A – Squadra B"></div>
     <div class="frow"><label for="nCat">Categoria</label><input id="nCat" type="text" list="categoriesList" placeholder="Es. U17"></div>
-    
+
     <div class="frow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div>
         <label for="nScore">Punteggio (Casa-Ospite)</label>
@@ -1561,11 +1618,11 @@ function openAddModal() {
   document.getElementById('nCancel').onclick = () => ov.remove();
   document.getElementById('nSave').onclick = () => {
     const date = document.getElementById('nDate').value;
-    if (!date) { 
+    if (!date) {
       toast('Inserisci almeno la data', 'warning');
-      document.getElementById('nErr').classList.add('on'); 
-      document.getElementById('nDate').focus(); 
-      return; 
+      document.getElementById('nErr').classList.add('on');
+      document.getElementById('nDate').focus();
+      return;
     }
     const time = document.getElementById('finalTimeVal').value;
     const t1 = document.getElementById('nT1').value.trim();
@@ -1587,18 +1644,18 @@ function openAddModal() {
       }
     }
 
-    const it = { 
-      id: uid(), 
-      title: document.getElementById('nTitle').value, 
-      date, 
-      time, 
+    const it = {
+      id: uid(),
+      title: document.getElementById('nTitle').value,
+      date,
+      time,
       cat,
       friendly: currentFriendlyVal,
       score: document.getElementById('nScore').value.trim(),
       status: statusVal,
-      t1, t2, arb, 
+      t1, t2, arb,
       ghost: statusVal === 'rinviata' || statusVal === 'annullata',
-      ts: Date.now() 
+      ts: Date.now()
     };
     pushUndo(); state.items.push(it); save(); ov.remove();
     setParam('m', it.date.slice(0, 7)); setParam('s', iso(monday(it.date)));
@@ -1700,14 +1757,14 @@ function fromExportFormat(arr) {
       chNome: (day.chiusura && day.chiusura.si) ? (day.chiusura.nome || '') : ''
     };
     (day.partite || []).forEach(p => {
-      newItems.push({ 
-        id: uid(), 
-        date: d, 
-        title: p.partita || '', 
+      newItems.push({
+        id: uid(),
+        date: d,
+        title: p.partita || '',
         cat: p.cat || '',
-        t1: p.tavolo1 || '', 
-        t2: p.tavolo2 || '', 
-        arb: p.arbitro || '', 
+        t1: p.tavolo1 || '',
+        t2: p.tavolo2 || '',
+        arb: p.arbitro || '',
         time: p.orario || '',
         friendly: !!p.amichevole,
         score: p.score || '',
@@ -1819,9 +1876,9 @@ function extractHomeMatches(lines, teamName) {
 
 function renderPdfPreview() {
   const wrap = document.getElementById('pdfPreviewWrap'); if (!wrap) return;
-  if (!state.pdfCandidates.length) { 
-    wrap.innerHTML = '<p style="color:var(--warn);font-size:13px;padding:6px 0">Nessuna gara in casa trovata.</p>'; 
-    return; 
+  if (!state.pdfCandidates.length) {
+    wrap.innerHTML = '<p style="color:var(--warn);font-size:13px;padding:6px 0">Nessuna gara in casa trovata.</p>';
+    return;
   }
   wrap.innerHTML = `<p style="color:var(--mute);font-size:12px;margin:4px 0 8px">Trovate ${state.pdfCandidates.length} gare:</p>` +
     state.pdfCandidates.map((c, i) => `<div style="border-bottom:1px solid var(--line);padding:8px 0;display:flex;flex-direction:column;gap:6px">
@@ -1872,7 +1929,7 @@ function generateMonthPDF(m) {
 
   doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.text('Partite — ' + monthLabel(m), ml, y);
   nl(24); doc.setDrawColor(200); doc.line(ml, y, pw - mr, y); nl(16);
-  
+
   if (!state.READONLY) {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text('Riepilogo del mese', ml, y); nl(16);
     const rows = computeRecapRows(m);
@@ -1959,19 +2016,19 @@ function promptLogin() {
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Accesso Amministratore">
     <h3>Accesso Gestione</h3>
     <p style="font-size:13px;color:var(--mute);margin:-6px 0 10px">Inserisci le credenziali amministratore per sbloccare le modifiche.</p>
-    
+
     <div class="frow">
       <label for="loginEmail">Email</label>
       <input id="loginEmail" type="email" placeholder="admin@esempio.com" autocomplete="username" autofocus>
     </div>
-    
+
     <div class="frow">
       <label for="loginPass">Password</label>
       <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
     </div>
-    
+
     <p class="err" id="loginErr">Credenziali non valide.</p>
-    
+
     <div class="mbtns">
       <button type="button" id="loginCancel">Annulla</button>
       <button type="button" class="primary" id="loginGo">Accedi</button>
@@ -1996,7 +2053,7 @@ function promptLogin() {
     try {
       if (!sb) throw new Error('Connessione cloud non disponibile');
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
-      
+
       if (error || !data.session) {
         throw new Error(error?.message || 'Credenziali errate');
       }
@@ -2017,7 +2074,7 @@ function promptLogin() {
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
   document.getElementById('loginCancel').onclick = () => ov.remove();
   document.getElementById('loginGo').onclick = go;
-  
+
   document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
   document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
@@ -2133,7 +2190,7 @@ function bindEvents() {
     todayB.onclick = () => {
       triggerHaptic('light');
       const t = iso(new Date());
-      setParam('m', t.slice(0, 7)); 
+      setParam('m', t.slice(0, 7));
       setParam('s', iso(monday(t)));
     };
   }
@@ -2345,22 +2402,22 @@ function bindEvents() {
         const valid = state.pdfCandidates.filter(c => c.date);
         pushUndo();
         valid.forEach(c => {
-          state.items.push({ 
-            id: uid(), 
-            title: c.title, 
-            date: c.date, 
-            time: c.time || '', 
-            cat: c.cat || '', 
+          state.items.push({
+            id: uid(),
+            title: c.title,
+            date: c.date,
+            time: c.time || '',
+            cat: c.cat || '',
             friendly: false,
             score: '',
             status: '',
-            t1: '', t2: '', arb: '', 
+            t1: '', t2: '', arb: '',
             ghost: false,
-            ts: Date.now() 
+            ts: Date.now()
           });
         });
-        save(); 
-        ov.remove(); 
+        save();
+        ov.remove();
         render();
         toast(`${valid.length} gare aggiunte`, 'success');
       };
@@ -2404,24 +2461,30 @@ window.addEventListener('DOMContentLoaded', async () => {
     setAuthMode(false);
   }
 
-  window.addEventListener('hashchange', () => { 
-    state.mem = null; 
-    render(); 
+  window.addEventListener('hashchange', () => {
+    state.mem = null;
+    render();
   });
 
+  // Render iniziale immediato da memoria locale
+  render();
+
+  // Sincronizzazione prioritaria con Supabase
   if (sb) {
-    setSyncVisualState('orange');
+    setSyncVisualState('orange', 'Verifica aggiornamenti cloud…');
     try {
-      const raw = await cloudFetchRaw();
-      if (raw) {
-        applyCloudData(raw);
-        setSyncVisualState('green');
+      const res = await cloudFetchRaw();
+      if (res && res.data) {
+        applyCloudData(res.data);
+        render();
+        setSyncVisualState('green', 'Sincronizzato con il Cloud');
       } else {
         setSyncVisualState('green');
       }
     } catch(e) {
-      setSyncVisualState('red');
+      setSyncVisualState('red', 'Connessione al Cloud fallita');
     }
+
     setupSupabaseRealtime({
       isModalOpen,
       onRealtimeUpdate: () => {
@@ -2432,6 +2495,4 @@ window.addEventListener('DOMContentLoaded', async () => {
   } else {
     setSyncVisualState('green', 'Memoria locale attiva');
   }
-
-  render();
 });
