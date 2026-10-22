@@ -58,24 +58,57 @@ function notifySave() {
   onBadgeUpdateCallbacks.forEach(fn => fn());
 }
 
-// SALVATAGGI CON NOTIFICA
+// 1. SALVATAGGI BASI (SCRITTURA DIRETTA SU STORAGE LOCALE)
+export function saveLocal() {
+  localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(state.items));
+}
+export const saveItemsLocal = saveLocal;
+export const saveItemsLocalOnly = saveLocal;
+export const saveLocalOnly = saveLocal;
+
+export function saveDLocal() {
+  localStorage.setItem(STORAGE_KEY_DAYMETA, JSON.stringify(state.dayMeta));
+}
+export const saveDLocalOnly = saveDLocal;
+
+export function saveMoltLocal() {
+  localStorage.setItem(STORAGE_KEY_MOLT, JSON.stringify(state.molt));
+}
+export const saveMoltLocalOnly = saveMoltLocal;
+
+export function saveNamesLocal() {
+  localStorage.setItem(STORAGE_KEY_NAMES, JSON.stringify(state.names));
+}
+export const saveNamesLocalOnly = saveNamesLocal;
+
+export function saveCategoriesLocal() {
+  localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(state.categories));
+}
+export const saveCategoriesLocalOnly = saveCategoriesLocal;
+
+export function saveFipLinksLocal() {
+  localStorage.setItem(STORAGE_KEY_FIP_LINKS, JSON.stringify(state.fipLinks));
+}
+export const saveFipLinksLocalOnly = saveFipLinksLocal;
+
+// 2. SALVATAGGI CON NOTIFICA (PER SINCRONIZZAZIONE / UI)
 export function save() {
-  saveLocalOnly();
+  saveLocal();
   notifySave();
 }
 
 export function saveD() {
-  saveDLocalOnly();
+  saveDLocal();
   notifySave();
 }
 
 export function saveMolt() {
-  saveMoltLocalOnly();
+  saveMoltLocal();
   notifySave();
 }
 
 export function saveNames() {
-  saveNamesLocalOnly();
+  saveNamesLocal();
   notifySave();
 }
 
@@ -85,37 +118,11 @@ export function saveCategories() {
 }
 
 export function saveFipLinks() {
-  saveFipLinksLocalOnly();
+  saveFipLinksLocal();
   notifySave();
 }
 
-// SALVATAGGI SOLO LOCALI (USATI DA API.JS)
-export function saveLocalOnly() {
-  localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(state.items));
-}
-
-export function saveDLocalOnly() {
-  localStorage.setItem(STORAGE_KEY_DAYMETA, JSON.stringify(state.dayMeta));
-}
-
-export function saveMoltLocalOnly() {
-  localStorage.setItem(STORAGE_KEY_MOLT, JSON.stringify(state.molt));
-}
-
-export function saveNamesLocalOnly() {
-  localStorage.setItem(STORAGE_KEY_NAMES, JSON.stringify(state.names));
-}
-
-export function saveCategoriesLocal() {
-  localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(state.categories));
-}
-export const saveCategoriesLocalOnly = saveCategoriesLocal;
-
-export function saveFipLinksLocalOnly() {
-  localStorage.setItem(STORAGE_KEY_FIP_LINKS, JSON.stringify(state.fipLinks));
-}
-
-// GESTIONE TEMA
+// 3. GESTIONE TEMA
 export function applyTheme(t) {
   state.currentTheme = t;
   localStorage.setItem(STORAGE_KEY_THEME, t);
@@ -126,7 +133,7 @@ export function applyTheme(t) {
   }
 }
 
-// UNDO / REDO
+// 4. UNDO / REDO
 export function pushUndo() {
   state.undoStack.push({
     items: JSON.parse(JSON.stringify(state.items)),
@@ -142,8 +149,8 @@ export function popUndoState() {
   const last = state.undoStack.pop();
   state.items = last.items;
   state.dayMeta = last.dayMeta;
-  saveLocalOnly();
-  saveDLocalOnly();
+  saveLocal();
+  saveDLocal();
   const btn = document.getElementById('undoBtn');
   if (btn) btn.disabled = state.undoStack.length === 0;
   notifySave();
