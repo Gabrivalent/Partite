@@ -1,47 +1,46 @@
-const CACHE_NAME = 'partite-cache-v2';
-const ASSETS = [
-  './',
-  'index.html',
-  'manifest.json',
-  'css/base.css',
-  'css/components.css',
-  'css/modals.css',
-  'css/responsive.css',
-  'js/config.js',
-  'js/state.js',
-  'js/api.js',
-  'js/main.js',
-  'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-];
+const CACHE_NAME = 'partite-pwa-v2';
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+self.addEventListener('install', event => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.map(key => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-    )).then(() => self.clients.claim())
-  );
-});
+// Strategia Network-First: cerca sempre prima in rete, usa la cache solo se offline
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
 
-self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const netFetch = fetch(e.request).then(res => {
-        if (res && res.status === 200 && e.request.method === 'GET') {
-          const resClone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, resClone));
+  const url = new URL(event.request.url);
+
+  // Ignora chiamate API/Supabase dal caching del Service Worker
+  if (url.origin.includes('supabase.co')) {
+    return;
+  }
+
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
         }
-        return res;
-      }).catch(() => cached);
-      return cached || netFetch;
-    })
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
