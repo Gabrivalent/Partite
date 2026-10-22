@@ -1,105 +1,122 @@
-import { STORAGE_KEYS } from './config.js';
+// GESTIONE STATO GLOBALE E STORAGE
+const STORAGE_KEY_ITEMS = 'partite_items_v2';
+const STORAGE_KEY_DAYMETA = 'partite_meta_v2';
+const STORAGE_KEY_MOLT = 'partite_molt_v1';
+const STORAGE_KEY_NAMES = 'partite_names_v1';
+const STORAGE_KEY_CATEGORIES = 'partite_categories_v1';
+const STORAGE_KEY_FIP_LINKS = 'partite_fip_links_v1';
+const STORAGE_KEY_THEME = 'partite_theme_v1';
+
+const DEFAULT_FIP_LINKS = {
+  'U13': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U13S/M&codice_fase=1&codice_girone=86464',
+  'U13S': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U13S/M&codice_fase=1&codice_girone=86464',
+  'U13S/M': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U13S/M&codice_fase=1&codice_girone=86464',
+  'U14': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U14S/M&codice_fase=1&codice_girone=86449',
+  'U14S': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U14S/M&codice_fase=1&codice_girone=86449',
+  'U14S/M': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U14S/M&codice_fase=1&codice_girone=86449',
+  'U15': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U15G/M&codice_fase=1&codice_girone=85540',
+  'U15G': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U15G/M&codice_fase=1&codice_girone=85540',
+  'U15G/M': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U15G/M&codice_fase=1&codice_girone=85540',
+  'U17': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U17S/M&codice_fase=1&codice_girone=86381',
+  'U17S': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U17S/M&codice_fase=1&codice_girone=86381',
+  'U17S/M': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U17S/M&codice_fase=1&codice_girone=86381',
+  'U19': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U19S/M&codice_fase=1&codice_girone=86357',
+  'U19S': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U19S/M&codice_fase=1&codice_girone=86357',
+  'U19S/M': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U19S/M&codice_fase=1&codice_girone=86357'
+};
 
 export const state = {
+  items: JSON.parse(localStorage.getItem(STORAGE_KEY_ITEMS) || '[]'),
+  dayMeta: JSON.parse(localStorage.getItem(STORAGE_KEY_DAYMETA) || '{}'),
+  molt: JSON.parse(localStorage.getItem(STORAGE_KEY_MOLT) || '{}'),
+  names: JSON.parse(localStorage.getItem(STORAGE_KEY_NAMES) || '[]'),
+  categories: JSON.parse(localStorage.getItem(STORAGE_KEY_CATEGORIES) || '["U13","U14","U15","U17","U19","DR1","Minibasket"]'),
+  fipLinks: JSON.parse(localStorage.getItem(STORAGE_KEY_FIP_LINKS) || JSON.stringify(DEFAULT_FIP_LINKS)),
+  currentTheme: localStorage.getItem(STORAGE_KEY_THEME) || 'default',
   READONLY: true,
-  currentTheme: localStorage.getItem(STORAGE_KEYS.THEME) || 'default',
-  items: [],
-  dayMeta: {},
-  molt: {},
-  names: [],
-  categories: [],
-  isDirty: false,
+  undoStack: [],
+  maxUndo: 15,
+  ready: false,
+  mem: null,
+  pdfCandidates: [],
   filterCat: '',
   filterIncomplete: false,
   searchQuery: '',
-  undoStack: [],
-  pdfCandidates: [],
-  swRegistration: null,
-  ready: false,
-  mem: null
+  swRegistration: null
 };
 
-try { state.items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || []; } catch(e) {}
-try { state.dayMeta = JSON.parse(localStorage.getItem(STORAGE_KEYS.DAYS)) || {}; } catch(e) {}
-try { state.molt = JSON.parse(localStorage.getItem(STORAGE_KEYS.MOLT)) || {}; } catch(e) {}
-try { state.names = JSON.parse(localStorage.getItem(STORAGE_KEYS.NAMES)) || []; } catch(e) {}
-try { state.categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATEGORIES)) || {}; } catch(e) {}
-
-let onSaveCallback = null;
-let onBadgeUpdateCallback = null;
+let onSaveCallbacks = [];
+let onBadgeUpdateCallbacks = [];
 
 export function registerStateCallbacks({ onSave, onBadgeUpdate }) {
-  onSaveCallback = onSave;
-  onBadgeUpdateCallback = onBadgeUpdate;
+  if (onSave) onSaveCallbacks.push(onSave);
+  if (onBadgeUpdate) onBadgeUpdateCallbacks.push(onBadgeUpdate);
 }
 
-export const saveLocalOnly = () => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(state.items));
-  } catch(e) { console.error('Errore salvataggio items locale', e); }
-  if (onBadgeUpdateCallback) onBadgeUpdateCallback();
-  state.isDirty = true;
-};
+function notifySave() {
+  onSaveCallbacks.forEach(fn => fn());
+  onBadgeUpdateCallbacks.forEach(fn => fn());
+}
 
-export const saveDLocalOnly = () => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.DAYS, JSON.stringify(state.dayMeta));
-  } catch(e) { console.error('Errore salvataggio dayMeta locale', e); }
-  state.isDirty = true;
-};
+export function save() {
+  localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(state.items));
+  notifySave();
+}
 
-export const saveMoltLocal = () => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.MOLT, JSON.stringify(state.molt));
-  } catch(e) { console.error('Errore salvataggio molt locale', e); }
-  state.isDirty = true;
-};
+export function saveD() {
+  localStorage.setItem(STORAGE_KEY_DAYMETA, JSON.stringify(state.dayMeta));
+  notifySave();
+}
 
-export const saveNamesLocal = () => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.NAMES, JSON.stringify(state.names));
-  } catch(e) { console.error('Errore salvataggio names locale', e); }
-  state.isDirty = true;
-};
+export function saveMolt() {
+  localStorage.setItem(STORAGE_KEY_MOLT, JSON.stringify(state.molt));
+  notifySave();
+}
 
-export const saveCategoriesLocal = () => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(state.categories));
-  } catch(e) { console.error('Errore salvataggio categories locale', e); }
-  state.isDirty = true;
-};
+export function saveNames() {
+  localStorage.setItem(STORAGE_KEY_NAMES, JSON.stringify(state.names));
+  notifySave();
+}
 
-export const save = () => { saveLocalOnly(); if (onSaveCallback) onSaveCallback(); };
-export const saveD = () => { saveDLocalOnly(); if (onSaveCallback) onSaveCallback(); };
-export const saveMolt = () => { saveMoltLocal(); if (onSaveCallback) onSaveCallback(); };
-export const saveNames = () => { saveNamesLocal(); if (onSaveCallback) onSaveCallback(); };
-export const saveCategories = () => { saveCategoriesLocal(); if (onSaveCallback) onSaveCallback(); };
+export function saveCategories() {
+  localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(state.categories));
+  notifySave();
+}
 
-export function applyTheme(themeName) {
-  state.currentTheme = themeName;
-  if (themeName === 'default') document.body.removeAttribute('data-theme');
-  else document.body.setAttribute('data-theme', themeName);
-  localStorage.setItem(STORAGE_KEYS.THEME, themeName);
+export function saveFipLinks() {
+  localStorage.setItem(STORAGE_KEY_FIP_LINKS, JSON.stringify(state.fipLinks));
+  notifySave();
+}
+
+export function applyTheme(t) {
+  state.currentTheme = t;
+  localStorage.setItem(STORAGE_KEY_THEME, t);
+  if (t === 'default') {
+    document.body.removeAttribute('data-theme');
+  } else {
+    document.body.setAttribute('data-theme', t);
+  }
 }
 
 export function pushUndo() {
-  state.undoStack.push(JSON.stringify({ items: state.items, dayMeta: state.dayMeta }));
-  if (state.undoStack.length > 20) state.undoStack.shift();
-  refreshUndoBtn();
-}
-
-export function refreshUndoBtn() {
-  const b = document.querySelector('#undoBtn');
-  if (b) b.disabled = !state.undoStack.length;
+  state.undoStack.push({
+    items: JSON.parse(JSON.stringify(state.items)),
+    dayMeta: JSON.parse(JSON.stringify(state.dayMeta))
+  });
+  if (state.undoStack.length > state.maxUndo) state.undoStack.shift();
+  const btn = document.getElementById('undoBtn');
+  if (btn) btn.disabled = false;
 }
 
 export function popUndoState() {
-  if (state.READONLY || !state.undoStack.length) return false;
-  const prev = JSON.parse(state.undoStack.pop());
-  state.items = prev.items;
-  state.dayMeta = prev.dayMeta;
-  save();
-  saveD();
-  refreshUndoBtn();
+  if (!state.undoStack.length) return false;
+  const last = state.undoStack.pop();
+  state.items = last.items;
+  state.dayMeta = last.dayMeta;
+  localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(state.items));
+  localStorage.setItem(STORAGE_KEY_DAYMETA, JSON.stringify(state.dayMeta));
+  const btn = document.getElementById('undoBtn');
+  if (btn) btn.disabled = state.undoStack.length === 0;
+  notifySave();
   return true;
 }
