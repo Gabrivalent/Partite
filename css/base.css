@@ -467,7 +467,7 @@ body.ro .auth-only {
   gap: 12px;
 }
 
-/* DUE COLONNE: SETTIMANE A SINISTRA, TABELLA RIEPILOGO A DESTRA */
+/* POSIZIONAMENTO A DUE COLONNE: SETTIMANE A SINISTRA (1), RIEPILOGO A DESTRA (2) */
 .mbody {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -476,53 +476,15 @@ body.ro .auth-only {
 }
 
 .mweeks {
+  grid-column: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* SETTIMANE E GIORNI */
-.week {
-  background: var(--surface);
-  border-radius: 16px;
-  padding: 12px 16px;
-  box-shadow: var(--shadow-sm);
-}
-.week summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 16px;
-  padding: 6px 0;
-  list-style: none;
-}
-.week summary::-webkit-details-marker { display: none; }
-
-.day {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--divider);
-}
-.day h4 {
-  margin: 0 0 10px;
-  color: var(--date);
-  font: 700 15px var(--font-title);
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-
-/* GRIGLIA PARTITE GRANDI E LEGGIBILI */
-.matches {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-
-/* RIEPILOGO LATERALE FISSO */
 .recap {
+  grid-column: 2;
   background: var(--surface);
   border-radius: 16px;
   padding: 18px;
@@ -563,6 +525,45 @@ body.ro .auth-only {
 }
 .recap td button.nb:hover {
   color: var(--acc);
+}
+
+/* SETTIMANE E GIORNI */
+.week {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.week summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 6px 0;
+  list-style: none;
+}
+.week summary::-webkit-details-marker { display: none; }
+
+.day {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+.day h4 {
+  margin: 0 0 10px;
+  color: var(--date);
+  font: 700 15px var(--font-title);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+/* GRIGLIA PARTITE GRANDI E LEGGIBILI */
+.matches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
 }
 
 /* APERTURA / CHIUSURA */
@@ -647,7 +648,11 @@ body.ro .robanner {
     grid-template-columns: 1fr;
     gap: 20px;
   }
+  .mweeks {
+    grid-column: 1;
+  }
   .recap {
+    grid-column: 1;
     position: static;
   }
   .matches {
