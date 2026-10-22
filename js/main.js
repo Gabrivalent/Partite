@@ -235,7 +235,7 @@ function findConflictingMatches() {
   return conflicts;
 }
 
-// Raggruppa i conflitti in cluster/componenti connesse
+// RAGGRUPPAMENTO DEI CONFLITTI IN COMPONENTI CONNESSE (CLUSTER)
 function getConflictClusters() {
   const conflictsMap = findConflictingMatches();
   const visited = new Set();
@@ -277,20 +277,23 @@ function getConflictClusters() {
   return clusters;
 }
 
+// CONTEGGIO ALERT: SE 3 GARE FANNO PARTE DELLO STESSO CONFLITTO -> CONTA 1!
 function updateAlertStatusBadge() {
   const btn = document.getElementById('conflictAlertBtn');
+  const bNavIcon = document.getElementById('bNavAlertIcon');
   if (!btn) return;
 
-  const conflictsMap = findConflictingMatches();
-  const conflictCount = conflictsMap.size;
+  const clusters = getConflictClusters();
+  const clusterCount = clusters.length; // Conta i gruppi di conflitto reali
   const urgentIncomplete = getUrgentIncompleteMatches();
   const pendingPostponed = getPendingPostponedMatches();
 
-  if (conflictCount > 0) {
+  if (clusterCount > 0) {
     btn.className = 'alert-btn-standalone status-conflict';
-    btn.textContent = `❗ ${conflictCount}`;
-    btn.title = `${conflictCount} partite in conflitto di orario! Clicca per visualizzare i gruppi.`;
+    btn.textContent = `❗ ${clusterCount}`;
+    btn.title = `${clusterCount} gruppo/i di partite in conflitto di orario! Clicca per risolvere.`;
     btn.onclick = openConflictsModal;
+    if (bNavIcon) bNavIcon.textContent = `❗ ${clusterCount}`;
     return;
   }
 
@@ -299,6 +302,7 @@ function updateAlertStatusBadge() {
     btn.textContent = `⚠️ ${urgentIncomplete.length}`;
     btn.title = `${urgentIncomplete.length} gara/e a meno di un giorno ancora con turni incompleti!`;
     btn.onclick = openUrgentIncompleteModal;
+    if (bNavIcon) bNavIcon.textContent = `⚠️ ${urgentIncomplete.length}`;
     return;
   }
 
@@ -307,6 +311,7 @@ function updateAlertStatusBadge() {
     btn.textContent = `⏳ ${pendingPostponed.length}`;
     btn.title = `${pendingPostponed.length} partita/e rinviata/e senza data di recupero. Clicca per gestire.`;
     btn.onclick = openPendingModal;
+    if (bNavIcon) bNavIcon.textContent = `⏳ ${pendingPostponed.length}`;
     return;
   }
 
@@ -314,6 +319,7 @@ function updateAlertStatusBadge() {
   btn.textContent = `✓`;
   btn.title = `Nessun conflitto o urgenza rilevata. Calendario regolare.`;
   btn.onclick = () => toast('Calendario regolare: nessun conflitto.');
+  if (bNavIcon) bNavIcon.textContent = '✓';
 }
 
 function openConflictsModal() {
@@ -329,14 +335,14 @@ function openConflictsModal() {
     const firstMatch = group[0];
     const lastMatch = group[group.length - 1];
     const dateFormatted = new Date(firstMatch.date + 'T12:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
-    const timeRange = firstMatch.time === lastMatch.time ? `ore ${firstMatch.time}` : `tra le ${firstMatch.time} e le ${lastMatch.time}`;
+    const timeRange = firstMatch.time === lastMatch.time ? `ore ${firstMatch.time}` : `dalle ${firstMatch.time} alle ${lastMatch.time}`;
 
-    listHtml += `<div style="margin-bottom:14px;border:1px solid #ef4444;border-radius:10px;padding:10px;background:var(--bg)">
-      <div style="font-weight:700;color:#ef4444;font-size:13px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
-        <span>⚠️ Gruppo ${idx + 1}: ${dateFormatted} (${timeRange})</span>
-        <span style="font-size:11px;background:#450a0a;color:#fca5a5;padding:2px 6px;border-radius:4px">${group.length} gare collegate</span>
+    listHtml += `<div style="margin-bottom:14px;border-radius:12px;padding:12px;background:var(--card)">
+      <div style="font-weight:700;color:#ef4444;font-size:13.5px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <span>⚠️ Conflitto ${idx + 1}: ${dateFormatted} (${timeRange})</span>
+        <span style="font-size:11px;background:rgba(239,68,68,0.2);color:#fca5a5;padding:3px 8px;border-radius:6px">${group.length} gare collegate</span>
       </div>
-      <div style="display:grid;gap:6px">`;
+      <div style="display:grid;gap:8px">`;
 
     group.forEach(it => {
       const rosterList = [
@@ -347,25 +353,25 @@ function openConflictsModal() {
 
       listHtml += `<div class="conflict-list-item" data-goto="${it.id}">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong style="font-size:13px">${esc(it.title || 'Partita senza titolo')}</strong>
-          <span style="font-size:12px;font-weight:700;color:var(--ink)">Ore ${esc(it.time || 'n.d.')}</span>
+          <strong style="font-size:14px">${esc(it.title || 'Partita senza titolo')}</strong>
+          <span style="font-size:13px;font-weight:700;color:var(--date)">Ore ${esc(it.time || 'n.d.')}</span>
         </div>
-        <div style="font-size:11px;color:var(--mute)">Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''} ${rosterList ? '• ' + rosterList : ''}</div>
-        <span style="font-size:11px;color:var(--acc);font-weight:600;margin-top:2px">Vai alla partita ➔</span>
+        <div style="font-size:12px;color:var(--mute)">Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''} ${rosterList ? '• ' + rosterList : ''}</div>
+        <span style="font-size:11px;color:var(--acc);font-weight:700;margin-top:2px">Vai alla partita ➔</span>
       </div>`;
     });
 
     listHtml += `</div></div>`;
   });
 
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Conflitti" style="max-height:90vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <h3 style="margin:0;color:#ef4444">Conflitti di Orario Raggruppati</h3>
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Conflitti">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0;color:#ef4444">Conflitti Raggruppati (${clusters.length})</h3>
       <button id="confCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
     </div>
-    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le partite correlate entro 120 minuti sono raggruppate nello stesso blocco:</p>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 14px">Tutte le partite connesse nello stesso orario/fascia:</p>
     <div>${listHtml}</div>
-    <div class="mbtns" style="margin-top:14px"><button class="primary" id="confClose">Chiudi</button></div>
+    <div class="mbtns" style="margin-top:16px"><button class="btn-primary-action" id="confClose" style="width:100%">Chiudi</button></div>
   </div>`;
 
   document.body.appendChild(ov);
@@ -400,21 +406,21 @@ function openUrgentIncompleteModal() {
     if (!it.friendly && !it.t2?.trim()) reqs.push('Tavolo 2');
     if (isRefereeNeeded(it.cat, it.friendly) && !it.arb?.trim()) reqs.push('Arbitro');
 
-    return `<div class="conflict-list-item" style="border-color:#f97316" data-goto="${it.id}">
+    return `<div class="conflict-list-item" style="border-left:4px solid #f97316" data-goto="${it.id}">
       <strong>${esc(it.title || 'Partita senza titolo')}</strong>
       <span style="font-size:12px;color:var(--mute)">Data: ${esc(it.date)} | Ore: ${esc(it.time || 'n.d.')} | Cat: ${esc(it.cat || 'n.d.')}${it.friendly ? ' [AMICHEVOLE]' : ''}</span>
       <span style="font-size:11px;color:#f97316;font-weight:700">Mancano: ${reqs.join(', ')} ➔</span>
     </div>`;
   }).join('');
 
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Gare imminenti incomplete" style="max-height:90vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Gare imminenti incomplete">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0;color:#f97316">Partite Imminenti Incomplete</h3>
       <button id="urgCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
     </div>
-    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le seguenti gare a un giorno o meno richiedono ancora turni di servizio:</p>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 14px">Gare nelle prossime 24-48h che necessitano ancora di persone al tavolo o arbitro:</p>
     <div style="display:grid;gap:8px">${listHtml}</div>
-    <div class="mbtns" style="margin-top:14px"><button class="primary" id="urgClose">Chiudi</button></div>
+    <div class="mbtns" style="margin-top:16px"><button class="btn-primary-action" id="urgClose" style="width:100%">Chiudi</button></div>
   </div>`;
 
   document.body.appendChild(ov);
@@ -444,21 +450,21 @@ function openPendingModal() {
   ov.id = 'pendingOv';
 
   let listHtml = pendingList.map(it => `
-    <div class="conflict-list-item" style="border-color:#eab308" data-goto="${it.id}">
+    <div class="conflict-list-item" style="border-left:4px solid #eab308" data-goto="${it.id}">
       <strong>${esc(it.title || 'Partita senza titolo')}</strong>
       <span style="font-size:12px;color:var(--mute)">Data originaria: ${esc(it.date)} | Cat: ${esc(it.cat || 'n.d.')}</span>
-      <span style="font-size:11px;color:#eab308;font-weight:700">Rinviata da definire (Clicca per modificare) ➔</span>
+      <span style="font-size:11px;color:#eab308;font-weight:700">Rinviata da definire (Clicca per assegnare data) ➔</span>
     </div>
   `).join('');
 
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Partite Rinviate in Sospeso" style="max-height:90vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Partite Rinviate">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0;color:#eab308">⏳ Partite Rinviate (Da Definire)</h3>
       <button id="pendCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
     </div>
-    <p style="font-size:13px;color:var(--mute);margin:-4px 0 12px">Le seguenti partite sono state rinviate ma non hanno ancora una data di recupero:</p>
+    <p style="font-size:13px;color:var(--mute);margin:-4px 0 14px">Partite da ricalendarizzare:</p>
     <div style="display:grid;gap:8px">${listHtml}</div>
-    <div class="mbtns" style="margin-top:14px"><button class="primary" id="pendClose">Chiudi</button></div>
+    <div class="mbtns" style="margin-top:16px"><button class="btn-primary-action" id="pendClose" style="width:100%">Chiudi</button></div>
   </div>`;
 
   document.body.appendChild(ov);
@@ -551,11 +557,11 @@ function openMoltModal(name, counts, month) {
     <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="mp">Partite (${counts.p}) ×</label><input id="mp" type="number" inputmode="numeric" min="0" value="${v.p}"></div>
     <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="ma">Aperture (${counts.a}) ×</label><input id="ma" type="number" inputmode="numeric" min="0" value="${v.a}"></div>
     <div class="frow" style="display:grid;grid-template-columns:1fr 70px;gap:8px;align-items:center"><label for="mc">Chiusure (${counts.c}) ×</label><input id="mc" type="number" inputmode="numeric" min="0" value="${v.c}"></div>
-    <div style="display:flex;justify-content:space-between;font-weight:600;margin:10px 0;padding-top:6px;border-top:1px solid var(--line)"><span>Totale</span><span id="mtot">${counts.p * v.p + counts.a * v.a + counts.c * v.c}</span></div>
-    <div class="mbtns"><button id="mCancel">Annulla</button><button class="primary" id="mSave">Salva</button></div>
+    <div style="display:flex;justify-content:space-between;font-weight:600;margin:10px 0;padding-top:8px;border-top:1px solid var(--divider)"><span>Totale</span><span id="mtot">${counts.p * v.p + counts.a * v.a + counts.c * v.c}€</span></div>
+    <div class="mbtns"><button id="mCancel">Annulla</button><button class="btn-primary-action" id="mSave">Salva</button></div>
   </div>`;
   document.body.appendChild(ov);
-  ov.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { document.getElementById('mtot').textContent = calc(); }));
+  ov.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { document.getElementById('mtot').textContent = calc() + '€'; }));
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
   document.getElementById('mCancel').onclick = () => ov.remove();
   document.getElementById('mSave').onclick = () => {
@@ -563,135 +569,6 @@ function openMoltModal(name, counts, month) {
     saveMolt(); ov.remove(); updateRecap(month); toast('Salvati');
   };
   document.getElementById('mp').focus();
-}
-
-function openPersonHistoryModal(personName) {
-  const normTarget = (personName || '').trim().toLowerCase();
-  if (!normTarget) return;
-
-  const completedMatches = state.items.filter(it => {
-    return !!it.ghost && [it.t1, it.t2, it.arb].some(n => (n || '').trim().toLowerCase() === normTarget);
-  }).sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
-
-  const totalMatchesCount = completedMatches.length;
-  const last3Matches = completedMatches.slice(0, 3);
-
-  let winsCount = 0;
-  let lossCount = 0;
-  let otherCount = 0;
-
-  completedMatches.forEach(it => {
-    const outcome = getMatchOutcome(it);
-    if (outcome?.type === 'win') winsCount++;
-    else if (outcome?.type === 'loss') lossCount++;
-    else otherCount++;
-  });
-
-  const recentListHtml = last3Matches.length
-    ? last3Matches.map(it => {
-        const outcome = getMatchOutcome(it);
-        let pillHtml = '<span class="score-pill suspended">—</span>';
-        if (outcome) {
-          pillHtml = `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>`;
-        }
-
-        let role = '';
-        if ((it.t1 || '').trim().toLowerCase() === normTarget) role = 'T1';
-        else if ((it.t2 || '').trim().toLowerCase() === normTarget) role = 'T2';
-        else if ((it.arb || '').trim().toLowerCase() === normTarget) role = 'Arb';
-
-        return `<div class="player-recent-item">
-          <div>
-            <div style="font-weight:700">${esc(it.title || 'Partita')}</div>
-            <div style="font-size:11px;color:var(--mute)">${it.date} (${it.time || 'n.d.'}) • Ruolo: <b>${role}</b></div>
-          </div>
-          <div>${pillHtml}</div>
-        </div>`;
-      }).join('')
-    : '<p style="color:var(--mute);font-size:12px;margin:4px 0">Nessuna partita svolta con check ✓.</p>';
-
-  const maxStat = Math.max(winsCount, lossCount, otherCount, 1);
-  const winHeight = Math.round((winsCount / maxStat) * 100);
-  const lossHeight = Math.round((lossCount / maxStat) * 100);
-  const otherHeight = Math.round((otherCount / maxStat) * 100);
-
-  const ov = document.createElement('div');
-  ov.className = 'ov';
-  ov.id = 'personHistoryOv';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="max-width:390px;padding:12px">
-    <div class="player-card">
-      <div class="player-card-header">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="player-card-avatar">👤</div>
-          <div>
-            <h3 class="player-card-name">${esc(personName)}</h3>
-            <span style="font-size:11px;color:var(--mute);font-weight:600">Scheda Collaboratore</span>
-          </div>
-        </div>
-        <div class="player-card-total-badge">
-          <div class="num">${totalMatchesCount}</div>
-          <div class="lbl">Partite ✓</div>
-        </div>
-      </div>
-
-      <div style="margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--mute);text-transform:uppercase;margin-bottom:6px">Ultime Partite Svolte (3)</div>
-        <div class="player-recent-list">
-          ${recentListHtml}
-        </div>
-      </div>
-
-      <button type="button" class="stats-toggle-btn" id="toggleStatsBtn">
-        <span>📊 Statistiche & Andamento</span>
-        <span id="statsArrow">▼</span>
-      </button>
-
-      <div class="stats-drawer" id="statsDrawer" style="display:none">
-        <div style="font-size:11px;color:var(--mute);font-weight:700;text-transform:uppercase;margin-bottom:4px">Bilancio Risultati Svolti</div>
-        <div class="trend-bars-wrap">
-          <div class="trend-bar-col">
-            <div style="font-size:10px;font-weight:700;color:#22c55e;margin-bottom:2px">${winsCount}</div>
-            <div class="trend-bar-fill win" style="height:${Math.max(winHeight, 8)}%"></div>
-            <div class="trend-bar-label">Vinte</div>
-          </div>
-          <div class="trend-bar-col">
-            <div style="font-size:10px;font-weight:700;color:#ef4444;margin-bottom:2px">${lossCount}</div>
-            <div class="trend-bar-fill loss" style="height:${Math.max(lossHeight, 8)}%"></div>
-            <div class="trend-bar-label">Perse</div>
-          </div>
-          <div class="trend-bar-col">
-            <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:2px">${otherCount}</div>
-            <div class="trend-bar-fill suspended" style="height:${Math.max(otherHeight, 8)}%"></div>
-            <div class="trend-bar-label">Altre/Sosp.</div>
-          </div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mute);padding-top:4px">
-          <span>% Vittorie: <b>${totalMatchesCount ? Math.round((winsCount / totalMatchesCount) * 100) : 0}%</b></span>
-          <span>Totale partite valide: <b>${totalMatchesCount}</b></span>
-        </div>
-      </div>
-
-      <div class="mbtns" style="margin-top:12px">
-        <button class="primary" id="phClose" style="width:100%">Chiudi Scheda</button>
-      </div>
-    </div>
-  </div>`;
-
-  document.body.appendChild(ov);
-  triggerHaptic('light');
-
-  const toggleBtn = ov.querySelector('#toggleStatsBtn');
-  const drawer = ov.querySelector('#statsDrawer');
-  const arrow = ov.querySelector('#statsArrow');
-  toggleBtn.onclick = () => {
-    triggerHaptic('light');
-    const isHidden = drawer.style.display === 'none';
-    drawer.style.display = isHidden ? 'block' : 'none';
-    arrow.textContent = isHidden ? '▲' : '▼';
-  };
-
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  ov.querySelector('#phClose').onclick = () => ov.remove();
 }
 
 function openQuickCloseModal(matchId) {
@@ -711,11 +588,11 @@ function openQuickCloseModal(matchId) {
     awayScore = parts[1]?.trim() || '';
   }
 
-  ov.innerHTML = `<div class="modal quick-close-modal" role="dialog" aria-modal="true" style="max-width:350px">
+  ov.innerHTML = `<div class="modal quick-close-modal" role="dialog" aria-modal="true">
     <div class="quick-close-header">🏁 Gestione Esito / Stato</div>
     <div class="quick-close-sub">${esc(it.title || 'Gara')}</div>
 
-    <div class="quick-outcome-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px">
+    <div class="quick-outcome-grid" style="grid-template-columns:repeat(3,1fr)">
       <button type="button" class="quick-outcome-btn ${selectedStatus === 'vinta' ? 'active' : ''}" data-outcome="vinta">
         <span style="font-size:16px">🟢</span> Vinta
       </button>
@@ -728,35 +605,33 @@ function openQuickCloseModal(matchId) {
     </div>
 
     <div class="quick-outcome-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px">
-      <button type="button" class="quick-outcome-btn ${selectedStatus === 'rinviata' ? 'active' : ''}" data-outcome="rinviata" style="border-color:#6b7280">
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'rinviata' ? 'active' : ''}" data-outcome="rinviata">
         <span style="font-size:16px">🔄</span> Rinviata
       </button>
-      <button type="button" class="quick-outcome-btn ${selectedStatus === 'annullata' ? 'active' : ''}" data-outcome="annullata" style="border-color:#881337">
+      <button type="button" class="quick-outcome-btn ${selectedStatus === 'annullata' ? 'active' : ''}" data-outcome="annullata">
         <span style="font-size:16px">❌</span> Annullata
       </button>
     </div>
 
-    <div id="postponedFields" style="display:${selectedStatus === 'rinviata' ? 'block' : 'none'};background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:12px;text-align:left">
-      <label style="font-size:11px;font-weight:700;color:var(--mute);display:block;margin-bottom:3px">Nuova Data Recupero (Opzionale):</label>
+    <div id="postponedFields" style="display:${selectedStatus === 'rinviata' ? 'block' : 'none'};background:var(--card);border-radius:12px;padding:10px;margin-bottom:12px;text-align:left">
+      <label style="font-size:11.5px;font-weight:700;color:var(--mute);display:block;margin-bottom:4px">Nuova Data Recupero (Opzionale):</label>
       <input type="date" id="qcPostponedDate" value="${it.postponedDate || ''}" style="margin-bottom:6px">
-      <label style="font-size:11px;font-weight:700;color:var(--mute);display:block;margin-bottom:3px">Nuovo Orario:</label>
+      <label style="font-size:11.5px;font-weight:700;color:var(--mute);display:block;margin-bottom:4px">Nuovo Orario:</label>
       <input type="time" id="qcPostponedTime" value="${it.postponedTime || it.time || '15:30'}">
     </div>
 
     <div id="scoreFields" style="display:${selectedStatus === 'rinviata' || selectedStatus === 'annullata' ? 'none' : 'block'}">
-      <div style="font-size:11px;color:var(--mute);margin-bottom:4px">Punti (opzionale): Casa - Ospiti</div>
+      <div style="font-size:12px;color:var(--mute);margin-bottom:4px">Punti (opzionale): Casa - Ospiti</div>
       <div class="quick-score-inputs">
         <input type="number" inputmode="numeric" id="qcHome" placeholder="Casa" value="${esc(homeScore)}">
-        <span style="font-weight:800;font-size:16px">:</span>
+        <span style="font-weight:800;font-size:18px">:</span>
         <input type="number" inputmode="numeric" id="qcAway" placeholder="Ospiti" value="${esc(awayScore)}">
       </div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <button type="button" class="primary" id="qcSave" style="width:100%;min-height:38px">✓ Conferma</button>
-      <div style="display:flex;gap:6px">
-        <button type="button" id="qcCancel" style="flex:1">Annulla</button>
-      </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button type="button" class="btn-primary-action" id="qcSave" style="width:100%;min-height:42px">✓ Conferma</button>
+      <button type="button" id="qcCancel" style="width:100%">Annulla</button>
     </div>
   </div>`;
 
@@ -821,7 +696,7 @@ function openQuickCloseModal(matchId) {
         state.items.push(clonedMatch);
         toast('Partita rinviata e clonata alla nuova data!', 'success');
       } else {
-        toast('Partita rinviata (da definire) -> Segnalata in alto', 'warning');
+        toast('Partita rinviata (da definire)', 'warning');
       }
     } else {
       it.ghost = true;
@@ -838,7 +713,7 @@ function openQuickCloseModal(matchId) {
       it.status = selectedStatus;
       it.postponedDate = '';
       it.postponedTime = '';
-      toast('Partita chiusa e svolta ✓', 'success');
+      toast('Partita completata ✓', 'success');
     }
 
     save();
@@ -896,16 +771,16 @@ function openExportMultiModal() {
 
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Esporta Mesi">
     <h3>Esporta Mesi in JSON</h3>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
       <button type="button" id="chkAllBtn" class="pill-btn-sm">Tutti</button>
       <button type="button" id="chkNoneBtn" class="pill-btn-sm">Nessuno</button>
     </div>
-    <div id="mChkWrap" style="display:grid;gap:6px;max-height:220px;overflow-y:auto">
+    <div id="mChkWrap" style="display:grid;gap:8px;max-height:220px;overflow-y:auto">
       ${listHtml}
     </div>
-    <div class="mbtns" style="margin-top:14px">
+    <div class="mbtns" style="margin-top:16px">
       <button id="expCancel">Annulla</button>
-      <button class="primary" id="expDownload">Scarica JSON</button>
+      <button class="btn-primary-action" id="expDownload">Scarica JSON</button>
     </div>
   </div>`;
 
@@ -968,35 +843,13 @@ function recapHTML(m) {
     ? `<table><thead><tr><th>Nome</th><th>Part.</th><th>Ap/Ch</th><th>Totale</th></tr></thead><tbody>${rows.map(r => {
         const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
         const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
-        return `<tr><td><button class="nb" data-name="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}">${esc(r.n)}</button></td><td>${pv}</td><td>${av}</td><td>${tot}</td></tr>`;
+        return `<tr><td><button class="nb" data-name="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}">${esc(r.n)}</button></td><td>${pv}</td><td>${av}</td><td>${tot}€</td></tr>`;
       }).join('')}</tbody></table>`
     : '<p>Nessun dato (partite con check ✓).</p>') + '</aside>';
 }
 
 function updateRecap(m) { const el = document.querySelector(`.recap[data-m="${m}"]`); if (el) el.outerHTML = recapHTML(m); }
 const openClose = d => state.READONLY ? '' : `<div class="oc">${slotHTML(d, 'ap')}${slotHTML(d, 'ch')}</div>`;
-
-function closeMenus() {
-  document.querySelectorAll('.menuDrop').forEach(d => {
-    if (d.hidden) return;
-    d.hidden = true;
-    const btn = document.getElementById(d.id.replace('Drop', 'Btn'));
-    if (btn) btn.setAttribute('aria-expanded', 'false');
-  });
-}
-
-function initMenu(btnId, dropId) {
-  const btn = $('#' + btnId), drop = $('#' + dropId); if (!btn || !drop) return;
-  btn.onclick = e => {
-    e.stopPropagation();
-    triggerHaptic('light');
-    const open = drop.hidden;
-    closeMenus();
-    drop.hidden = !open;
-    btn.setAttribute('aria-expanded', String(open));
-  };
-  drop.addEventListener('click', e => { if (e.target.closest('button')) closeMenus(); });
-}
 
 function params() { return new URLSearchParams(state.mem !== null ? state.mem : location.hash.slice(1)); }
 function writeHash(p) {
@@ -1011,6 +864,7 @@ function setParam(k, v) {
   render();
 }
 
+// INTESTAZIONE CARD RIDISEGNATA (ORARIO & SQUADRE IN PRIMO PIANO)
 function card(i, hasConflict, isUrgentIncomplete) {
   const isCancelled = i.status === 'annullata';
   const isPostponed = i.status === 'rinviata';
@@ -1033,24 +887,25 @@ function card(i, hasConflict, isUrgentIncomplete) {
   if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
   else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da definire)'}</div>`;
   else if (hasConflict && !state.READONLY) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
-  else if (isUrgentIncomplete && !state.READONLY) badgeHtml = `<div class="urgent-badge">⏰ GARA IMMINENTE INCOMPLETA</div>`;
+  else if (isUrgentIncomplete && !state.READONLY) badgeHtml = `<div class="urgent-badge">⏰ IMMINENTE INCOMPLETA</div>`;
 
   return `<div class="match${isCancelled ? ' cancelled' : (isPostponed ? ' postponed' : (ghostOn ? ' ghost' : ''))}${missingReq && !state.READONLY ? ' missing-t1' : ''}${hasConflict && !state.READONLY ? ' conflict-match' : ''}${isUrgentIncomplete && !state.READONLY ? ' urgent-incomplete' : ''}" data-id="${i.id}">
     ${badgeHtml}
-    <div class="m-top">
-      <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita (senza nome)'}</div>
+    <div class="m-card-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="m-time-pill">${i.time || '--:--'}</span>
+        ${catHtml}
+        ${friendlyHtml}
+      </div>
       <div class="m-actions">
+        ${scoreHtml}
         ${!state.READONLY && !isCancelled ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Gestisci esito / Check">✓</button>` : ''}
         ${!state.READONLY && !i.ghost && !isCancelled && !isPostponed ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
       </div>
     </div>
-    <div class="m-meta">
-      <div class="m-time">${i.time ? 'Ore ' + i.time : 'Orario n.d.'}</div>
-      ${catHtml}
-      ${friendlyHtml}
-      ${scoreHtml}
-      <div class="m-date">${i.date}</div>
-    </div>
+    
+    <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita senza titolo'}</div>
+
     <div class="m-roster">
       <div class="m-row"><span class="lbl">Tavolo 1</span><span class="val">${t1Val}</span></div>
       <div class="m-row"><span class="lbl">Tavolo 2</span><span class="val">${t2Val}</span></div>
@@ -1084,7 +939,7 @@ function openEditModal(matchId) {
 
     <div class="frow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div>
-        <label for="edScore">Punteggio (Casa-Ospite)</label>
+        <label for="edScore">Punteggio</label>
         <input id="edScore" type="text" placeholder="Es. 72-65" value="${esc(it.score || '')}">
       </div>
       <div>
@@ -1108,17 +963,17 @@ function openEditModal(matchId) {
       </div>
     </div>
 
-    <div style="border-top:1px solid var(--line);margin:12px 0 10px;padding-top:8px">
+    <div style="border-top:1px solid var(--divider);margin:12px 0 10px;padding-top:10px">
       <div class="frow"><label for="edT1">Tavolo 1 *</label><input id="edT1" type="text" list="namesList" value="${esc(it.t1)}" placeholder="Nome obbligatorio"></div>
       <div class="frow"><label for="edT2">Tavolo 2</label><input id="edT2" type="text" list="namesList" value="${esc(it.t2)}" placeholder="Nome"></div>
       <div class="frow"><label for="edArb">Arbitro</label><input id="edArb" type="text" list="namesList" value="${esc(it.arb)}" placeholder="Nome"></div>
     </div>
     <div id="edConflictBox" style="display:none"></div>
     <div class="mbtns">
-      <button id="edDelete" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b;font-weight:600">Elimina</button>
-      <div style="display:flex;gap:6px">
+      <button id="edDelete" style="background:rgba(239,68,68,0.2);color:#fca5a5;font-weight:600">Elimina</button>
+      <div style="display:flex;gap:8px">
         <button id="edCancel">Annulla</button>
-        <button class="primary" id="edSave">Salva</button>
+        <button class="btn-primary-action" id="edSave">Salva</button>
       </div>
     </div>
   </div>`;
@@ -1156,8 +1011,8 @@ function openEditModal(matchId) {
         if (delBtn.isConnected) {
           delete delBtn.dataset.arm;
           delBtn.textContent = 'Elimina';
-          delBtn.style.background = '#fee2e2';
-          delBtn.style.color = '#991b1b';
+          delBtn.style.background = 'rgba(239,68,68,0.2)';
+          delBtn.style.color = '#fca5a5';
         }
       }, 3500);
     }
@@ -1409,7 +1264,7 @@ export function render(focusId) {
         ${label}
         <button class="waBtn" data-warecap="${activeM}" type="button" title="Copia riepilogo">📲 WA Riepilogo</button>
       </h2>
-      <span style="color:var(--mute);font-weight:600;font-size:14px">${count} gare totali</span>
+      <span style="color:var(--mute);font-weight:700;font-size:14px">${count} gare totali</span>
     </div>
     <div class="mbody">
       ${recapHTML(activeM)}
@@ -1476,7 +1331,7 @@ document.addEventListener('click', e => {
       save();
       render();
       triggerHaptic('light');
-      toast('Check rimosso: modifiche riabilitate', 'warning');
+      toast('Check rimosso', 'warning');
     } else {
       openQuickCloseModal(id);
     }
@@ -1570,7 +1425,7 @@ function openAddModal() {
 
     <div class="frow" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div>
-        <label for="nScore">Punteggio (Casa-Ospite)</label>
+        <label for="nScore">Punteggio</label>
         <input id="nScore" type="text" placeholder="Es. 72-65">
       </div>
       <div>
@@ -1599,7 +1454,7 @@ function openAddModal() {
     <div class="frow"><label for="nArb">Arbitro</label><input id="nArb" type="text" list="namesList" placeholder="Nome"></div>
     <div id="nConflictBox" style="display:none"></div>
     <p class="err" id="nErr">Inserisci almeno la data.</p>
-    <div class="mbtns"><button id="nCancel">Annulla</button><button class="primary" id="nSave">Aggiungi</button></div>
+    <div class="mbtns"><button id="nCancel">Annulla</button><button class="btn-primary-action" id="nSave">Aggiungi</button></div>
   </div>`;
   document.body.appendChild(ov);
   bindTimePickerEvents(ov);
@@ -1712,7 +1567,7 @@ function openResocontoModal() {
               monthSum += tot;
               return `<tr><td>${esc(r.n)}</td><td>${r.p}</td><td>${r.a + r.c}</td><td>${tot}€</td></tr>`;
             }).join('')}
-            <tr style="border-top:1px solid var(--line);font-weight:700"><td>Totale Mese</td><td colspan="2"></td><td>${monthSum}€</td></tr>
+            <tr style="border-top:1px solid var(--divider);font-weight:700"><td>Totale Mese</td><td colspan="2"></td><td>${monthSum}€</td></tr>
           </tbody>
         </table>`
       : '<p style="color:var(--mute);font-size:12px">Nessuna partita con check.</p>';
@@ -1722,11 +1577,11 @@ function openResocontoModal() {
         <span>${monthLabel(m)}</span>
         <button class="waBtn" data-warecap="${m}" type="button">📲 WA</button>
       </summary>
-      <div style="margin-top:6px">${table}</div>
+      <div style="margin-top:8px">${table}</div>
     </details>`;
   }).join('');
 
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Resoconto" style="max-height:90vh;overflow-y:auto">
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Resoconto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0">Resoconto Compensi</h3>
       <button id="resCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
@@ -1735,9 +1590,9 @@ function openResocontoModal() {
       <h4>Totale Generale Compensi</h4>
       ${grandTableHtml}
     </div>
-    <h4 style="margin:14px 0 8px;font:700 16px var(--font-title);color:var(--mute);text-transform:uppercase">Dettaglio Singoli Mesi</h4>
+    <h4 style="margin:14px 0 8px;font:700 16px var(--font-title);color:var(--mute);text-transform:uppercase">Dettaglio Mesi</h4>
     <div class="resoconto-months">${monthsBlocksHtml}</div>
-    <div class="mbtns" style="margin-top:16px"><button class="primary" id="resClose">Chiudi</button></div>
+    <div class="mbtns" style="margin-top:16px"><button class="btn-primary-action" id="resClose" style="width:100%">Chiudi</button></div>
   </div>`;
 
   document.body.appendChild(ov);
@@ -1881,7 +1736,7 @@ function renderPdfPreview() {
     return;
   }
   wrap.innerHTML = `<p style="color:var(--mute);font-size:12px;margin:4px 0 8px">Trovate ${state.pdfCandidates.length} gare:</p>` +
-    state.pdfCandidates.map((c, i) => `<div style="border-bottom:1px solid var(--line);padding:8px 0;display:flex;flex-direction:column;gap:6px">
+    state.pdfCandidates.map((c, i) => `<div style="border-bottom:1px solid var(--divider);padding:8px 0;display:flex;flex-direction:column;gap:6px">
     <input data-pf="title" data-pi="${i}" value="${esc(c.title)}" style="font-weight:700">
     <div style="display:flex;gap:6px">
       <input data-pf="date" data-pi="${i}" type="date" value="${c.date || ''}" style="flex:1">
@@ -1913,8 +1768,6 @@ window.addEventListener('keydown', e => {
     const modals = document.querySelectorAll('.ov');
     if (modals.length) {
       modals.forEach(m => m.remove());
-    } else {
-      closeMenus();
     }
   }
 });
@@ -1944,7 +1797,7 @@ function generateMonthPDF(m) {
         const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
         const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
         let x = ml;
-        [r.n, String(pv), String(av), String(tot)].forEach((t, i) => { doc.text(t, x, y); x += cols[i].w; });
+        [r.n, String(pv), String(av), String(tot) + '€'].forEach((t, i) => { doc.text(t, x, y); x += cols[i].w; });
         nl(15);
       });
     }
@@ -1987,7 +1840,7 @@ function setAuthMode(isAdmin) {
   }
   const authBtn = $('#authBtn');
   if (authBtn) {
-    authBtn.textContent = isAdmin ? '🔓 Esci' : '🔒 Accedi';
+    authBtn.innerHTML = isAdmin ? '<span class="icon">🔓</span><span class="label">Esci</span>' : '<span class="icon">🔒</span><span class="label">Accedi</span>';
     authBtn.title = isAdmin ? 'Termina sessione amministratore' : 'Accedi come Amministratore per modificare';
   }
   document.querySelectorAll('.robanner').forEach(el => {
@@ -2031,7 +1884,7 @@ function promptLogin() {
 
     <div class="mbtns">
       <button type="button" id="loginCancel">Annulla</button>
-      <button type="button" class="primary" id="loginGo">Accedi</button>
+      <button type="button" class="btn-primary-action" id="loginGo">Accedi</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
@@ -2081,81 +1934,117 @@ function promptLogin() {
 
 function bindEvents() {
   const authBtn = $('#authBtn');
-  if (authBtn) {
-    authBtn.onclick = () => window.handleAuthClick();
-  }
+  if (authBtn) authBtn.onclick = () => window.handleAuthClick();
 
-  const navToggleBtn = $('#navToggleBtn');
-  const navSidebar = $('#navSidebar');
+  // CONTROLLI SIDEBAR RAIL & DRAWER
+  const sidebar = $('#appSidebar');
+  const sidebarToggle = $('#sidebarToggleBtn');
+  const mobileMenuBtn = $('#mobileMenuBtn');
   const navBackdrop = $('#navBackdrop');
 
-  const closeSidebarMobile = () => {
-    if (navSidebar) navSidebar.classList.remove('open');
-    if (navBackdrop) navBackdrop.classList.remove('open');
-  };
-
-  const openSidebarMobile = () => {
-    triggerHaptic('light');
-    if (navSidebar) navSidebar.classList.add('open');
-    if (navBackdrop) navBackdrop.classList.add('open');
-  };
-
-  if (navToggleBtn) {
-    navToggleBtn.onclick = () => {
-      if (navSidebar?.classList.contains('open')) closeSidebarMobile();
-      else openSidebarMobile();
+  if (sidebarToggle) {
+    sidebarToggle.onclick = () => {
+      triggerHaptic('light');
+      sidebar.classList.toggle('expanded');
     };
   }
 
-  if (navBackdrop) {
-    navBackdrop.onclick = closeSidebarMobile;
-  }
+  const openMobileDrawer = () => {
+    triggerHaptic('light');
+    sidebar.classList.add('open');
+    navBackdrop.classList.add('open');
+  };
+
+  const closeMobileDrawer = () => {
+    sidebar.classList.remove('open');
+    navBackdrop.classList.remove('open');
+  };
+
+  if (mobileMenuBtn) mobileMenuBtn.onclick = openMobileDrawer;
+  if (navBackdrop) navBackdrop.onclick = closeMobileDrawer;
 
   document.addEventListener('click', e => {
     if (e.target.closest('[data-pickm]') || e.target.closest('[data-navw]')) {
-      if (window.innerWidth < 860) {
-        closeSidebarMobile();
-      }
+      if (window.innerWidth < 860) closeMobileDrawer();
     }
   });
 
-  const notifyBtn = $('#notifyBtn');
-  if (notifyBtn) notifyBtn.onclick = () => requestNotificationPermission();
+  // VISTE SIDEBAR RAIL
+  const railHome = $('#railNavHome');
+  if (railHome) railHome.onclick = () => {
+    const t = iso(new Date());
+    setParam('m', t.slice(0, 7));
+    if (window.innerWidth < 860) closeMobileDrawer();
+  };
 
-  const shareLinkBtn = $('#shareLinkBtn');
-  if (shareLinkBtn) {
-    shareLinkBtn.onclick = async () => {
-      const cleanUrl = location.origin + location.pathname + '#readonly=true';
-      try {
-        await navigator.clipboard.writeText(cleanUrl);
-        toast('Link di sola visualizzazione copiato!', 'success');
-      } catch(e) { prompt('Copia il link:', cleanUrl); }
-    };
-  }
+  const railToday = $('#railNavToday');
+  if (railToday) railToday.onclick = () => {
+    triggerHaptic('light');
+    const t = iso(new Date());
+    setParam('m', t.slice(0, 7));
+    setParam('s', iso(monday(t)));
+    if (window.innerWidth < 860) closeMobileDrawer();
+  };
 
-  const themeBtn = $('#themeBtn');
-  if (themeBtn) {
-    themeBtn.onclick = () => {
-      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'themeOv';
-      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Scegli Tema">
-        <h3>Tema / Stile</h3>
-        <div class="frow">
-          <label for="themeSelectModal">Aspetto grafico</label>
-          <select id="themeSelectModal">
-            <option value="default"${state.currentTheme === 'default' ? ' selected' : ''}>🎨 Standard (Auto)</option>
-            <option value="synthwave"${state.currentTheme === 'synthwave' ? ' selected' : ''}>🕹 Synthwave Neon</option>
-            <option value="gazzetta"${state.currentTheme === 'gazzetta' ? ' selected' : ''}>📰 Gazzetta Rosa</option>
-            <option value="tv"${state.currentTheme === 'tv' ? ' selected' : ''}>📺 Tabellone TV</option>
-          </select>
-        </div>
-        <div class="mbtns"><button type="button" id="themeClose" class="primary">Fatto</button></div>
-      </div>`;
-      document.body.appendChild(ov);
-      ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-      document.getElementById('themeSelectModal').onchange = e => applyTheme(e.target.value);
-      document.getElementById('themeClose').onclick = () => ov.remove();
-    };
-  }
+  const railRes = $('#railNavResoconto');
+  if (railRes) railRes.onclick = () => {
+    if (window.innerWidth < 860) closeMobileDrawer();
+    openResocontoModal();
+  };
+
+  // VISTE BOTTOM BAR MOBILE
+  const bNavHome = $('#bNavHome');
+  if (bNavHome) bNavHome.onclick = () => {
+    triggerHaptic('light');
+    const t = iso(new Date());
+    setParam('m', t.slice(0, 7));
+    setParam('s', '');
+  };
+
+  const bNavToday = $('#bNavToday');
+  if (bNavToday) bNavToday.onclick = () => {
+    triggerHaptic('light');
+    const t = iso(new Date());
+    setParam('m', t.slice(0, 7));
+    setParam('s', iso(monday(t)));
+  };
+
+  const bNavAdd = $('#bNavAdd');
+  if (bNavAdd) bNavAdd.onclick = () => openAddModal();
+
+  const bNavRes = $('#bNavResoconto');
+  if (bNavRes) bNavRes.onclick = () => openResocontoModal();
+
+  const bNavAlerts = $('#bNavAlerts');
+  if (bNavAlerts) bNavAlerts.onclick = () => {
+    const btn = document.getElementById('conflictAlertBtn');
+    if (btn) btn.click();
+  };
+
+  // TEMA
+  const openThemeModal = () => {
+    const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'themeOv';
+    ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Scegli Tema">
+      <h3>Tema / Stile</h3>
+      <div class="frow">
+        <label for="themeSelectModal">Aspetto grafico</label>
+        <select id="themeSelectModal">
+          <option value="default"${state.currentTheme === 'default' ? ' selected' : ''}>🎨 Standard Moderno</option>
+          <option value="synthwave"${state.currentTheme === 'synthwave' ? ' selected' : ''}>🕹 Synthwave Neon</option>
+          <option value="gazzetta"${state.currentTheme === 'gazzetta' ? ' selected' : ''}>📰 Gazzetta Rosa</option>
+          <option value="tv"${state.currentTheme === 'tv' ? ' selected' : ''}>📺 Tabellone TV</option>
+        </select>
+      </div>
+      <div class="mbtns"><button type="button" id="themeClose" class="btn-primary-action" style="width:100%">Fatto</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    document.getElementById('themeSelectModal').onchange = e => applyTheme(e.target.value);
+    document.getElementById('themeClose').onclick = () => ov.remove();
+  };
+
+  const railTheme = $('#railNavTheme');
+  if (railTheme) railTheme.onclick = openThemeModal;
 
   const qSave = $('#quickSaveBtn');
   if (qSave) qSave.onclick = async () => {
@@ -2170,11 +2059,33 @@ function bindEvents() {
     toast('Aggiornato!', 'success');
   };
 
-  const expMulti = $('#exportMultiJsonBtn');
-  if (expMulti) expMulti.onclick = openExportMultiModal;
+  const railExp = $('#railNavExport');
+  if (railExp) railExp.onclick = openExportMultiModal;
 
-  const resBtn = $('#resocontoBtn');
-  if (resBtn) resBtn.onclick = openResocontoModal;
+  const railPrint = $('#railNavPrint');
+  if (railPrint) railPrint.onclick = () => {
+    const months = monthsWithData();
+    if (!months.length) { toast('Nessuna gara presente', 'warning'); return; }
+    const cur = params().get('m');
+    const def = months.includes(cur) ? cur : months[months.length - 1];
+    const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'printOv';
+    ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Stampa PDF">
+      <h3>Stampa PDF</h3>
+      <div class="frow"><label for="pMonth">Mese</label>
+        <select id="pMonth">
+          ${months.map(m => `<option value="${m}"${m === def ? ' selected' : ''}>${monthLabel(m)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="mbtns"><button type="button" id="pCancel">Annulla</button><button type="button" class="btn-primary-action" id="pGo">Genera PDF</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    document.getElementById('pCancel').onclick = () => ov.remove();
+    document.getElementById('pGo').onclick = () => {
+      const m = document.getElementById('pMonth').value; ov.remove();
+      generateMonthPDF(m);
+    };
+  };
 
   const addBtn = $('#add');
   if (addBtn) addBtn.onclick = openAddModal;
@@ -2184,16 +2095,6 @@ function bindEvents() {
 
   const undoB = $('#undoBtn');
   if (undoB) { undoB.disabled = true; undoB.onclick = performUndo; }
-
-  const todayB = $('#todayBtn');
-  if (todayB) {
-    todayB.onclick = () => {
-      triggerHaptic('light');
-      const t = iso(new Date());
-      setParam('m', t.slice(0, 7));
-      setParam('s', iso(monday(t)));
-    };
-  }
 
   const searchInput = $('#searchFilter');
   if (searchInput) {
@@ -2216,38 +2117,28 @@ function bindEvents() {
     };
   }
 
-  const namesB = $('#namesBtn');
-  if (namesB) {
-    namesB.onclick = () => {
+  // COLLABORATORI
+  const railNames = $('#railNavNames');
+  if (railNames) {
+    railNames.onclick = () => {
       if (state.READONLY) return;
       const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'namesOv';
       const rowsHtml = () => state.names.length
-        ? state.names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)">
+        ? state.names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--divider)">
             <span style="font-weight:600;font-size:14px">${esc(n)}</span>
-            <div style="display:flex;gap:6px">
-              <button type="button" data-viewcard="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px" title="Vedi scheda">📊 Scheda</button>
-              <button type="button" data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px" title="Rimuovi">✕</button>
-            </div>
+            <button type="button" data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px;background:rgba(239,68,68,0.2);color:#fca5a5">✕</button>
           </div>`).join('')
         : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessun nome inserito.</p>';
       ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Nomi">
         <h3>Elenco Collaboratori</h3>
-        <p style="font-size:12px;color:var(--mute);margin:-6px 0 10px">Tocca "📊 Scheda" per visualizzare presenze e andamento.</p>
-        <div id="namesListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:8px">${rowsHtml()}</div>
-        <div class="frow" style="display:flex;gap:6px"><input id="newNameInput" type="text" placeholder="Nuovo nome" style="flex:1"><button type="button" class="primary" id="addNameBtn">Aggiungi</button></div>
-        <div class="mbtns"><button type="button" id="namesClose">Chiudi</button></div>
+        <div id="namesListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:10px">${rowsHtml()}</div>
+        <div class="frow" style="display:flex;gap:8px"><input id="newNameInput" type="text" placeholder="Nuovo nome" style="flex:1"><button type="button" class="btn-primary-action" id="addNameBtn">Aggiungi</button></div>
+        <div class="mbtns"><button type="button" id="namesClose" style="width:100%">Chiudi</button></div>
       </div>`;
       document.body.appendChild(ov);
       const refreshList = () => { document.getElementById('namesListWrap').innerHTML = rowsHtml(); };
       ov.addEventListener('click', e => {
         if (e.target === ov) { ov.remove(); return; }
-
-        const cardBtn = e.target.closest('[data-viewcard]');
-        if (cardBtn) {
-          openPersonHistoryModal(cardBtn.dataset.viewcard);
-          return;
-        }
-
         const rm = e.target.closest('[data-rmname]');
         if (rm) {
           state.names = state.names.filter(n => n.toLowerCase() !== rm.dataset.rmname.toLowerCase());
@@ -2268,19 +2159,20 @@ function bindEvents() {
     };
   }
 
-  const catB = $('#catBtn');
-  if (catB) {
-    catB.onclick = () => {
+  // CATEGORIE
+  const railCat = $('#railNavCat');
+  if (railCat) {
+    railCat.onclick = () => {
       if (state.READONLY) return;
       const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'catOv';
       const rowsHtml = () => state.categories.length
-        ? state.categories.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><span>${esc(c)}</span><button type="button" data-rmcat="${esc(c)}" style="min-height:26px;padding:2px 8px;font-size:12px">✕</button></div>`).join('')
+        ? state.categories.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--divider)"><span>${esc(c)}</span><button type="button" data-rmcat="${esc(c)}" style="min-height:26px;padding:2px 8px;font-size:12px;background:rgba(239,68,68,0.2);color:#fca5a5">✕</button></div>`).join('')
         : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessuna categoria.</p>';
       ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Categorie">
         <h3>Categorie</h3>
-        <div id="catListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:8px">${rowsHtml()}</div>
-        <div class="frow" style="display:flex;gap:6px"><input id="newCatInput" type="text" placeholder="Es. U17" style="flex:1"><button type="button" class="primary" id="addCatBtn">Aggiungi</button></div>
-        <div class="mbtns"><button type="button" id="catClose">Chiudi</button></div>
+        <div id="catListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:10px">${rowsHtml()}</div>
+        <div class="frow" style="display:flex;gap:8px"><input id="newCatInput" type="text" placeholder="Es. U17" style="flex:1"><button type="button" class="btn-primary-action" id="addCatBtn">Aggiungi</button></div>
+        <div class="mbtns"><button type="button" id="catClose" style="width:100%">Chiudi</button></div>
       </div>`;
       document.body.appendChild(ov);
       const refreshList = () => { document.getElementById('catListWrap').innerHTML = rowsHtml(); };
@@ -2306,35 +2198,8 @@ function bindEvents() {
     };
   }
 
-  const prnB = $('#printBtn');
-  if (prnB) {
-    prnB.onclick = () => {
-      const months = monthsWithData();
-      if (!months.length) { toast('Nessuna gara presente', 'warning'); return; }
-      const cur = params().get('m');
-      const def = months.includes(cur) ? cur : months[months.length - 1];
-      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'printOv';
-      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Stampa PDF">
-        <h3>Stampa PDF</h3>
-        <div class="frow"><label for="pMonth">Mese</label>
-          <select id="pMonth">
-            ${months.map(m => `<option value="${m}"${m === def ? ' selected' : ''}>${monthLabel(m)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="mbtns"><button type="button" id="pCancel">Annulla</button><button type="button" class="primary" id="pGo">Genera PDF</button></div>
-      </div>`;
-      document.body.appendChild(ov);
-      ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-      document.getElementById('pCancel').onclick = () => ov.remove();
-      document.getElementById('pGo').onclick = () => {
-        const m = document.getElementById('pMonth').value; ov.remove();
-        generateMonthPDF(m);
-      };
-    };
-  }
-
-  const impB = $('#importBtn');
-  if (impB) impB.onclick = () => $('#importFile')?.click();
+  const railImport = $('#railNavImport');
+  if (railImport) railImport.onclick = () => $('#importFile')?.click();
 
   const impF = $('#importFile');
   if (impF) {
@@ -2360,18 +2225,18 @@ function bindEvents() {
     };
   }
 
-  const pdfBtn = $('#pdfImportBtn');
-  if (pdfBtn) {
-    pdfBtn.onclick = () => {
+  const railPdf = $('#railNavPdf');
+  if (railPdf) {
+    railPdf.onclick = () => {
       if (state.READONLY) return;
       const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'pdfOv';
       ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Importa PDF">
         <h3>Importa da PDF</h3>
         <div class="frow"><label for="pdfFile">File PDF</label><input id="pdfFile" type="file" accept="application/pdf,.pdf"></div>
         <div class="frow"><label for="pdfTeam">Nome squadra di casa</label><input id="pdfTeam" type="text" placeholder="Es. VIS PERSICETO"></div>
-        <div class="mbtns"><button type="button" id="pdfCancel">Annulla</button><button type="button" class="primary" id="pdfGo">Estrai</button></div>
+        <div class="mbtns"><button type="button" id="pdfCancel">Annulla</button><button type="button" class="btn-primary-action" id="pdfGo">Estrai</button></div>
         <div id="pdfPreviewWrap" style="margin-top:10px;max-height:220px;overflow-y:auto"></div>
-        <div class="mbtns" id="pdfConfirmBtns" style="display:none;margin-top:10px"><button type="button" id="pdfAddAll" class="primary" style="width:100%">Aggiungi al calendario</button></div>
+        <div class="mbtns" id="pdfConfirmBtns" style="display:none;margin-top:10px"><button type="button" id="pdfAddAll" class="btn-primary-action" style="width:100%">Aggiungi al calendario</button></div>
       </div>`;
       document.body.appendChild(ov);
       ov.addEventListener('click', e => {
@@ -2423,10 +2288,6 @@ function bindEvents() {
       };
     };
   }
-
-  initMenu('menuBtn', 'menuDrop');
-  initMenu('gearBtn', 'gearDrop');
-  document.addEventListener('click', e => { if (!e.target.closest('.menuWrap')) closeMenus(); });
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -2435,7 +2296,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
       if (window.Telegram.WebApp.setHeaderColor) {
-        window.Telegram.WebApp.setHeaderColor('#1f2020');
+        window.Telegram.WebApp.setHeaderColor('#131415');
       }
     } catch(e) {}
   }
@@ -2466,23 +2327,21 @@ window.addEventListener('DOMContentLoaded', async () => {
     render();
   });
 
-  // Render iniziale immediato da memoria locale
   render();
 
-  // Sincronizzazione prioritaria con Supabase
   if (sb) {
-    setSyncVisualState('orange', 'Verifica aggiornamenti cloud…');
+    setSyncVisualState('orange', 'Controllo aggiornamenti...');
     try {
       const res = await cloudFetchRaw();
       if (res && res.data) {
         applyCloudData(res.data);
         render();
-        setSyncVisualState('green', 'Sincronizzato con il Cloud');
+        setSyncVisualState('green', 'Sincronizzato Cloud');
       } else {
         setSyncVisualState('green');
       }
     } catch(e) {
-      setSyncVisualState('red', 'Connessione al Cloud fallita');
+      setSyncVisualState('red', 'Cloud non raggiungibile');
     }
 
     setupSupabaseRealtime({
