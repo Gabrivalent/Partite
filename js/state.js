@@ -58,39 +58,64 @@ function notifySave() {
   onBadgeUpdateCallbacks.forEach(fn => fn());
 }
 
+// SALVATAGGI CON NOTIFICA
 export function save() {
-  localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(state.items));
+  saveLocalOnly();
   notifySave();
 }
 
 export function saveD() {
-  localStorage.setItem(STORAGE_KEY_DAYMETA, JSON.stringify(state.dayMeta));
+  saveDLocalOnly();
   notifySave();
 }
 
 export function saveMolt() {
-  localStorage.setItem(STORAGE_KEY_MOLT, JSON.stringify(state.molt));
+  saveMoltLocalOnly();
   notifySave();
 }
 
 export function saveNames() {
-  localStorage.setItem(STORAGE_KEY_NAMES, JSON.stringify(state.names));
+  saveNamesLocalOnly();
   notifySave();
+}
+
+export function saveCategories() {
+  saveCategoriesLocal();
+  notifySave();
+}
+
+export function saveFipLinks() {
+  saveFipLinksLocalOnly();
+  notifySave();
+}
+
+// SALVATAGGI SOLO LOCALI (USATI DA API.JS)
+export function saveLocalOnly() {
+  localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(state.items));
+}
+
+export function saveDLocalOnly() {
+  localStorage.setItem(STORAGE_KEY_DAYMETA, JSON.stringify(state.dayMeta));
+}
+
+export function saveMoltLocalOnly() {
+  localStorage.setItem(STORAGE_KEY_MOLT, JSON.stringify(state.molt));
+}
+
+export function saveNamesLocalOnly() {
+  localStorage.setItem(STORAGE_KEY_NAMES, JSON.stringify(state.names));
 }
 
 export function saveCategoriesLocal() {
   localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(state.categories));
-  notifySave();
 }
+export const saveCategoriesLocalOnly = saveCategoriesLocal;
 
-// Alias per compatibilità con altre sezioni o import
-export const saveCategories = saveCategoriesLocal;
-
-export function saveFipLinks() {
+export function saveFipLinksLocalOnly() {
   localStorage.setItem(STORAGE_KEY_FIP_LINKS, JSON.stringify(state.fipLinks));
-  notifySave();
 }
 
+// GESTIONE TEMA
 export function applyTheme(t) {
   state.currentTheme = t;
   localStorage.setItem(STORAGE_KEY_THEME, t);
@@ -101,6 +126,7 @@ export function applyTheme(t) {
   }
 }
 
+// UNDO / REDO
 export function pushUndo() {
   state.undoStack.push({
     items: JSON.parse(JSON.stringify(state.items)),
@@ -116,8 +142,8 @@ export function popUndoState() {
   const last = state.undoStack.pop();
   state.items = last.items;
   state.dayMeta = last.dayMeta;
-  localStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(state.items));
-  localStorage.setItem(STORAGE_KEY_DAYMETA, JSON.stringify(state.dayMeta));
+  saveLocalOnly();
+  saveDLocalOnly();
   const btn = document.getElementById('undoBtn');
   if (btn) btn.disabled = state.undoStack.length === 0;
   notifySave();
