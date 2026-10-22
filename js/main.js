@@ -7,6 +7,7 @@ import {
   saveMolt,
   saveNames,
   saveCategories,
+  saveFipLinks,
   applyTheme,
   pushUndo,
   popUndoState
@@ -142,6 +143,20 @@ function getMatchOutcome(item) {
   return null;
 }
 
+function getCategoryFipUrl(catStr) {
+  if (!catStr || !state.fipLinks) return null;
+  const cleaned = catStr.trim().toUpperCase().replace(/\s+/g, '');
+  if (state.fipLinks[cleaned]) return state.fipLinks[cleaned];
+
+  for (const k of Object.keys(state.fipLinks)) {
+    const testK = k.toUpperCase().replace(/\s+/g, '');
+    if (cleaned === testK || cleaned.startsWith(testK) || testK.startsWith(cleaned)) {
+      return state.fipLinks[k];
+    }
+  }
+  return null;
+}
+
 function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb, targetCategory = '') {
   if (!date || !timeStr) return [];
 
@@ -235,7 +250,6 @@ function findConflictingMatches() {
   return conflicts;
 }
 
-// RAGGRUPPAMENTO DEI CONFLITTI IN CLUSTER
 function getConflictClusters() {
   const conflictsMap = findConflictingMatches();
   const visited = new Set();
@@ -277,7 +291,6 @@ function getConflictClusters() {
   return clusters;
 }
 
-// CONTEGGIO ALERT: SE 3 GARE FANNO PARTE DELLO STESSO CONFLITTO -> CONTA 1!
 function updateAlertStatusBadge() {
   const btn = document.getElementById('conflictAlertBtn');
   const bNavIcon = document.getElementById('bNavAlertIcon');
@@ -882,6 +895,10 @@ function card(i, hasConflict, isUrgentIncomplete) {
   const outcome = getMatchOutcome(i);
   const scoreHtml = outcome ? `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>` : '';
 
+  // ICONA FIP: COMPARE SOLO SE ESISTE IL LINK PER LA CATEGORIA
+  const fipUrl = getCategoryFipUrl(i.cat);
+  const fipBtnHtml = fipUrl ? `<a href="${esc(fipUrl)}" target="_blank" rel="noopener noreferrer" class="fipBtn" title="Apri risultati FIP (Nuova scheda)">🌐</a>` : '';
+
   let badgeHtml = '';
   if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
   else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da definire)'}</div>`;
@@ -897,6 +914,7 @@ function card(i, hasConflict, isUrgentIncomplete) {
         ${friendlyHtml}
       </div>
       <div class="m-actions">
+        ${fipBtnHtml}
         ${scoreHtml}
         ${!state.READONLY && !isCancelled ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Gestisci esito / Check">✓</button>` : ''}
         ${!state.READONLY && !i.ghost && !isCancelled && !isPostponed ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
@@ -1354,7 +1372,7 @@ document.addEventListener('click', e => {
   }
 
   const matchCard = e.target.closest('.match');
-  if (matchCard && !state.READONLY && !e.target.closest('button')) {
+  if (matchCard && !state.READONLY && !e.target.closest('button') && !e.target.closest('a')) {
     const it = state.items.find(x => x.id === matchCard.dataset.id);
     if (it?.ghost && it.status !== 'rinviata') {
       toast('Partita con check: togli il ✓ per modificarla');
@@ -1931,7 +1949,6 @@ function promptLogin() {
   document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
 
-// MODALE TECNICA COMPATTATA (INGRANAGGIO)
 function openSettingsModal() {
   const ov = document.createElement('div');
   ov.className = 'ov';
@@ -1949,6 +1966,11 @@ function openSettingsModal() {
       <button type="button" class="settings-card-btn" id="sBtnTheme">
         <span class="s-icon">🎨</span>
         <span class="s-label">Tema / Stile</span>
+      </button>
+
+      <button type="button" class="settings-card-btn" id="sBtnFip">
+        <span class="s-icon">🔗</span>
+        <span class="s-label">Link Campionati</span>
       </button>
 
       <button type="button" class="settings-card-btn" id="sBtnPrint">
@@ -1996,6 +2018,7 @@ function openSettingsModal() {
   ov.querySelector('#setCloseTop').onclick = () => ov.remove();
 
   ov.querySelector('#sBtnTheme').onclick = () => { ov.remove(); openThemeModal(); };
+  ov.querySelector('#sBtnFip').onclick = () => { ov.remove(); openFipLinksModal(); };
   ov.querySelector('#sBtnPrint').onclick = () => { ov.remove(); openPrintModal(); };
   ov.querySelector('#sBtnExport').onclick = () => { ov.remove(); openExportMultiModal(); };
 
@@ -2004,6 +2027,72 @@ function openSettingsModal() {
     ov.querySelector('#sBtnPdf').onclick = () => { ov.remove(); openPdfImportModal(); };
     ov.querySelector('#sBtnNames').onclick = () => { ov.remove(); openNamesModal(); };
     ov.querySelector('#sBtnCat').onclick = () => { ov.remove(); openCatModal(); };
+  }
+}
+
+// MODALE GESTIONE LINK FIP CAMPIONATI
+function openFipLinksModal() {
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'fipLinksOv';
+
+  const cats = Array.from(new Set([...state.categories, 'U13', 'U14', 'U15', 'U17', 'U19']));
+  const isAuth = !state.READONLY;
+
+  const rowsHtml = cats.map(c => {
+    const link = state.fipLinks[c] || getCategoryFipUrl(c) || '';
+    return `
+      <div style="margin-bottom:12px;background:var(--card);padding:10px 12px;border-radius:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="font-size:13.5px;color:var(--date)">${esc(c)}</strong>
+          ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--wa);text-decoration:none;font-weight:700">Testa link ↗</a>` : '<span style="font-size:11px;color:var(--mute)">Nessun link</span>'}
+        </div>
+        <input type="url" data-fipcat="${esc(c)}" value="${esc(link)}" placeholder="Incolla link FIP per ${esc(c)}..." ${isAuth ? '' : 'disabled'} style="font-size:12.5px!important;padding:6px 10px;width:100%">
+      </div>
+    `;
+  }).join('');
+
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Link Risultati FIP">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">🔗 Link Risultati FIP</h3>
+      <button id="fipCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
+    </div>
+    <p style="font-size:12.5px;color:var(--mute);margin:-4px 0 12px">
+      ${isAuth ? 'Assegna a ciascuna categoria il rispettivo link del girone. Se presente, sulla partita apparirà l\'icona 🌐 per aprirlo al volo.' : 'Visualizzazione link assegnati ai vari campionati.'}
+    </p>
+
+    <div style="max-height:300px;overflow-y:auto;padding-right:4px">
+      ${rowsHtml}
+    </div>
+
+    <div class="mbtns" style="margin-top:14px">
+      <button type="button" id="fipCancel">Chiudi</button>
+      ${isAuth ? `<button type="button" class="btn-primary-action" id="fipSave">Salva Link</button>` : ''}
+    </div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#fipCancel').onclick = () => ov.remove();
+  ov.querySelector('#fipCloseTop').onclick = () => ov.remove();
+
+  if (isAuth) {
+    ov.querySelector('#fipSave').onclick = () => {
+      const inputs = ov.querySelectorAll('input[data-fipcat]');
+      inputs.forEach(inp => {
+        const c = inp.dataset.fipcat;
+        const val = inp.value.trim();
+        if (val) {
+          state.fipLinks[c] = val;
+        } else {
+          delete state.fipLinks[c];
+        }
+      });
+      saveFipLinks();
+      ov.remove();
+      render();
+      toast('Link campionati salvati!', 'success');
+    };
   }
 }
 
@@ -2232,7 +2321,6 @@ function bindEvents() {
     openResocontoModal();
   };
 
-  // INGRANAGGIO COMPATTATO IN FONDO ALLA SIDEBAR
   const railSettings = $('#railNavSettings');
   if (railSettings) {
     railSettings.onclick = () => {
@@ -2241,7 +2329,6 @@ function bindEvents() {
     };
   }
 
-  // TASTO OGGI NELLA TOP BAR
   const todayTopBtn = $('#todayBtn');
   if (todayTopBtn) {
     todayTopBtn.onclick = () => {
@@ -2252,7 +2339,6 @@ function bindEvents() {
     };
   }
 
-  // VISTE BOTTOM BAR MOBILE
   const bNavHome = $('#bNavHome');
   if (bNavHome) bNavHome.onclick = () => {
     triggerHaptic('light');
