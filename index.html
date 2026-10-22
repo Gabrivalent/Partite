@@ -7,12 +7,14 @@
   
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='110' fill='%231d5fa8'/%3E%3Ccircle cx='256' cy='256' r='160' fill='none' stroke='white' stroke-width='28'/%3E%3C/svg%3E">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1f2020">
+  <meta name="theme-color" content="#161717">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Partite">
 
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
@@ -22,88 +24,157 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body class="ro">
-<div class="sticky-top-wrap">
-  <header>
-    <div class="title-with-sync">
-      <button id="navToggleBtn" type="button" class="nav-toggle-btn" title="Apri Calendario">📅</button>
-      <h1>Partite</h1>
-      <button id="conflictAlertBtn" type="button" class="alert-btn-standalone status-ok" title="Stato partite: tutto regolare">✓</button>
+<div class="app-layout">
 
-      <div id="syncIndicatorWrap" class="sync-indicator-wrap">
+  <!-- SIDEBAR / ICON RAIL (Desktop) & DRAWER (Mobile) -->
+  <aside class="app-sidebar" id="appSidebar">
+    <div class="sidebar-top">
+      <button id="sidebarToggleBtn" class="rail-icon-btn" title="Espandi / Comprimi Menu" type="button">
+        <span class="icon">☰</span>
+      </button>
+      <span class="sidebar-brand-label">Menu Partite</span>
+    </div>
+
+    <!-- AZIONI RAPIDE ICON RAIL -->
+    <nav class="sidebar-nav">
+      <button type="button" class="rail-nav-item active" id="railNavHome" title="Partite">
+        <span class="icon">🏀</span>
+        <span class="label">Partite</span>
+      </button>
+      <button type="button" class="rail-nav-item" id="railNavToday" title="Oggi">
+        <span class="icon">📅</span>
+        <span class="label">Oggi</span>
+      </button>
+      <button type="button" class="rail-nav-item" id="railNavResoconto" title="Resoconto Compensi">
+        <span class="icon">📊</span>
+        <span class="label">Compensi</span>
+      </button>
+      <button type="button" class="rail-nav-item auth-only" id="railNavNames" title="Gestione Collaboratori">
+        <span class="icon">👥</span>
+        <span class="label">Collaboratori</span>
+      </button>
+      <button type="button" class="rail-nav-item auth-only" id="railNavCat" title="Gestione Categorie">
+        <span class="icon">🏷️</span>
+        <span class="label">Categorie</span>
+      </button>
+      <button type="button" class="rail-nav-item auth-only" id="railNavPdf" title="Importa PDF">
+        <span class="icon">📄</span>
+        <span class="label">Importa PDF</span>
+      </button>
+      <button type="button" class="rail-nav-item" id="railNavPrint" title="Stampa PDF">
+        <span class="icon">🖨️</span>
+        <span class="label">Stampa PDF</span>
+      </button>
+      <button type="button" class="rail-nav-item" id="railNavExport" title="Esporta JSON">
+        <span class="icon">📤</span>
+        <span class="label">Esporta JSON</span>
+      </button>
+      <button type="button" class="rail-nav-item auth-only" id="railNavImport" title="Importa JSON">
+        <span class="icon">📥</span>
+        <span class="label">Importa JSON</span>
+      </button>
+      <button type="button" class="rail-nav-item" id="railNavTheme" title="Tema Grafico">
+        <span class="icon">🎨</span>
+        <span class="label">Tema / Stile</span>
+      </button>
+    </nav>
+
+    <!-- ALBERO CRONOLOGICO (Visibile quando espanso) -->
+    <div class="sidebar-tree-container">
+      <div class="sidebar-section-title">Archivio Calendario</div>
+      <div id="navTree" class="nav-tree"></div>
+    </div>
+
+    <!-- STATO SINCRONIZZAZIONE E LOGIN IN FONDO -->
+    <div class="sidebar-bottom">
+      <div class="rail-sync-wrap" id="railSyncWrap">
         <span id="syncDot" class="sync-dot sync-green" title="Pronto"></span>
-        <button id="quickSaveBtn" class="pill-btn-sm auth-only" title="Salva modifiche sul cloud (Ctrl+S)">💾 Salva</button>
-        <button id="quickPullBtn" class="pill-btn-sm" title="Aggiorna dal cloud">↻</button>
+        <span class="sync-text-status" id="syncStatusText">Connesso</span>
       </div>
+      <button id="authBtn" type="button" class="rail-auth-btn" title="Accesso Amministratore">
+        <span class="icon">🔒</span>
+        <span class="label">Accedi</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- BACKDROP MOBILE PER IL DRAWER -->
+  <div id="navBackdrop" class="nav-backdrop"></div>
+
+  <!-- AREA PRINCIPALE CONTENUTO -->
+  <div class="app-content-wrapper">
+    
+    <!-- TOP BAR SNELITA -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button id="mobileMenuBtn" type="button" class="mobile-menu-btn" title="Apri Menu">☰</button>
+        <h1 class="page-title">Partite</h1>
+        <button id="conflictAlertBtn" type="button" class="alert-btn-standalone status-ok" title="Nessun conflitto">✓</button>
+      </div>
+
+      <div class="top-bar-actions">
+        <button id="add" type="button" class="btn-primary-action auth-only">+ Partita</button>
+        <button id="undoBtn" type="button" class="pill-btn-sm auth-only" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
+        <button id="quickSaveBtn" class="pill-btn-sm auth-only" title="Salva modifiche (Ctrl+S)">💾</button>
+        <button id="quickPullBtn" class="pill-btn-sm" title="Aggiorna dati">↻</button>
+      </div>
+    </header>
+
+    <!-- BARRA RICERCA E FILTRI VELOCI -->
+    <div class="filter-strip">
+      <div class="search-wrap">
+        <input type="search" id="searchFilter" placeholder="🔍 Cerca squadre, ruoli..." autocomplete="off">
+      </div>
+      <select id="filterCat"><option value="">Tutte le categorie</option></select>
+      <button id="filterIncomplete" type="button" class="filter-chip" aria-pressed="false">Incomplete <span id="incCount"></span></button>
+      <button class="waBtn" id="waTodayBtn" type="button" title="Copia turni dei prossimi 7 giorni">📲 WA 7gg</button>
     </div>
 
-    <div class="top-actions">
-      <input type="file" id="importFile" accept="application/json,.json" hidden>
-      
-      <button id="authBtn" type="button" class="auth-btn">🔒 Accedi</button>
-      <button id="add" type="button" class="primary auth-only">+ Partita</button>
-      <button id="todayBtn" type="button" title="Vai a oggi">Oggi</button>
-      <button id="undoBtn" type="button" class="auth-only" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
+    <!-- LISTA GARE & RESOCONTO MENSILE -->
+    <main class="content-scroll">
+      <div id="list"></div>
+    </main>
 
-      <div class="menuWrap">
-        <button id="gearBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Impostazioni">⚙️</button>
-        <div class="menuDrop" id="gearDrop" role="menu" hidden>
-          <button id="themeBtn" type="button" role="menuitem">🎨 Tema / Stile</button>
-          <button id="notifyBtn" type="button" role="menuitem">🔔 Abilita Notifiche</button>
-          <button id="exportMultiJsonBtn" type="button" role="menuitem">📤 Esporta JSON (Mesi)</button>
-          <button id="importBtn" type="button" class="auth-only" role="menuitem">📥 Importa JSON</button>
-          <button id="pdfImportBtn" type="button" class="auth-only" role="menuitem">📄 Importa da PDF</button>
-          <button id="changePinBtn" type="button" class="auth-only" role="menuitem">🔑 Cambia Password Admin</button>
-        </div>
-      </div>
-      <div class="menuWrap">
-        <button id="menuBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Menu">☰</button>
-        <div class="menuDrop" id="menuDrop" role="menu" hidden>
-          <button id="resocontoBtn" type="button" role="menuitem">📊 Resoconto Compensi</button>
-          <button id="shareLinkBtn" type="button" role="menuitem">🔗 Copia Link Calendario</button>
-          <button id="printBtn" type="button" role="menuitem">🖨️ Stampa PDF</button>
-          <button id="namesBtn" type="button" class="auth-only" role="menuitem">👥 Gestione Nomi</button>
-          <button id="catBtn" type="button" class="auth-only" role="menuitem">🏷️ Gestione Categorie</button>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <div class="filterBar">
-    <div class="search-input-wrap">
-      <input type="search" id="searchFilter" placeholder="🔍 Cerca squadre o persone..." autocomplete="off">
-    </div>
-    <select id="filterCat"><option value="">Tutte le categorie</option></select>
-    <button id="filterIncomplete" type="button" aria-pressed="false">Incomplete <span id="incCount" style="opacity:.75"></span></button>
-    <button class="waBtn" id="waTodayBtn" type="button" title="Copia turni dei prossimi 7 giorni">📲 WA Prossimi 7gg</button>
   </div>
 </div>
 
-<main class="layout-main">
-  <div id="navBackdrop" class="nav-backdrop"></div>
-  <datalist id="namesList"></datalist>
-  <datalist id="categoriesList"></datalist>
+<!-- BOTTOM BAR MOBILE (STILE INSTAGRAM CON '+' AL CENTRO) -->
+<nav class="bottom-nav-bar" id="bottomNavBar">
+  <button type="button" class="b-nav-item active" id="bNavHome">
+    <span class="b-nav-icon">🏀</span>
+    <span class="b-nav-label">Gare</span>
+  </button>
+  <button type="button" class="b-nav-item" id="bNavToday">
+    <span class="b-nav-icon">📅</span>
+    <span class="b-nav-label">Oggi</span>
+  </button>
+  <button type="button" class="b-nav-item b-nav-add auth-only" id="bNavAdd" title="Nuova Partita">
+    <span class="b-nav-add-icon">+</span>
+  </button>
+  <button type="button" class="b-nav-item" id="bNavResoconto">
+    <span class="b-nav-icon">📊</span>
+    <span class="b-nav-label">Compensi</span>
+  </button>
+  <button type="button" class="b-nav-item" id="bNavAlerts">
+    <span class="b-nav-icon" id="bNavAlertIcon">✓</span>
+    <span class="b-nav-label">Alert</span>
+  </button>
+</nav>
 
-  <!-- COLONNA SINISTRA: ALBERO DI NAVIGAZIONE ANNO / MESE / SETTIMANE -->
-  <aside class="nav-sidebar" id="navSidebar">
-    <div class="sidebar-header">
-      <span class="sidebar-title">📅 Calendario</span>
-    </div>
-    <div id="navTree" class="nav-tree"></div>
-  </aside>
+<!-- INPUT FILE NASCOSTO PER IMPORT -->
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<datalist id="namesList"></datalist>
+<datalist id="categoriesList"></datalist>
 
-  <!-- COLONNA DESTRA / CENTRALE: CONTENUTO DEL SINGOLO MESE SELEZIONATO -->
-  <section class="content-area">
-    <div id="list"></div>
-  </section>
-</main>
-
+<!-- TOAST NOTIFICHE -->
 <div id="msg" role="status"></div>
 
+<!-- BANNER DI ACCESSO RISERVATO -->
 <div class="robanner" id="roBanner">
-  <div style="font-size: 28px; margin-bottom: 8px;">🔒</div>
+  <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
   <h3 style="margin: 0 0 8px; color: var(--ink);">Accesso Riservato</h3>
   <p style="color: var(--mute); margin: 0 0 16px; font-size: 13px;">
-    Il calendario e le designazioni sono private. Effettua l'accesso per visualizzare le partite.
+    Il calendario e le designazioni dei turni sono private. Effettua l'accesso come amministratore per gestire o sbloccare le modifiche.
   </p>
   <button type="button" class="primary" onclick="window.handleAuthClick()" style="width: 100%;">
     Accedi con Account
