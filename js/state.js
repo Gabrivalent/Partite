@@ -78,10 +78,13 @@ export function saveNames() {
   notifySave();
 }
 
-export function saveCategories() {
+export function saveCategoriesLocal() {
   localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(state.categories));
   notifySave();
 }
+
+// Alias per compatibilità con altre sezioni o import
+export const saveCategories = saveCategoriesLocal;
 
 export function saveFipLinks() {
   localStorage.setItem(STORAGE_KEY_FIP_LINKS, JSON.stringify(state.fipLinks));
