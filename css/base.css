@@ -97,7 +97,7 @@ input, select, textarea {
   font-size: 16px !important;
 }
 
-/* LAYOUT A GRIGLIA APPLICATIVO */
+/* LAYOUT PRINCIPALE */
 .app-layout {
   display: flex;
   min-height: 100vh;
@@ -128,30 +128,29 @@ input, select, textarea {
 .sidebar-top {
   display: flex;
   align-items: center;
-  padding: 12px 14px;
+  padding: 12px 10px;
   gap: 12px;
   min-height: 56px;
 }
+
 .sidebar-brand-label {
   font: 700 17px var(--font-title);
   letter-spacing: .5px;
   white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  pointer-events: none;
+  display: none;
 }
 .app-sidebar.expanded .sidebar-brand-label {
-  opacity: 1;
-  pointer-events: auto;
+  display: inline-block;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   padding: 8px;
 }
 
+/* PULSANTI DELLA RAIL */
 .rail-icon-btn, .rail-nav-item {
   width: 100%;
   height: 44px;
@@ -161,32 +160,62 @@ input, select, textarea {
   color: var(--mute);
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 12px;
+  justify-content: center; /* Centra l'icona quando chiusa */
+  padding: 0;
   cursor: pointer;
-  transition: all .15s ease;
+  transition: background .15s ease, color .15s ease;
   white-space: nowrap;
+  box-shadow: none;
 }
-.rail-icon-btn { justify-content: center; width: 44px; padding: 0; }
+
+.app-sidebar.expanded .rail-nav-item {
+  justify-content: flex-start;
+  padding: 0 14px;
+  gap: 14px;
+}
+
+.rail-icon-btn {
+  width: 44px;
+  margin: 0 auto;
+}
+.app-sidebar.expanded .rail-icon-btn {
+  margin: 0;
+}
+
 .rail-icon-btn:hover, .rail-nav-item:hover {
   background: var(--hl);
   color: var(--ink);
 }
+
 .rail-nav-item.active {
   background: var(--card);
   color: var(--acc);
   font-weight: 700;
   box-shadow: var(--shadow-sm);
 }
-.rail-nav-item .icon { font-size: 19px; min-width: 24px; text-align: center; }
+
+.rail-nav-item .icon {
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+}
+
 .rail-nav-item .label {
+  display: none; /* Nasconde il testo quando la rail è compressa */
   font-size: 13.5px;
   font-weight: 600;
-  opacity: 0;
-  transition: opacity 0.15s;
 }
 .app-sidebar.expanded .rail-nav-item .label {
-  opacity: 1;
+  display: inline-block;
+}
+
+/* GESTIONE ELEMENTI RISERVATI AGLI AMMINISTRATORI */
+body.ro .rail-nav-item.auth-only,
+body.ro .auth-only {
+  display: none !important;
 }
 
 .sidebar-tree-container {
@@ -208,28 +237,37 @@ input, select, textarea {
 
 .sidebar-bottom {
   margin-top: auto;
-  padding: 10px;
+  padding: 10px 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-top: 1px solid var(--divider);
 }
+
 .rail-sync-wrap {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   height: 38px;
-  padding: 0 10px;
+  padding: 0;
   border-radius: 8px;
 }
+.app-sidebar.expanded .rail-sync-wrap {
+  justify-content: flex-start;
+  padding: 0 10px;
+}
+
 .sync-text-status {
+  display: none;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--mute);
-  opacity: 0;
   white-space: nowrap;
 }
-.app-sidebar.expanded .sync-text-status { opacity: 1; }
+.app-sidebar.expanded .sync-text-status {
+  display: inline-block;
+}
 
 .rail-auth-btn {
   width: 100%;
@@ -240,14 +278,25 @@ input, select, textarea {
   color: var(--ink);
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 10px;
+  justify-content: center;
+  padding: 0;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: none;
 }
-.rail-auth-btn:hover { background: var(--hl); }
-.rail-auth-btn .label { font-size: 13px; font-weight: 600; opacity: 0; }
-.app-sidebar.expanded .rail-auth-btn .label { opacity: 1; }
+.app-sidebar.expanded .rail-auth-btn {
+  justify-content: flex-start;
+  padding: 0 12px;
+  gap: 12px;
+}
+.rail-auth-btn .label {
+  display: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.app-sidebar.expanded .rail-auth-btn .label {
+  display: inline-block;
+}
 
 /* AREA CONTENUTO CENTRALE */
 .app-content-wrapper {
@@ -406,7 +455,6 @@ input, select, textarea {
 }
 
 /* BANNER SOLA LETTURA */
-body.ro .auth-only { display: none !important; }
 body:not(.ro) .robanner { display: none !important; }
 body.ro .app-content-wrapper { display: none !important; }
 body.ro .bottom-nav-bar { display: none !important; }
