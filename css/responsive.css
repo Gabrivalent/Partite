@@ -1,64 +1,146 @@
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161717;
-    --card: #2b2c2c;
-    --ink: #f1f5fa;
-    --mute: #9ca3af;
-    --line: #3a3c3c;
-    --acc: #5ea2ea;
-    --acc-hover: #74b1f3;
-    --date: #88beff;
-    --hl: #28303d;
-    --warn: #f87171;
-    --wa: #2cdb6e;
-    --wa-dark: #22b859;
-    color-scheme: dark;
-    --glass-bg: rgba(31, 32, 32, 0.92);
-  }
-}
-
 @media (min-width: 760px) {
-  .matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-  .mbody { grid-template-columns: minmax(0, 1fr) 280px; }
+  .matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .mbody { grid-template-columns: minmax(0, 1fr) 300px; }
   .mweeks { grid-column: 1; grid-row: 1; }
-  .recap { grid-column: 2; grid-row: 1; position: sticky; top: 110px; align-self: start; }
+  .recap { grid-column: 2; grid-row: 1; position: sticky; top: 90px; align-self: start; }
 }
 
-@media (min-width: 860px) {
-  .layout-main {
-    grid-template-columns: 250px minmax(0, 1fr);
-  }
-}
-
-/* COMPORTAMENTO SOLO SU SMARTPHONE E TABLET (< 860px) */
+/* COMPORTAMENTO SOLO SU SMARTPHONE (< 860px) */
 @media (max-width: 859px) {
-  .nav-toggle-btn {
+  .mobile-menu-btn {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .nav-sidebar {
+  /* DRAWER LATERALE A SCOMPARSA (GEMINI STYLE) */
+  .app-sidebar {
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 280px;
-    max-width: 82vw;
-    max-height: 100vh;
+    width: 290px;
+    max-width: 84vw;
     height: 100vh;
-    border-radius: 0 16px 16px 0;
+    border-radius: 0 20px 20px 0;
     z-index: 900;
     transform: translateX(-105%);
     transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
-    padding: 16px 12px 30px;
+    box-shadow: var(--shadow-lg);
+    background: var(--surface);
   }
-
-  .nav-sidebar.open {
+  .app-sidebar.open {
     transform: translateX(0);
   }
+  .app-sidebar .sidebar-brand-label,
+  .app-sidebar .rail-nav-item .label,
+  .app-sidebar .sync-text-status,
+  .app-sidebar .rail-auth-btn .label {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  .app-sidebar .sidebar-tree-container {
+    display: block !important;
+  }
 
+  .nav-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 850;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
   .nav-backdrop.open {
     display: block;
     opacity: 1;
+  }
+
+  /* BOTTOM NAVIGATION BAR MOBILE (INSTAGRAM STYLE) */
+  .bottom-nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--divider);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 10px calc(env(safe-area-inset-bottom, 0) + 4px);
+    z-index: 700;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  .b-nav-item {
+    flex: 1;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: auto;
+    padding: 4px 0;
+    color: var(--mute);
+    cursor: pointer;
+    border-radius: 8px;
+  }
+  .b-nav-item:active { transform: scale(0.92); }
+  .b-nav-item.active { color: var(--acc); }
+  .b-nav-icon { font-size: 20px; line-height: 1; }
+  .b-nav-label { font-size: 10.5px; font-weight: 700; letter-spacing: .2px; }
+
+  /* TASTO '+' IN RISALTO AL CENTRO */
+  .b-nav-add {
+    margin-top: -18px;
+    flex: 0 0 52px;
+    height: 52px;
+    border-radius: 50% !important;
+    background: var(--acc) !important;
+    color: #fff !important;
+    box-shadow: 0 6px 18px var(--acc-glow) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .b-nav-add-icon {
+    font-size: 30px;
+    font-weight: 300;
+    line-height: 1;
+    margin-top: -2px;
+  }
+
+  /* MODALI A BOTTOM SHEET SU MOBILE */
+  .ov {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 24px 24px 0 0;
+    padding: 24px 20px calc(env(safe-area-inset-bottom, 0) + 24px);
+    max-height: 85vh;
+    animation: slideUpSheet 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slideUpSheet {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+}
+
+@media (min-width: 860px) {
+  .bottom-nav-bar {
+    display: none;
   }
 }
