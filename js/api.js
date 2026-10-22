@@ -24,10 +24,10 @@ export function setSyncVisualState(syncState, tooltip) {
   wrap.style.display = 'inline-flex';
   if (syncState === 'orange') {
     dot.className = 'sync-dot sync-orange';
-    dot.title = tooltip || 'Sincronizzazione…';
+    dot.title = tooltip || 'Sincronizzazione in corso…';
   } else if (syncState === 'green') {
     dot.className = 'sync-dot sync-green';
-    dot.title = tooltip || (sb ? 'Sincronizzato Realtime' : 'Memoria locale');
+    dot.title = tooltip || (sb ? 'Sincronizzato Cloud' : 'Memoria locale');
   } else if (syncState === 'red') {
     dot.className = 'sync-dot sync-red';
     dot.title = tooltip || 'Cloud non raggiungibile';
@@ -39,11 +39,14 @@ export async function cloudFetchRaw() {
   try {
     const { data, error } = await sb
       .from('partite_board')
-      .select('data')
+      .select('data, updated_at')
       .eq('id', SUPABASE_CONFIG.board)
       .maybeSingle();
-    if (error) return null;
-    return data && data.data ? data.data : null;
+    if (error || !data) return null;
+    return {
+      data: data.data || null,
+      updated_at: data.updated_at || null
+    };
   } catch(e) {
     return null;
   }
@@ -54,10 +57,10 @@ export function registerCloudCallback(cb) {
   onCloudDataAppliedCallback = cb;
 }
 
-export function applyCloudData(raw) {
-  if (!raw) return;
-  
-  // Sicurezza: se il cloud è vuoto ma noi abbiamo già dati locali, non sovrascriviamo con il vuoto
+export function applyCloudData(payload) {
+  if (!payload) return;
+  const raw = payload.data ? payload.data : payload;
+
   const cloudItems = Array.isArray(raw.items) ? raw.items : [];
   if (cloudItems.length === 0 && state.items.length > 0 && !state.isDirty) {
     return;
@@ -68,14 +71,14 @@ export function applyCloudData(raw) {
   state.molt = raw.molt && typeof raw.molt === 'object' ? raw.molt : {};
   state.names = Array.isArray(raw.names) ? raw.names : [];
   state.categories = Array.isArray(raw.categories) ? raw.categories : [];
-  
+
   saveLocalOnly();
   saveDLocalOnly();
   saveMoltLocal();
   saveNamesLocal();
   saveCategoriesLocal();
   state.isDirty = false;
-  
+
   if (onCloudDataAppliedCallback) onCloudDataAppliedCallback();
 }
 
@@ -107,7 +110,6 @@ export async function cloudPushNow() {
 let syncTimer = null;
 export function scheduleCloudPush() {
   clearTimeout(syncTimer);
-  // Salvataggio automatico in background dopo 1 secondo di inattività
   syncTimer = setTimeout(cloudPushNow, 1000);
 }
 
@@ -116,9 +118,9 @@ export async function cloudPullSafe(silent) {
   if (state.isDirty && !state.READONLY) await cloudPushNow();
   if (!silent) setSyncVisualState('orange');
   try {
-    const raw = await cloudFetchRaw();
-    if (raw) {
-      applyCloudData(raw);
+    const res = await cloudFetchRaw();
+    if (res && res.data) {
+      applyCloudData(res.data);
       setSyncVisualState('green');
       return true;
     }
