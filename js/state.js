@@ -24,7 +24,7 @@ try { state.items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || []; 
 try { state.dayMeta = JSON.parse(localStorage.getItem(STORAGE_KEYS.DAYS)) || {}; } catch(e) {}
 try { state.molt = JSON.parse(localStorage.getItem(STORAGE_KEYS.MOLT)) || {}; } catch(e) {}
 try { state.names = JSON.parse(localStorage.getItem(STORAGE_KEYS.NAMES)) || []; } catch(e) {}
-try { state.categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATEGORIES)) || {}; } catch(e) {}
+try { state.categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATEGORIES)) || []; } catch(e) {}
 
 let onSaveCallback = null;
 let onBadgeUpdateCallback = null;
