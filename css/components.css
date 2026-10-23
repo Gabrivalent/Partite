@@ -1,350 +1,357 @@
-/* FINESTRE MODALI, OVERLAY E POPUP */
+/* COMPONENTI: CARD, BADGE, TASTI, ROSTER */
 
-.ov {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px;
-  z-index: 1000;
-  overflow-y: auto;
-}
-
-.modal {
-  background: var(--surface);
-  border-radius: 18px;
-  box-shadow: var(--shadow-lg);
-  width: 100%;
-  max-width: 480px;
-  padding: 16px 20px;
-  border: 1px solid var(--divider);
+/* CARD PARTITA */
+.match {
+  position: relative;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
   display: flex;
   flex-direction: column;
-  position: relative;
-  max-height: 96vh;
-  box-sizing: border-box;
+  gap: 10px;
+  border-left: 4px solid transparent;
 }
 
-.modal h3 {
-  margin: 0 0 10px;
-  font: 700 20px var(--font-title);
+.match:hover {
+  background: var(--card-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* STATI DELLA CARD */
+.match.ghost {
+  opacity: 0.65;
+  filter: grayscale(0.2);
+}
+
+.match.cancelled {
+  opacity: 0.45;
+  filter: grayscale(0.85);
+  border-left: 4px solid var(--warn) !important;
+}
+
+.match.postponed {
+  border-left: 4px solid #eab308 !important;
+}
+
+.match.conflict-match {
+  border-left: 4px solid var(--warn) !important;
+  animation: pulseConflict 2.2s infinite;
+}
+
+/* PARTITA INCOMPLETA: STESSO ARANCIONE (<24h) */
+.match.missing-t1,
+.match.urgent-incomplete {
+  border-left: 4px solid #f97316 !important;
+}
+
+@keyframes pulseConflict {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(239, 68, 68, 0.35); }
+}
+
+/* BADGE DI AVVISO IN TESTA */
+.cancelled-badge, .postponed-badge, .conflict-badge, .urgent-badge {
+  font: 700 12px var(--font-title);
+  letter-spacing: .5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  align-self: flex-start;
+  margin-bottom: 2px;
+}
+.cancelled-badge { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.postponed-badge { background: rgba(234, 179, 8, 0.2); color: #fde047; }
+.conflict-badge { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.urgent-badge { background: rgba(249, 115, 22, 0.2); color: #fdba74; }
+
+/* HEADER DELLA CARD */
+.m-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.m-time-pill {
+  font: 700 18px var(--font-title);
+  color: var(--date);
+  letter-spacing: .4px;
+}
+
+.cat-pill {
+  background: var(--hl);
   color: var(--ink);
-  letter-spacing: .3px;
+  font: 700 12.5px var(--font-title);
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
 }
 
-/* PULSANTE CHIUDI IN ALTO A DESTRA */
-#setCloseTop, #confCloseTop, #urgCloseTop, #pendCloseTop, #resCloseTop, #fipCloseTop {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+/* NUOVO BADGE AMICHEVOLE: PULITO, ELEGANTE E MODERNO */
+.friendly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  font: 700 11.5px var(--font-title);
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+
+.friendly-badge::before {
+  content: "🤝";
+  font-size: 11px;
+}
+
+.m-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-pill {
+  font: 700 13.5px var(--font-title);
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+.score-pill.win { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+.score-pill.loss { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.score-pill.suspended { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+
+.fipBtn, .ghostBtn, .editBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: none;
-  background: var(--card);
+  background: var(--surface);
   color: var(--mute);
-  cursor: pointer;
+  font-size: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
+  cursor: pointer;
   transition: all .15s ease;
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
 }
-
-#setCloseTop:hover, #confCloseTop:hover, #urgCloseTop:hover, #pendCloseTop:hover, #resCloseTop:hover, #fipCloseTop:hover {
+.fipBtn:hover {
+  background: var(--hl);
+  color: #38bdf8;
+  transform: scale(1.05);
+}
+.ghostBtn:hover, .editBtn:hover {
   background: var(--hl);
   color: var(--ink);
 }
+.ghostBtn[aria-pressed="true"] {
+  background: var(--wa);
+  color: #fff;
+}
 
-/* CAMPI FORM COMPATTI */
-.frow {
-  margin-bottom: 8px;
+/* TITOLO PARTITA E SQUADRE */
+.m-title {
+  font-weight: 700;
+  font-size: 16.5px;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+/* ROSTER TAVOLO E ARBITRO */
+.m-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--divider);
+  padding-top: 8px;
+}
+
+.m-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.m-row .lbl {
+  color: var(--mute);
+}
+.m-row .val {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* TESTO DA ASSEGNARE IN ARANCIONE */
+.m-row .empty-req {
+  color: #fb923c;
+  font-style: italic;
+  font-weight: 700;
+}
+.m-row .empty-opt {
+  color: var(--mute);
+  opacity: 0.65;
+}
+
+/* BADGE ALERT TOP BAR */
+.alert-btn-standalone {
+  min-height: 34px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: none;
+  font: 700 13px var(--font-title);
+  letter-spacing: .5px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.alert-btn-standalone.status-ok {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+.alert-btn-standalone.status-conflict {
+  background: #dc2626;
+  color: #ffffff;
+  animation: pulseAlert 1.5s infinite;
+}
+.alert-btn-standalone.status-urgent-incomplete {
+  background: #ea580c;
+  color: #ffffff;
+}
+.alert-btn-standalone.status-pending {
+  background: #ca8a04;
+  color: #ffffff;
+}
+
+@keyframes pulseAlert {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.waBtn {
+  background: var(--wa);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: var(--shadow-sm);
+}
+.waBtn:hover { background: var(--wa-dark); }
+
+.pill-btn-sm {
+  background: var(--surface);
+  color: var(--ink);
+  border: none;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+.pill-btn-sm:hover { background: var(--hl); }
+
+/* VOCI ALBERO CALENDARIO */
+.nav-year, .nav-month {
+  margin-bottom: 6px;
+}
+.nav-year summary, .nav-month summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  color: var(--mute);
+}
+.nav-year summary::-webkit-details-marker,
+.nav-month summary::-webkit-details-marker { display: none; }
+.nav-year summary:hover, .nav-month summary:hover {
+  background: var(--hl);
+  color: var(--ink);
+}
+.nav-month.active-month > summary {
+  color: var(--acc);
+}
+
+.nav-weeks-list {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  padding-left: 12px;
+  margin-top: 4px;
 }
-
-.frow label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--mute);
-}
-
-.frow input, 
-.frow select {
+.nav-week-link {
   width: 100%;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--divider);
-  background: var(--card);
-  color: var(--ink);
-  outline: none;
-  font-size: 14px !important;
-  box-sizing: border-box;
-}
-
-.frow input:focus, 
-.frow select:focus {
-  border-color: var(--acc);
-}
-
-/* TIME PICKER COMPATTO SENZA SCROLL */
-.time-picker-box {
-  background: var(--card);
-  border: 1px solid var(--divider);
-  border-radius: 10px;
-  padding: 8px;
-}
-
-.time-dropdowns {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.time-dropdowns select {
-  width: auto;
-  min-width: 58px;
-  text-align: center;
-  font-size: 14px !important;
-  font-weight: 700;
-  padding: 3px 6px;
-  background: var(--surface);
-  border: 1px solid var(--divider);
-  border-radius: 6px;
-  color: var(--ink);
-}
-
-.time-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  justify-content: center;
-}
-
-.time-chip {
-  background: var(--surface);
-  color: var(--mute);
-  border: 1px solid var(--divider);
-  border-radius: 6px;
-  padding: 3px 7px;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.time-chip.active, .time-chip:hover {
-  background: var(--acc);
-  color: #fff;
-  border-color: var(--acc);
-}
-
-/* SELETTORE AMICHEVOLE COMPATTO */
-.yn {
-  display: inline-flex;
-  background: var(--card);
-  border-radius: 8px;
-  padding: 2px;
-  border: 1px solid var(--divider);
-}
-
-.yn button {
-  background: transparent;
   border: none;
+  background: transparent;
   color: var(--mute);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 3px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all .15s ease;
-}
-
-.yn button[aria-pressed="true"] {
-  background: var(--acc);
-  color: #fff;
-  font-weight: 700;
-}
-
-/* ROSTER FIELDS IN GRIGLIA COMPATTA */
-.modal-roster-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 6px;
-}
-
-/* GRIGLIA IMPOSTAZIONI */
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin: 10px 0 16px;
-}
-
-.settings-card-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: var(--card);
-  border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 12px 10px;
-  color: var(--ink);
-  cursor: pointer;
-  transition: all .16s ease;
-  min-height: 72px;
-  box-shadow: var(--shadow-sm);
-}
-
-.settings-card-btn:hover {
-  background: var(--card-hover);
-  border-color: var(--acc);
-  transform: translateY(-2px);
-}
-
-.settings-card-btn .s-icon {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.settings-card-btn .s-label {
+  text-align: left;
   font-size: 13px;
   font-weight: 600;
-  text-align: center;
-}
-
-/* TABELLE RESOCONTO */
-.grand-total-box {
-  background: var(--card);
-  border-radius: 12px;
-  padding: 12px;
-  border: 1px solid var(--divider);
-}
-
-.grand-total-box h4 {
-  margin: 0 0 8px;
-  font: 700 15px var(--font-title);
-  color: var(--date);
-  text-transform: uppercase;
-}
-
-.modal table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.modal table th, 
-.modal table td {
-  padding: 8px 10px;
-  font-size: 13.5px;
-}
-
-.modal table th {
-  color: var(--mute);
-  font-size: 11px;
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--divider);
-  font-weight: 700;
-}
-
-.modal table th:not(:first-child),
-.modal table td:not(:first-child) {
-  text-align: right;
-}
-
-.resoconto-months {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 220px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.res-month-block {
-  background: var(--card);
-  border-radius: 10px;
-  padding: 8px 12px;
-  border: 1px solid var(--divider);
-}
-
-.res-month-block summary {
+  padding: 6px 10px;
+  border-radius: 6px;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 13.5px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  list-style: none;
 }
-.res-month-block summary::-webkit-details-marker { display: none; }
-
-/* PULSANTI ELIMINA COLLABORATORE / CATEGORIA ROTONDI */
-[data-rmname], [data-rmcat] {
-  width: 26px !important;
-  height: 26px !important;
-  min-height: 26px !important;
-  border-radius: 50% !important;
-  border: none !important;
-  background: rgba(239, 68, 68, 0.15) !important;
-  color: #f87171 !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  transition: all .15s ease !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
-
-[data-rmname]:hover, [data-rmcat]:hover {
-  background: #ef4444 !important;
-  color: #fff !important;
-  transform: scale(1.08) !important;
-}
-
-/* PULSANTI AZIONE IN BASSO */
-.mbtns {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.mbtns button {
-  min-height: 36px;
-  padding: 6px 16px;
-  border-radius: 8px;
-  border: none;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all .15s ease;
-}
-
-.mbtns button:not(.btn-primary-action) {
-  background: var(--card);
+.nav-week-link:hover {
+  background: var(--hl);
   color: var(--ink);
 }
-
-.mbtns button:not(.btn-primary-action):hover {
-  background: var(--hl);
+.nav-week-link.active-week {
+  background: var(--card);
+  color: var(--acc);
+  font-weight: 700;
 }
-
-.err {
-  color: var(--warn);
+.nav-badge-count {
   font-size: 12px;
-  font-weight: 600;
-  display: none;
-  margin: 4px 0 0;
+  opacity: 0.7;
 }
-.err.on { display: block; }
+
+/* TOAST */
+#msg {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  font-weight: 600;
+  font-size: 14.5px;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-left: 4px solid var(--acc);
+}
+#msg.on {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sync-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.sync-green { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
+.sync-orange { background: #f97316; box-shadow: 0 0 6px rgba(249, 115, 22, 0.5); }
+.sync-red { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); }
