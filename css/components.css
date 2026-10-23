@@ -204,9 +204,11 @@ body.ro .match { cursor: default; }
 }
 .match:active { transform: scale(0.99); }
 
+/* INCOMPLETO IN ARANCIONE #f97316 */
 .match.missing-t1:not(.ghost) {
-  border-left: 4px solid var(--warn);
+  border-left: 4px solid #f97316;
 }
+
 .match.conflict-match {
   border-left: 4px solid #ef4444;
   box-shadow: 0 4px 18px rgba(239, 68, 68, 0.25) !important;
@@ -274,7 +276,7 @@ body.ro .match { cursor: default; }
 }
 
 .m-actions { display: flex; gap: 6px; align-items: center; }
-.ghostBtn, .editBtn {
+.ghostBtn, .editBtn, .fipBtn {
   min-height: 30px;
   min-width: 30px;
   width: 30px;
@@ -283,7 +285,17 @@ body.ro .match { cursor: default; }
   font-size: 13px;
   border-radius: 8px;
   background: var(--surface);
+  color: var(--mute);
   box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: all .15s ease;
+}
+.fipBtn:hover {
+  background: var(--hl);
+  color: #38bdf8;
 }
 .ghostBtn[aria-pressed="true"] { background: #22c55e; color: #fff; }
 
@@ -316,7 +328,8 @@ body.ro .match { cursor: default; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.m-row .val.empty-req { color: var(--warn); font-weight: 600; font-style: italic; }
+/* DA ASSEGNARE IN ARANCIONE #f97316 */
+.m-row .val.empty-req { color: #f97316; font-weight: 700; font-style: italic; }
 .m-row .val.empty-opt { color: var(--mute); font-style: italic; }
 
 /* RECAP TABELLA */
