@@ -1,4 +1,4 @@
-import { STORAGE_KEYS, DEFAULT_FIP_LINKS } from './config.js';
+AVimport { STORAGE_KEYS, DEFAULT_FIP_LINKS } from './config.js';
 
 export const state = {
   READONLY: true,
