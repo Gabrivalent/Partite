@@ -5,7 +5,7 @@
   --card-hover: #2c2e30;
   --ink: #f8fafc;
   --mute: #94a3b8;
-  --line: transparent; /* Addio gabbia di bordi continui */
+  --line: transparent;
   --divider: rgba(255, 255, 255, 0.07);
   --acc: #2563eb;
   --acc-hover: #1d4ed8;
@@ -160,7 +160,7 @@ input, select, textarea {
   color: var(--mute);
   display: flex;
   align-items: center;
-  justify-content: center; /* Centra l'icona quando chiusa */
+  justify-content: center;
   padding: 0;
   cursor: pointer;
   transition: background .15s ease, color .15s ease;
@@ -204,7 +204,7 @@ input, select, textarea {
 }
 
 .rail-nav-item .label {
-  display: none; /* Nasconde il testo quando la rail è compressa */
+  display: none;
   font-size: 13.5px;
   font-weight: 600;
 }
@@ -212,7 +212,6 @@ input, select, textarea {
   display: inline-block;
 }
 
-/* GESTIONE ELEMENTI RISERVATI AGLI AMMINISTRATORI */
 body.ro .rail-nav-item.auth-only,
 body.ro .auth-only {
   display: none !important;
@@ -348,6 +347,29 @@ body.ro .auth-only {
   align-items: center;
   gap: 8px;
 }
+
+/* PULSANTE AZIONE A PILLOLA PER "OGGI" */
+.pill-btn-action {
+  background: var(--surface);
+  color: var(--ink);
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 14px;
+  min-height: 34px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all .16s ease;
+}
+.pill-btn-action:hover {
+  background: var(--hl);
+  color: var(--date);
+}
+.pill-btn-action:active {
+  transform: scale(0.96);
+}
+
 .btn-primary-action {
   background: var(--acc);
   color: #fff;
