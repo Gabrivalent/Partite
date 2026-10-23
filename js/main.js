@@ -7,6 +7,7 @@ import {
   saveMolt,
   saveNames,
   saveCategories,
+  saveFipLinks,
   applyTheme,
   pushUndo,
   popUndoState
@@ -2124,6 +2125,63 @@ function openPdfImportModal() {
   };
 }
 
+function openFipLinksModal() {
+  const isAuth = !state.READONLY;
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.id = 'fipLinksOv';
+
+  const defaultCats = ['U13', 'U14', 'U15', 'U17', 'U19'];
+  const allCats = Array.from(new Set([...defaultCats, ...state.categories]));
+
+  const rowsHtml = allCats.map(c => {
+    const val = state.fipLinks[c] || getCategoryFipUrl(c) || '';
+    return `
+      <div style="margin-bottom:8px">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--date);margin-bottom:3px">${esc(c)}</label>
+        <input type="url" data-fipcat="${esc(c)}" value="${esc(val)}" placeholder="Incolla link girone FIP..." ${isAuth ? '' : 'disabled'}>
+      </div>
+    `;
+  }).join('');
+
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Link Risultati FIP">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">🔗 Link Risultati FIP</h3>
+      <button id="fipCloseTop" class="pill-btn-sm" style="min-height:28px">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--mute);margin:-4px 0 12px">Inserisci i link dei campionati FIP per ciascuna categoria. Verrà mostrato il tasto 🌐 nelle card.</p>
+    <div style="max-height:260px;overflow-y:auto;padding-right:4px">${rowsHtml}</div>
+    <div class="mbtns" style="margin-top:14px">
+      <button type="button" id="fipCancel">Chiudi</button>
+      ${isAuth ? '<button type="button" class="btn-primary-action" id="fipSave">Salva</button>' : ''}
+    </div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#fipCancel').onclick = () => ov.remove();
+  ov.querySelector('#fipCloseTop').onclick = () => ov.remove();
+
+  if (isAuth) {
+    ov.querySelector('#fipSave').onclick = () => {
+      const inputs = ov.querySelectorAll('input[data-fipcat]');
+      inputs.forEach(inp => {
+        const c = inp.dataset.fipcat;
+        const val = inp.value.trim();
+        if (val) {
+          state.fipLinks[c] = val;
+        } else {
+          delete state.fipLinks[c];
+        }
+      });
+      saveFipLinks();
+      ov.remove();
+      render();
+      toast('Link FIP salvati!', 'success');
+    };
+  }
+}
+
 function openSettingsModal() {
   const isAuth = !state.READONLY;
   const ov = document.createElement('div');
@@ -2135,6 +2193,7 @@ function openSettingsModal() {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
       <button type="button" id="sBtnTheme" style="padding:10px;font-size:13px;border-radius:10px">🎨 Tema / Stile</button>
+      <button type="button" id="sBtnFip" style="padding:10px;font-size:13px;border-radius:10px">🔗 Link FIP</button>
       <button type="button" id="sBtnPrint" style="padding:10px;font-size:13px;border-radius:10px">🖨️ Stampa PDF</button>
       <button type="button" id="sBtnExport" style="padding:10px;font-size:13px;border-radius:10px">📤 Esporta JSON</button>
       ${isAuth ? `
@@ -2153,6 +2212,7 @@ function openSettingsModal() {
   ov.querySelector('#setCloseTop').onclick = () => ov.remove();
 
   ov.querySelector('#sBtnTheme').onclick = () => { ov.remove(); openThemeModal(); };
+  ov.querySelector('#sBtnFip').onclick = () => { ov.remove(); openFipLinksModal(); };
   ov.querySelector('#sBtnPrint').onclick = () => { ov.remove(); openPrintModal(); };
   ov.querySelector('#sBtnExport').onclick = () => { ov.remove(); openExportMultiModal(); };
   if (isAuth) {
