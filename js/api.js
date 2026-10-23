@@ -5,7 +5,8 @@ import {
   saveDLocalOnly,
   saveMoltLocal,
   saveNamesLocal,
-  saveCategoriesLocal
+  saveCategoriesLocal,
+  saveFipLinksLocal
 } from './state.js';
 
 export let sb = null;
@@ -71,12 +72,16 @@ export function applyCloudData(payload) {
   state.molt = raw.molt && typeof raw.molt === 'object' ? raw.molt : {};
   state.names = Array.isArray(raw.names) ? raw.names : [];
   state.categories = Array.isArray(raw.categories) ? raw.categories : [];
+  if (raw.fipLinks && typeof raw.fipLinks === 'object') {
+    state.fipLinks = Object.assign({}, state.fipLinks, raw.fipLinks);
+  }
 
   saveLocalOnly();
   saveDLocalOnly();
   saveMoltLocal();
   saveNamesLocal();
   saveCategoriesLocal();
+  saveFipLinksLocal();
   state.isDirty = false;
 
   if (onCloudDataAppliedCallback) onCloudDataAppliedCallback();
@@ -93,7 +98,8 @@ export async function cloudPushNow() {
         dayMeta: state.dayMeta,
         molt: state.molt,
         names: state.names,
-        categories: state.categories
+        categories: state.categories,
+        fipLinks: state.fipLinks
       },
       updated_at: new Date().toISOString()
     });
