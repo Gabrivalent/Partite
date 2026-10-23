@@ -437,7 +437,7 @@ body.ro .auth-only {
   font-weight: 700;
 }
 
-/* SCROLL E STRUTTURA CONTENUTI */
+/* SCROLL E CONTENUTI */
 .content-scroll {
   width: 100%;
   max-width: 1500px;
@@ -467,16 +467,16 @@ body.ro .auth-only {
   gap: 12px;
 }
 
-/* POSIZIONAMENTO A DUE COLONNE: SETTIMANE A SINISTRA (1), RIEPILOGO A DESTRA (2) */
+/* LAYOUT FLEX: SETTIMANE A SINISTRA (LARGA), RIEPILOGO A DESTRA (FISSO) */
 .mbody {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 28px;
-  align-items: start;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  width: 100%;
 }
 
 .mweeks {
-  grid-column: 1;
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -484,13 +484,14 @@ body.ro .auth-only {
 }
 
 .recap {
-  grid-column: 2;
+  width: 320px;
+  flex-shrink: 0;
   background: var(--surface);
   border-radius: 16px;
   padding: 18px;
   box-shadow: var(--shadow-sm);
   position: sticky;
-  top: 86px;
+  top: 80px;
 }
 .recap h4 {
   margin: 0 0 12px;
@@ -559,7 +560,7 @@ body.ro .auth-only {
   letter-spacing: .5px;
 }
 
-/* GRIGLIA PARTITE GRANDI E LEGGIBILI */
+/* GRIGLIA PARTITE */
 .matches {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -625,8 +626,8 @@ body.ro .robanner {
   display: block;
 }
 
-/* RESPONSIVE PER SMARTPHONE E TABLET */
-@media (max-width: 860px) {
+/* RESPONSIVE */
+@media (max-width: 900px) {
   .app-sidebar {
     position: fixed;
     left: -290px;
@@ -645,14 +646,11 @@ body.ro .robanner {
     justify-content: center;
   }
   .mbody {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     gap: 20px;
   }
-  .mweeks {
-    grid-column: 1;
-  }
   .recap {
-    grid-column: 1;
+    width: 100%;
     position: static;
   }
   .matches {
