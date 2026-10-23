@@ -535,6 +535,7 @@ body.ro .auth-only {
   padding: 12px 16px;
   box-shadow: var(--shadow-sm);
 }
+
 .week summary {
   display: flex;
   justify-content: space-between;
@@ -546,6 +547,13 @@ body.ro .auth-only {
   list-style: none;
 }
 .week summary::-webkit-details-marker { display: none; }
+
+/* SPAZIATURA TRA "X GARE" E PULSANTE WA */
+.week summary .n {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
 
 .day {
   margin-top: 14px;
