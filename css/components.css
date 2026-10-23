@@ -70,7 +70,6 @@ button:active { transform: scale(0.96); }
 .score-pill.loss { background: rgba(239, 68, 68, 0.2); color: #f87171; }
 .score-pill.suspended { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
 
-/* ALERT BADGE AUTONOMO */
 .alert-btn-standalone {
   min-height: 28px;
   padding: 0 10px;
@@ -97,7 +96,6 @@ button:active { transform: scale(0.96); }
 .sync-orange { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.6); }
 .sync-red { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.6); }
 
-/* ALBERO NAVIGAZIONE */
 .nav-tree details { margin-bottom: 4px; }
 .nav-tree summary {
   padding: 6px 8px;
@@ -139,7 +137,6 @@ button:active { transform: scale(0.96); }
 .nav-week-link.active-week { background: var(--acc); color: #fff; font-weight: 700; }
 .nav-badge-count { font-size: 11px; font-weight: 700; opacity: .85; }
 
-/* SETTIMANE E GIORNI */
 .week { margin: 8px 0 16px; padding-left: 12px; border-left: 3px solid var(--acc); border-radius: 0 10px 10px 0; }
 .week > summary { font: 600 16px var(--font-main); padding: 8px 0; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
 .week > summary .n { font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
@@ -180,7 +177,6 @@ button:active { transform: scale(0.96); }
   outline: none;
 }
 
-/* MATCH CARDS (SENZA GABBIA DI BORDI) */
 .matches { display: flex; flex-direction: column; gap: 12px; }
 
 .match {
@@ -204,11 +200,9 @@ body.ro .match { cursor: default; }
 }
 .match:active { transform: scale(0.99); }
 
-/* INCOMPLETO IN ARANCIONE #f97316 */
 .match.missing-t1:not(.ghost) {
   border-left: 4px solid #f97316;
 }
-
 .match.conflict-match {
   border-left: 4px solid #ef4444;
   box-shadow: 0 4px 18px rgba(239, 68, 68, 0.25) !important;
@@ -241,7 +235,6 @@ body.ro .match { cursor: default; }
 .cancelled-badge { background: #4c0519; color: #fecdd3; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; align-self: flex-start; }
 .match.cancelled .m-title { text-decoration: line-through; color: #fda4af; }
 
-/* INTESTAZIONE CARD: ORARIO IN RISALTO E TITOLO DOMINANTE */
 .m-card-header {
   display: flex;
   justify-content: space-between;
@@ -293,13 +286,10 @@ body.ro .match { cursor: default; }
   text-decoration: none;
   transition: all .15s ease;
 }
-.fipBtn:hover {
-  background: var(--hl);
-  color: #38bdf8;
-}
+.fipBtn:hover { background: var(--hl); color: #38bdf8; }
+.ghostBtn:hover, .editBtn:hover { background: var(--hl); color: var(--ink); }
 .ghostBtn[aria-pressed="true"] { background: #22c55e; color: #fff; }
 
-/* SLOTS COLLABORATORI (INVARIATI NELLA LOGICA) */
 .m-roster {
   display: grid;
   gap: 4px;
@@ -328,11 +318,9 @@ body.ro .match { cursor: default; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* DA ASSEGNARE IN ARANCIONE #f97316 */
 .m-row .val.empty-req { color: #f97316; font-weight: 700; font-style: italic; }
 .m-row .val.empty-opt { color: var(--mute); font-style: italic; }
 
-/* RECAP TABELLA */
 .recap {
   background: var(--surface);
   border-radius: 16px;
@@ -349,7 +337,6 @@ body.ro .match { cursor: default; }
 .recap .nb { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: var(--date); cursor: pointer; box-shadow: none; }
 .recap .nb:hover { text-decoration: underline; }
 
-/* SELETTORE ORARIO */
 .time-picker-box { background: var(--surface); border-radius: 12px; padding: 12px; display: grid; gap: 10px; }
 .time-dropdowns { display: flex; align-items: center; gap: 8px; justify-content: center; }
 .time-dropdowns select { font-size: 17px; font-weight: 700; padding: 6px 12px; border-radius: 8px; border: none; background: var(--card); color: var(--ink); text-align: center; }
