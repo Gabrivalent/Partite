@@ -7,7 +7,6 @@ import {
   saveMolt,
   saveNames,
   saveCategories,
-  saveFipLinks,
   applyTheme,
   pushUndo,
   popUndoState
@@ -143,20 +142,6 @@ function getMatchOutcome(item) {
   return null;
 }
 
-function getCategoryFipUrl(catStr) {
-  if (!catStr || !state.fipLinks) return null;
-  const cleaned = catStr.trim().toUpperCase().replace(/\s+/g, '');
-  if (state.fipLinks[cleaned]) return state.fipLinks[cleaned];
-
-  for (const k of Object.keys(state.fipLinks)) {
-    const testK = k.toUpperCase().replace(/\s+/g, '');
-    if (cleaned === testK || cleaned.startsWith(testK) || testK.startsWith(cleaned)) {
-      return state.fipLinks[k];
-    }
-  }
-  return null;
-}
-
 function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2, arb, targetCategory = '') {
   if (!date || !timeStr) return [];
 
@@ -250,6 +235,7 @@ function findConflictingMatches() {
   return conflicts;
 }
 
+// RAGGRUPPAMENTO DEI CONFLITTI IN COMPONENTI CONNESSE (CLUSTER)
 function getConflictClusters() {
   const conflictsMap = findConflictingMatches();
   const visited = new Set();
@@ -291,20 +277,21 @@ function getConflictClusters() {
   return clusters;
 }
 
+// CONTEGGIO ALERT: SE 3 GARE FANNO PARTE DELLO STESSO CONFLITTO -> CONTA 1!
 function updateAlertStatusBadge() {
   const btn = document.getElementById('conflictAlertBtn');
   const bNavIcon = document.getElementById('bNavAlertIcon');
   if (!btn) return;
 
   const clusters = getConflictClusters();
-  const clusterCount = clusters.length;
+  const clusterCount = clusters.length; // Conta i gruppi di conflitto reali
   const urgentIncomplete = getUrgentIncompleteMatches();
   const pendingPostponed = getPendingPostponedMatches();
 
   if (clusterCount > 0) {
     btn.className = 'alert-btn-standalone status-conflict';
     btn.textContent = `❗ ${clusterCount}`;
-    btn.title = `${clusterCount} gruppo/i di partite in conflitto di orario! Clicca per visualizzare.`;
+    btn.title = `${clusterCount} gruppo/i di partite in conflitto di orario! Clicca per risolvere.`;
     btn.onclick = openConflictsModal;
     if (bNavIcon) bNavIcon.textContent = `❗ ${clusterCount}`;
     return;
@@ -481,18 +468,20 @@ function openPendingModal() {
   </div>`;
 
   document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  const itemEl = e.target.closest('[data-goto]');
-  if (itemEl) {
-    const targetId = itemEl.dataset.goto;
-    ov.remove();
-    const targetMatch = state.items.find(x => x.id === targetId);
-    if (targetMatch) {
-      setParam('m', targetMatch.date.slice(0, 7));
-      setParam('s', iso(monday(targetMatch.date)));
-      openEditModal(targetId);
+  ov.addEventListener('click', e => {
+    if (e.target === ov) ov.remove();
+    const itemEl = e.target.closest('[data-goto]');
+    if (itemEl) {
+      const targetId = itemEl.dataset.goto;
+      ov.remove();
+      const targetMatch = state.items.find(x => x.id === targetId);
+      if (targetMatch) {
+        setParam('m', targetMatch.date.slice(0, 7));
+        setParam('s', iso(monday(targetMatch.date)));
+        openEditModal(targetId);
+      }
     }
-  }
+  });
   document.getElementById('pendClose').onclick = () => ov.remove();
   document.getElementById('pendCloseTop').onclick = () => ov.remove();
 }
@@ -875,6 +864,7 @@ function setParam(k, v) {
   render();
 }
 
+// INTESTAZIONE CARD RIDISEGNATA (ORARIO & SQUADRE IN PRIMO PIANO)
 function card(i, hasConflict, isUrgentIncomplete) {
   const isCancelled = i.status === 'annullata';
   const isPostponed = i.status === 'rinviata';
@@ -893,10 +883,6 @@ function card(i, hasConflict, isUrgentIncomplete) {
   const outcome = getMatchOutcome(i);
   const scoreHtml = outcome ? `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>` : '';
 
-  // ICONA FIP: COMPARE SOLO SE ESISTE IL LINK PER LA CATEGORIA
-  const fipUrl = getCategoryFipUrl(i.cat);
-  const fipBtnHtml = fipUrl ? `<a href="${esc(fipUrl)}" target="_blank" rel="noopener noreferrer" class="fipBtn" title="Apri risultati FIP (Nuova scheda)">🌐</a>` : '';
-
   let badgeHtml = '';
   if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
   else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da definire)'}</div>`;
@@ -912,7 +898,6 @@ function card(i, hasConflict, isUrgentIncomplete) {
         ${friendlyHtml}
       </div>
       <div class="m-actions">
-        ${fipBtnHtml}
         ${scoreHtml}
         ${!state.READONLY && !isCancelled ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Gestisci esito / Check">✓</button>` : ''}
         ${!state.READONLY && !i.ghost && !isCancelled && !isPostponed ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
@@ -1273,7 +1258,6 @@ export function render(focusId) {
     </details>`;
   }).join('');
 
-  // INVERSIONE CORRETTA: PRIMA LE SETTIMANE A SINISTRA, POI IL RIEPILOGO A DESTRA
   listEl.innerHTML = `<div class="selected-month-view">
     <div class="selected-month-header">
       <h2>
@@ -1283,8 +1267,8 @@ export function render(focusId) {
       <span style="color:var(--mute);font-weight:700;font-size:14px">${count} gare totali</span>
     </div>
     <div class="mbody">
-      <div class="mweeks">${wkHtml}</div>
       ${recapHTML(activeM)}
+      <div class="mweeks">${wkHtml}</div>
     </div>
   </div>`;
 
@@ -1371,7 +1355,7 @@ document.addEventListener('click', e => {
   }
 
   const matchCard = e.target.closest('.match');
-  if (matchCard && !state.READONLY && !e.target.closest('button') && !e.target.closest('a')) {
+  if (matchCard && !state.READONLY && !e.target.closest('button')) {
     const it = state.items.find(x => x.id === matchCard.dataset.id);
     if (it?.ghost && it.status !== 'rinviata') {
       toast('Partita con check: togli il ✓ per modificarla');
@@ -1948,332 +1932,11 @@ function promptLogin() {
   document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
 }
 
-function openSettingsModal() {
-  const ov = document.createElement('div');
-  ov.className = 'ov';
-  ov.id = 'settingsModalOv';
-
-  const isAuth = !state.READONLY;
-
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Impostazioni e Strumenti">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="margin:0">⚙️ Strumenti & Impostazioni</h3>
-      <button id="setCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
-    </div>
-
-    <div class="settings-grid">
-      <button type="button" class="settings-card-btn" id="sBtnTheme">
-        <span class="s-icon">🎨</span>
-        <span class="s-label">Tema / Stile</span>
-      </button>
-
-      <button type="button" class="settings-card-btn" id="sBtnFip">
-        <span class="s-icon">🔗</span>
-        <span class="s-label">Link Campionati</span>
-      </button>
-
-      <button type="button" class="settings-card-btn" id="sBtnPrint">
-        <span class="s-icon">🖨️</span>
-        <span class="s-label">Stampa PDF</span>
-      </button>
-
-      <button type="button" class="settings-card-btn" id="sBtnExport">
-        <span class="s-icon">📤</span>
-        <span class="s-label">Esporta JSON</span>
-      </button>
-
-      ${isAuth ? `
-        <button type="button" class="settings-card-btn" id="sBtnImport">
-          <span class="s-icon">📥</span>
-          <span class="s-label">Importa JSON</span>
-        </button>
-
-        <button type="button" class="settings-card-btn" id="sBtnPdf">
-          <span class="s-icon">📄</span>
-          <span class="s-label">Importa PDF</span>
-        </button>
-
-        <button type="button" class="settings-card-btn" id="sBtnNames">
-          <span class="s-icon">👥</span>
-          <span class="s-label">Collaboratori</span>
-        </button>
-
-        <button type="button" class="settings-card-btn" id="sBtnCat">
-          <span class="s-icon">🏷️</span>
-          <span class="s-label">Categorie</span>
-        </button>
-      ` : ''}
-    </div>
-
-    <div class="mbtns">
-      <button type="button" id="setClose" class="btn-primary-action" style="width:100%">Chiudi</button>
-    </div>
-  </div>`;
-
-  document.body.appendChild(ov);
-
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  ov.querySelector('#setClose').onclick = () => ov.remove();
-  ov.querySelector('#setCloseTop').onclick = () => ov.remove();
-
-  ov.querySelector('#sBtnTheme').onclick = () => { ov.remove(); openThemeModal(); };
-  ov.querySelector('#sBtnFip').onclick = () => { ov.remove(); openFipLinksModal(); };
-  ov.querySelector('#sBtnPrint').onclick = () => { ov.remove(); openPrintModal(); };
-  ov.querySelector('#sBtnExport').onclick = () => { ov.remove(); openExportMultiModal(); };
-
-  if (isAuth) {
-    ov.querySelector('#sBtnImport').onclick = () => { ov.remove(); $('#importFile')?.click(); };
-    ov.querySelector('#sBtnPdf').onclick = () => { ov.remove(); openPdfImportModal(); };
-    ov.querySelector('#sBtnNames').onclick = () => { ov.remove(); openNamesModal(); };
-    ov.querySelector('#sBtnCat').onclick = () => { ov.remove(); openCatModal(); };
-  }
-}
-
-function openFipLinksModal() {
-  const ov = document.createElement('div');
-  ov.className = 'ov';
-  ov.id = 'fipLinksOv';
-
-  const cats = Array.from(new Set([...state.categories, 'U13', 'U14', 'U15', 'U17', 'U19']));
-  const isAuth = !state.READONLY;
-
-  const rowsHtml = cats.map(c => {
-    const link = state.fipLinks[c] || getCategoryFipUrl(c) || '';
-    return `
-      <div style="margin-bottom:12px;background:var(--card);padding:10px 12px;border-radius:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <strong style="font-size:13.5px;color:var(--date)">${esc(c)}</strong>
-          ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--wa);text-decoration:none;font-weight:700">Testa link ↗</a>` : '<span style="font-size:11px;color:var(--mute)">Nessun link</span>'}
-        </div>
-        <input type="url" data-fipcat="${esc(c)}" value="${esc(link)}" placeholder="Incolla link FIP per ${esc(c)}..." ${isAuth ? '' : 'disabled'} style="font-size:12.5px!important;padding:6px 10px;width:100%">
-      </div>
-    `;
-  }).join('');
-
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Link Risultati FIP">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="margin:0">🔗 Link Risultati FIP</h3>
-      <button id="fipCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
-    </div>
-    <p style="font-size:12.5px;color:var(--mute);margin:-4px 0 12px">
-      ${isAuth ? 'Assegna a ciascuna categoria il rispettivo link del girone. Se presente, sulla partita apparirà l\'icona 🌐 per aprirlo al volo.' : 'Visualizzazione link assegnati ai vari campionati.'}
-    </p>
-
-    <div style="max-height:300px;overflow-y:auto;padding-right:4px">
-      ${rowsHtml}
-    </div>
-
-    <div class="mbtns" style="margin-top:14px">
-      <button type="button" id="fipCancel">Chiudi</button>
-      ${isAuth ? `<button type="button" class="btn-primary-action" id="fipSave">Salva Link</button>` : ''}
-    </div>
-  </div>`;
-
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  ov.querySelector('#fipCancel').onclick = () => ov.remove();
-  ov.querySelector('#fipCloseTop').onclick = () => ov.remove();
-
-  if (isAuth) {
-    ov.querySelector('#fipSave').onclick = () => {
-      const inputs = ov.querySelectorAll('input[data-fipcat]');
-      inputs.forEach(inp => {
-        const c = inp.dataset.fipcat;
-        const val = inp.value.trim();
-        if (val) {
-          state.fipLinks[c] = val;
-        } else {
-          delete state.fipLinks[c];
-        }
-      });
-      saveFipLinks();
-      ov.remove();
-      render();
-      toast('Link campionati salvati!', 'success');
-    };
-  }
-}
-
-function openThemeModal() {
-  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'themeOv';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Scegli Tema">
-    <h3>Tema / Stile</h3>
-    <div class="frow">
-      <label for="themeSelectModal">Aspetto grafico</label>
-      <select id="themeSelectModal">
-        <option value="default"${state.currentTheme === 'default' ? ' selected' : ''}>🎨 Standard Moderno</option>
-        <option value="synthwave"${state.currentTheme === 'synthwave' ? ' selected' : ''}>🕹 Synthwave Neon</option>
-        <option value="gazzetta"${state.currentTheme === 'gazzetta' ? ' selected' : ''}>📰 Gazzetta Rosa</option>
-        <option value="tv"${state.currentTheme === 'tv' ? ' selected' : ''}>📺 Tabellone TV</option>
-      </select>
-    </div>
-    <div class="mbtns"><button type="button" id="themeClose" class="btn-primary-action" style="width:100%">Fatto</button></div>
-  </div>`;
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  document.getElementById('themeSelectModal').onchange = e => applyTheme(e.target.value);
-  document.getElementById('themeClose').onclick = () => ov.remove();
-}
-
-function openPrintModal() {
-  const months = monthsWithData();
-  if (!months.length) { toast('Nessuna gara presente', 'warning'); return; }
-  const cur = params().get('m');
-  const def = months.includes(cur) ? cur : months[months.length - 1];
-  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'printOv';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Stampa PDF">
-    <h3>Stampa PDF</h3>
-    <div class="frow"><label for="pMonth">Mese</label>
-      <select id="pMonth">
-        ${months.map(m => `<option value="${m}"${m === def ? ' selected' : ''}>${monthLabel(m)}</option>`).join('')}
-      </select>
-    </div>
-    <div class="mbtns"><button type="button" id="pCancel">Annulla</button><button type="button" class="btn-primary-action" id="pGo">Genera PDF</button></div>
-  </div>`;
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
-  document.getElementById('pCancel').onclick = () => ov.remove();
-  document.getElementById('pGo').onclick = () => {
-    const m = document.getElementById('pMonth').value; ov.remove();
-    generateMonthPDF(m);
-  };
-}
-
-function openNamesModal() {
-  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'namesOv';
-  const rowsHtml = () => state.names.length
-    ? state.names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--divider)">
-        <span style="font-weight:600;font-size:14px">${esc(n)}</span>
-        <button type="button" data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px;background:rgba(239,68,68,0.2);color:#fca5a5">✕</button>
-      </div>`).join('')
-    : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessun nome inserito.</p>';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Nomi">
-    <h3>Elenco Collaboratori</h3>
-    <div id="namesListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:10px">${rowsHtml()}</div>
-    <div class="frow" style="display:flex;gap:8px"><input id="newNameInput" type="text" placeholder="Nuovo nome" style="flex:1"><button type="button" class="btn-primary-action" id="addNameBtn">Aggiungi</button></div>
-    <div class="mbtns"><button type="button" id="namesClose" style="width:100%">Chiudi</button></div>
-  </div>`;
-  document.body.appendChild(ov);
-  const refreshList = () => { document.getElementById('namesListWrap').innerHTML = rowsHtml(); };
-  ov.addEventListener('click', e => {
-    if (e.target === ov) { ov.remove(); return; }
-    const rm = e.target.closest('[data-rmname]');
-    if (rm) {
-      state.names = state.names.filter(n => n.toLowerCase() !== rm.dataset.rmname.toLowerCase());
-      saveNames(); renderNamesList(); refreshList(); return;
-    }
-    if (e.target.id === 'addNameBtn') {
-      const inp = document.getElementById('newNameInput'), v = inp.value.trim();
-      if (v && !state.names.some(n => n.toLowerCase() === v.toLowerCase())) {
-        state.names.push(v); state.names.sort((a, b) => a.localeCompare(b));
-        saveNames(); renderNamesList(); refreshList();
-      }
-      inp.value = ''; inp.focus();
-    }
-  });
-  document.getElementById('newNameInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addNameBtn').click(); } });
-  document.getElementById('namesClose').onclick = () => ov.remove();
-  document.getElementById('newNameInput').focus();
-}
-
-function openCatModal() {
-  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'catOv';
-  const rowsHtml = () => state.categories.length
-    ? state.categories.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--divider)"><span>${esc(c)}</span><button type="button" data-rmcat="${esc(c)}" style="min-height:26px;padding:2px 8px;font-size:12px;background:rgba(239,68,68,0.2);color:#fca5a5">✕</button></div>`).join('')
-    : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessuna categoria.</p>';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Categorie">
-    <h3>Categorie</h3>
-    <div id="catListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:10px">${rowsHtml()}</div>
-    <div class="frow" style="display:flex;gap:8px"><input id="newCatInput" type="text" placeholder="Es. U17" style="flex:1"><button type="button" class="btn-primary-action" id="addCatBtn">Aggiungi</button></div>
-    <div class="mbtns"><button type="button" id="catClose" style="width:100%">Chiudi</button></div>
-  </div>`;
-  document.body.appendChild(ov);
-  const refreshList = () => { document.getElementById('catListWrap').innerHTML = rowsHtml(); };
-  ov.addEventListener('click', e => {
-    if (e.target === ov) { ov.remove(); return; }
-    const rm = e.target.closest('[data-rmcat]');
-    if (rm) {
-      state.categories = state.categories.filter(c => c.toLowerCase() !== rm.dataset.rmcat.toLowerCase());
-      saveCategories(); renderCategoriesList(); refreshList(); return;
-    }
-    if (e.target.id === 'addCatBtn') {
-      const inp = document.getElementById('newCatInput'), v = inp.value.trim();
-      if (v && !state.categories.some(c => c.toLowerCase() === v.toLowerCase())) {
-        state.categories.push(v); state.categories.sort((a, b) => a.localeCompare(b));
-        saveCategories(); renderCategoriesList(); refreshList();
-      }
-      inp.value = ''; inp.focus();
-    }
-  });
-  document.getElementById('newCatInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addCatBtn').click(); } });
-  document.getElementById('catClose').onclick = () => ov.remove();
-  document.getElementById('newCatInput').focus();
-}
-
-function openPdfImportModal() {
-  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'pdfOv';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Importa PDF">
-    <h3>Importa da PDF</h3>
-    <div class="frow"><label for="pdfFile">File PDF</label><input id="pdfFile" type="file" accept="application/pdf,.pdf"></div>
-    <div class="frow"><label for="pdfTeam">Nome squadra di casa</label><input id="pdfTeam" type="text" placeholder="Es. VIS PERSICETO"></div>
-    <div class="mbtns"><button type="button" id="pdfCancel">Annulla</button><button type="button" class="btn-primary-action" id="pdfGo">Estrai</button></div>
-    <div id="pdfPreviewWrap" style="margin-top:10px;max-height:220px;overflow-y:auto"></div>
-    <div class="mbtns" id="pdfConfirmBtns" style="display:none;margin-top:10px"><button type="button" id="pdfAddAll" class="btn-primary-action" style="width:100%">Aggiungi al calendario</button></div>
-  </div>`;
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => {
-    if (e.target === ov) { ov.remove(); return; }
-    const rm = e.target.closest('[data-pf="rm"]');
-    if (rm) { state.pdfCandidates.splice(+rm.dataset.pi, 1); renderPdfPreview(); return; }
-  });
-  ov.addEventListener('input', e => {
-    const f = e.target.dataset.pf; if (!f || f === 'rm') return;
-    state.pdfCandidates[+e.target.dataset.pi][f] = e.target.value;
-  });
-  document.getElementById('pdfCancel').onclick = () => ov.remove();
-  document.getElementById('pdfGo').onclick = async () => {
-    const file = document.getElementById('pdfFile').files[0];
-    const team = document.getElementById('pdfTeam').value.trim();
-    if (!file || !team) { toast('Dati mancanti', 'warning'); return; }
-    if (!window.pdfjsLib) { toast('Libreria non caricata', 'warning'); return; }
-    const btn = document.getElementById('pdfGo'); btn.disabled = true; btn.textContent = 'Estrazione…';
-    try {
-      const lines = await pdfToLines(file);
-      state.pdfCandidates = extractHomeMatches(lines, team);
-      document.getElementById('pdfConfirmBtns').style.display = state.pdfCandidates.length ? 'flex' : 'none';
-      renderPdfPreview();
-    } catch(e) { toast('Errore lettura', 'warning'); }
-    btn.disabled = false; btn.textContent = 'Estrai';
-  };
-  document.getElementById('pdfAddAll').onclick = () => {
-    const valid = state.pdfCandidates.filter(c => c.date);
-    pushUndo();
-    valid.forEach(c => {
-      state.items.push({
-        id: uid(),
-        title: c.title,
-        date: c.date,
-        time: c.time || '',
-        cat: c.cat || '',
-        friendly: false,
-        score: '',
-        status: '',
-        t1: '', t2: '', arb: '',
-        ghost: false,
-        ts: Date.now()
-      });
-    });
-    save();
-    ov.remove();
-    render();
-    toast(`${valid.length} gare aggiunte`, 'success');
-  };
-}
-
 function bindEvents() {
   const authBtn = $('#authBtn');
   if (authBtn) authBtn.onclick = () => window.handleAuthClick();
 
+  // CONTROLLI SIDEBAR RAIL & DRAWER
   const sidebar = $('#appSidebar');
   const sidebarToggle = $('#sidebarToggleBtn');
   const mobileMenuBtn = $('#mobileMenuBtn');
@@ -2306,10 +1969,20 @@ function bindEvents() {
     }
   });
 
+  // VISTE SIDEBAR RAIL
   const railHome = $('#railNavHome');
   if (railHome) railHome.onclick = () => {
     const t = iso(new Date());
     setParam('m', t.slice(0, 7));
+    if (window.innerWidth < 860) closeMobileDrawer();
+  };
+
+  const railToday = $('#railNavToday');
+  if (railToday) railToday.onclick = () => {
+    triggerHaptic('light');
+    const t = iso(new Date());
+    setParam('m', t.slice(0, 7));
+    setParam('s', iso(monday(t)));
     if (window.innerWidth < 860) closeMobileDrawer();
   };
 
@@ -2319,24 +1992,7 @@ function bindEvents() {
     openResocontoModal();
   };
 
-  const railSettings = $('#railNavSettings');
-  if (railSettings) {
-    railSettings.onclick = () => {
-      if (window.innerWidth < 860) closeMobileDrawer();
-      openSettingsModal();
-    };
-  }
-
-  const todayTopBtn = $('#todayBtn');
-  if (todayTopBtn) {
-    todayTopBtn.onclick = () => {
-      triggerHaptic('light');
-      const t = iso(new Date());
-      setParam('m', t.slice(0, 7));
-      setParam('s', iso(monday(t)));
-    };
-  }
-
+  // VISTE BOTTOM BAR MOBILE
   const bNavHome = $('#bNavHome');
   if (bNavHome) bNavHome.onclick = () => {
     triggerHaptic('light');
@@ -2365,6 +2021,31 @@ function bindEvents() {
     if (btn) btn.click();
   };
 
+  // TEMA
+  const openThemeModal = () => {
+    const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'themeOv';
+    ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Scegli Tema">
+      <h3>Tema / Stile</h3>
+      <div class="frow">
+        <label for="themeSelectModal">Aspetto grafico</label>
+        <select id="themeSelectModal">
+          <option value="default"${state.currentTheme === 'default' ? ' selected' : ''}>🎨 Standard Moderno</option>
+          <option value="synthwave"${state.currentTheme === 'synthwave' ? ' selected' : ''}>🕹 Synthwave Neon</option>
+          <option value="gazzetta"${state.currentTheme === 'gazzetta' ? ' selected' : ''}>📰 Gazzetta Rosa</option>
+          <option value="tv"${state.currentTheme === 'tv' ? ' selected' : ''}>📺 Tabellone TV</option>
+        </select>
+      </div>
+      <div class="mbtns"><button type="button" id="themeClose" class="btn-primary-action" style="width:100%">Fatto</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    document.getElementById('themeSelectModal').onchange = e => applyTheme(e.target.value);
+    document.getElementById('themeClose').onclick = () => ov.remove();
+  };
+
+  const railTheme = $('#railNavTheme');
+  if (railTheme) railTheme.onclick = openThemeModal;
+
   const qSave = $('#quickSaveBtn');
   if (qSave) qSave.onclick = async () => {
     const ok = await cloudPushNow();
@@ -2376,6 +2057,34 @@ function bindEvents() {
     await cloudPullSafe(false);
     render();
     toast('Aggiornato!', 'success');
+  };
+
+  const railExp = $('#railNavExport');
+  if (railExp) railExp.onclick = openExportMultiModal;
+
+  const railPrint = $('#railNavPrint');
+  if (railPrint) railPrint.onclick = () => {
+    const months = monthsWithData();
+    if (!months.length) { toast('Nessuna gara presente', 'warning'); return; }
+    const cur = params().get('m');
+    const def = months.includes(cur) ? cur : months[months.length - 1];
+    const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'printOv';
+    ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Stampa PDF">
+      <h3>Stampa PDF</h3>
+      <div class="frow"><label for="pMonth">Mese</label>
+        <select id="pMonth">
+          ${months.map(m => `<option value="${m}"${m === def ? ' selected' : ''}>${monthLabel(m)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="mbtns"><button type="button" id="pCancel">Annulla</button><button type="button" class="btn-primary-action" id="pGo">Genera PDF</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    document.getElementById('pCancel').onclick = () => ov.remove();
+    document.getElementById('pGo').onclick = () => {
+      const m = document.getElementById('pMonth').value; ov.remove();
+      generateMonthPDF(m);
+    };
   };
 
   const addBtn = $('#add');
@@ -2408,6 +2117,90 @@ function bindEvents() {
     };
   }
 
+  // COLLABORATORI
+  const railNames = $('#railNavNames');
+  if (railNames) {
+    railNames.onclick = () => {
+      if (state.READONLY) return;
+      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'namesOv';
+      const rowsHtml = () => state.names.length
+        ? state.names.map(n => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--divider)">
+            <span style="font-weight:600;font-size:14px">${esc(n)}</span>
+            <button type="button" data-rmname="${esc(n)}" style="min-height:26px;padding:2px 8px;font-size:12px;background:rgba(239,68,68,0.2);color:#fca5a5">✕</button>
+          </div>`).join('')
+        : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessun nome inserito.</p>';
+      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Nomi">
+        <h3>Elenco Collaboratori</h3>
+        <div id="namesListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:10px">${rowsHtml()}</div>
+        <div class="frow" style="display:flex;gap:8px"><input id="newNameInput" type="text" placeholder="Nuovo nome" style="flex:1"><button type="button" class="btn-primary-action" id="addNameBtn">Aggiungi</button></div>
+        <div class="mbtns"><button type="button" id="namesClose" style="width:100%">Chiudi</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      const refreshList = () => { document.getElementById('namesListWrap').innerHTML = rowsHtml(); };
+      ov.addEventListener('click', e => {
+        if (e.target === ov) { ov.remove(); return; }
+        const rm = e.target.closest('[data-rmname]');
+        if (rm) {
+          state.names = state.names.filter(n => n.toLowerCase() !== rm.dataset.rmname.toLowerCase());
+          saveNames(); renderNamesList(); refreshList(); return;
+        }
+        if (e.target.id === 'addNameBtn') {
+          const inp = document.getElementById('newNameInput'), v = inp.value.trim();
+          if (v && !state.names.some(n => n.toLowerCase() === v.toLowerCase())) {
+            state.names.push(v); state.names.sort((a, b) => a.localeCompare(b));
+            saveNames(); renderNamesList(); refreshList();
+          }
+          inp.value = ''; inp.focus();
+        }
+      });
+      document.getElementById('newNameInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addNameBtn').click(); } });
+      document.getElementById('namesClose').onclick = () => ov.remove();
+      document.getElementById('newNameInput').focus();
+    };
+  }
+
+  // CATEGORIE
+  const railCat = $('#railNavCat');
+  if (railCat) {
+    railCat.onclick = () => {
+      if (state.READONLY) return;
+      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'catOv';
+      const rowsHtml = () => state.categories.length
+        ? state.categories.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--divider)"><span>${esc(c)}</span><button type="button" data-rmcat="${esc(c)}" style="min-height:26px;padding:2px 8px;font-size:12px;background:rgba(239,68,68,0.2);color:#fca5a5">✕</button></div>`).join('')
+        : '<p style="color:var(--mute);font-size:13px;margin:4px 0">Nessuna categoria.</p>';
+      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Categorie">
+        <h3>Categorie</h3>
+        <div id="catListWrap" style="max-height:220px;overflow-y:auto;margin-bottom:10px">${rowsHtml()}</div>
+        <div class="frow" style="display:flex;gap:8px"><input id="newCatInput" type="text" placeholder="Es. U17" style="flex:1"><button type="button" class="btn-primary-action" id="addCatBtn">Aggiungi</button></div>
+        <div class="mbtns"><button type="button" id="catClose" style="width:100%">Chiudi</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      const refreshList = () => { document.getElementById('catListWrap').innerHTML = rowsHtml(); };
+      ov.addEventListener('click', e => {
+        if (e.target === ov) { ov.remove(); return; }
+        const rm = e.target.closest('[data-rmcat]');
+        if (rm) {
+          state.categories = state.categories.filter(c => c.toLowerCase() !== rm.dataset.rmcat.toLowerCase());
+          saveCategories(); renderCategoriesList(); refreshList(); return;
+        }
+        if (e.target.id === 'addCatBtn') {
+          const inp = document.getElementById('newCatInput'), v = inp.value.trim();
+          if (v && !state.categories.some(c => c.toLowerCase() === v.toLowerCase())) {
+            state.categories.push(v); state.categories.sort((a, b) => a.localeCompare(b));
+            saveCategories(); renderCategoriesList(); refreshList();
+          }
+          inp.value = ''; inp.focus();
+        }
+      });
+      document.getElementById('newCatInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addCatBtn').click(); } });
+      document.getElementById('catClose').onclick = () => ov.remove();
+      document.getElementById('newCatInput').focus();
+    };
+  }
+
+  const railImport = $('#railNavImport');
+  if (railImport) railImport.onclick = () => $('#importFile')?.click();
+
   const impF = $('#importFile');
   if (impF) {
     impF.onchange = e => {
@@ -2429,6 +2222,70 @@ function bindEvents() {
         } catch(err) { toast('File non valido', 'warning'); }
       };
       reader.readAsText(file);
+    };
+  }
+
+  const railPdf = $('#railNavPdf');
+  if (railPdf) {
+    railPdf.onclick = () => {
+      if (state.READONLY) return;
+      const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'pdfOv';
+      ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Importa PDF">
+        <h3>Importa da PDF</h3>
+        <div class="frow"><label for="pdfFile">File PDF</label><input id="pdfFile" type="file" accept="application/pdf,.pdf"></div>
+        <div class="frow"><label for="pdfTeam">Nome squadra di casa</label><input id="pdfTeam" type="text" placeholder="Es. VIS PERSICETO"></div>
+        <div class="mbtns"><button type="button" id="pdfCancel">Annulla</button><button type="button" class="btn-primary-action" id="pdfGo">Estrai</button></div>
+        <div id="pdfPreviewWrap" style="margin-top:10px;max-height:220px;overflow-y:auto"></div>
+        <div class="mbtns" id="pdfConfirmBtns" style="display:none;margin-top:10px"><button type="button" id="pdfAddAll" class="btn-primary-action" style="width:100%">Aggiungi al calendario</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      ov.addEventListener('click', e => {
+        if (e.target === ov) { ov.remove(); return; }
+        const rm = e.target.closest('[data-pf="rm"]');
+        if (rm) { state.pdfCandidates.splice(+rm.dataset.pi, 1); renderPdfPreview(); return; }
+      });
+      ov.addEventListener('input', e => {
+        const f = e.target.dataset.pf; if (!f || f === 'rm') return;
+        state.pdfCandidates[+e.target.dataset.pi][f] = e.target.value;
+      });
+      document.getElementById('pdfCancel').onclick = () => ov.remove();
+      document.getElementById('pdfGo').onclick = async () => {
+        const file = document.getElementById('pdfFile').files[0];
+        const team = document.getElementById('pdfTeam').value.trim();
+        if (!file || !team) { toast('Dati mancanti', 'warning'); return; }
+        if (!window.pdfjsLib) { toast('Libreria non caricata', 'warning'); return; }
+        const btn = document.getElementById('pdfGo'); btn.disabled = true; btn.textContent = 'Estrazione…';
+        try {
+          const lines = await pdfToLines(file);
+          state.pdfCandidates = extractHomeMatches(lines, team);
+          document.getElementById('pdfConfirmBtns').style.display = state.pdfCandidates.length ? 'flex' : 'none';
+          renderPdfPreview();
+        } catch(e) { toast('Errore lettura', 'warning'); }
+        btn.disabled = false; btn.textContent = 'Estrai';
+      };
+      document.getElementById('pdfAddAll').onclick = () => {
+        const valid = state.pdfCandidates.filter(c => c.date);
+        pushUndo();
+        valid.forEach(c => {
+          state.items.push({
+            id: uid(),
+            title: c.title,
+            date: c.date,
+            time: c.time || '',
+            cat: c.cat || '',
+            friendly: false,
+            score: '',
+            status: '',
+            t1: '', t2: '', arb: '',
+            ghost: false,
+            ts: Date.now()
+          });
+        });
+        save();
+        ov.remove();
+        render();
+        toast(`${valid.length} gare aggiunte`, 'success');
+      };
     };
   }
 }
