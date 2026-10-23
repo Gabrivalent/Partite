@@ -481,20 +481,18 @@ function openPendingModal() {
   </div>`;
 
   document.body.appendChild(ov);
-  ov.addEventListener('click', e => {
-    if (e.target === ov) ov.remove();
-    const itemEl = e.target.closest('[data-goto]');
-    if (itemEl) {
-      const targetId = itemEl.dataset.goto;
-      ov.remove();
-      const targetMatch = state.items.find(x => x.id === targetId);
-      if (targetMatch) {
-        setParam('m', targetMatch.date.slice(0, 7));
-        setParam('s', iso(monday(targetMatch.date)));
-        openEditModal(targetId);
-      }
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  const itemEl = e.target.closest('[data-goto]');
+  if (itemEl) {
+    const targetId = itemEl.dataset.goto;
+    ov.remove();
+    const targetMatch = state.items.find(x => x.id === targetId);
+    if (targetMatch) {
+      setParam('m', targetMatch.date.slice(0, 7));
+      setParam('s', iso(monday(targetMatch.date)));
+      openEditModal(targetId);
     }
-  });
+  }
   document.getElementById('pendClose').onclick = () => ov.remove();
   document.getElementById('pendCloseTop').onclick = () => ov.remove();
 }
@@ -1275,6 +1273,7 @@ export function render(focusId) {
     </details>`;
   }).join('');
 
+  // INVERSIONE CORRETTA: PRIMA LE SETTIMANE A SINISTRA, POI IL RIEPILOGO A DESTRA
   listEl.innerHTML = `<div class="selected-month-view">
     <div class="selected-month-header">
       <h2>
@@ -1284,8 +1283,8 @@ export function render(focusId) {
       <span style="color:var(--mute);font-weight:700;font-size:14px">${count} gare totali</span>
     </div>
     <div class="mbody">
-      ${recapHTML(activeM)}
       <div class="mweeks">${wkHtml}</div>
+      ${recapHTML(activeM)}
     </div>
   </div>`;
 
@@ -2030,7 +2029,6 @@ function openSettingsModal() {
   }
 }
 
-// MODALE GESTIONE LINK FIP CAMPIONATI
 function openFipLinksModal() {
   const ov = document.createElement('div');
   ov.className = 'ov';
