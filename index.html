@@ -35,7 +35,7 @@
       <span class="sidebar-brand-label">Menu Partite</span>
     </div>
 
-    <!-- AZIONI RAPIDE ICON RAIL -->
+    <!-- AZIONI PRINCIPALI IN CIMA -->
     <nav class="sidebar-nav">
       <button type="button" class="rail-nav-item active" id="railNavHome" title="Partite">
         <span class="icon">🏀</span>
@@ -49,44 +49,21 @@
         <span class="icon">📊</span>
         <span class="label">Compensi</span>
       </button>
-      <button type="button" class="rail-nav-item auth-only" id="railNavNames" title="Gestione Collaboratori">
-        <span class="icon">👥</span>
-        <span class="label">Collaboratori</span>
-      </button>
-      <button type="button" class="rail-nav-item auth-only" id="railNavCat" title="Gestione Categorie">
-        <span class="icon">🏷️</span>
-        <span class="label">Categorie</span>
-      </button>
-      <button type="button" class="rail-nav-item auth-only" id="railNavPdf" title="Importa PDF">
-        <span class="icon">📄</span>
-        <span class="label">Importa PDF</span>
-      </button>
-      <button type="button" class="rail-nav-item" id="railNavPrint" title="Stampa PDF">
-        <span class="icon">🖨️</span>
-        <span class="label">Stampa PDF</span>
-      </button>
-      <button type="button" class="rail-nav-item" id="railNavExport" title="Esporta JSON">
-        <span class="icon">📤</span>
-        <span class="label">Esporta JSON</span>
-      </button>
-      <button type="button" class="rail-nav-item auth-only" id="railNavImport" title="Importa JSON">
-        <span class="icon">📥</span>
-        <span class="label">Importa JSON</span>
-      </button>
-      <button type="button" class="rail-nav-item" id="railNavTheme" title="Tema Grafico">
-        <span class="icon">🎨</span>
-        <span class="label">Tema / Stile</span>
-      </button>
     </nav>
 
-    <!-- ALBERO CRONOLOGICO (Visibile quando espanso) -->
+    <!-- ALBERO CRONOLOGICO ALZATO SUBITO SOTTO -->
     <div class="sidebar-tree-container">
       <div class="sidebar-section-title">Archivio Calendario</div>
       <div id="navTree" class="nav-tree"></div>
     </div>
 
-    <!-- STATO SINCRONIZZAZIONE E LOGIN IN FONDO -->
+    <!-- IN FONDO: IMPOSTAZIONI (⚙️), STATO E LOGIN -->
     <div class="sidebar-bottom">
+      <button type="button" class="rail-nav-item" id="railNavSettings" title="Strumenti & Impostazioni">
+        <span class="icon">⚙️</span>
+        <span class="label">Impostazioni</span>
+      </button>
+
       <div class="rail-sync-wrap" id="railSyncWrap">
         <span id="syncDot" class="sync-dot sync-green" title="Pronto"></span>
         <span class="sync-text-status" id="syncStatusText">Connesso</span>
@@ -138,7 +115,7 @@
   </div>
 </div>
 
-<!-- BOTTOM BAR MOBILE (STILE INSTAGRAM CON '+' AL CENTRO) -->
+<!-- BOTTOM BAR MOBILE -->
 <nav class="bottom-nav-bar" id="bottomNavBar">
   <button type="button" class="b-nav-item active" id="bNavHome">
     <span class="b-nav-icon">🏀</span>
