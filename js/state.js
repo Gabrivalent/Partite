@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from './config.js';
+import { STORAGE_KEYS, DEFAULT_FIP_LINKS } from './config.js';
 
 export const state = {
   READONLY: true,
@@ -8,6 +8,7 @@ export const state = {
   molt: {},
   names: [],
   categories: [],
+  fipLinks: JSON.parse(localStorage.getItem('partite-fip-v1') || JSON.stringify(DEFAULT_FIP_LINKS)),
   isDirty: false,
   filterCat: '',
   filterIncomplete: false,
@@ -69,11 +70,19 @@ export const saveCategoriesLocal = () => {
   state.isDirty = true;
 };
 
+export const saveFipLinksLocal = () => {
+  try {
+    localStorage.setItem('partite-fip-v1', JSON.stringify(state.fipLinks));
+  } catch(e) { console.error('Errore salvataggio fipLinks locale', e); }
+  state.isDirty = true;
+};
+
 export const save = () => { saveLocalOnly(); if (onSaveCallback) onSaveCallback(); };
 export const saveD = () => { saveDLocalOnly(); if (onSaveCallback) onSaveCallback(); };
 export const saveMolt = () => { saveMoltLocal(); if (onSaveCallback) onSaveCallback(); };
 export const saveNames = () => { saveNamesLocal(); if (onSaveCallback) onSaveCallback(); };
 export const saveCategories = () => { saveCategoriesLocal(); if (onSaveCallback) onSaveCallback(); };
+export const saveFipLinks = () => { saveFipLinksLocal(); if (onSaveCallback) onSaveCallback(); };
 
 export function applyTheme(themeName) {
   state.currentTheme = themeName;
