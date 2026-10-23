@@ -21,3 +21,11 @@ export const APP_ICONS = {
   icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="110" fill="%231d5fa8"/%3E%3Ccircle cx="256" cy="256" r="160" fill="none" stroke="white" stroke-width="28"/%3E%3C/svg%3E',
   badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"%3E%3Crect width="512" height="512" rx="256" fill="%231d5fa8"/%3E%3C/svg%3E'
 };
+
+export const DEFAULT_FIP_LINKS = {
+  'U13': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U13S/M&codice_fase=1&codice_girone=86464',
+  'U14': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U14S/M&codice_fase=1&codice_girone=86449',
+  'U15': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U15G/M&codice_fase=1&codice_girone=85540',
+  'U17': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U17S/M&codice_fase=1&codice_girone=86381',
+  'U19': 'https://fip.it/risultati/?group=campionati-regionali&regione_codice=EM&comitato_codice=REM&sesso=M&codice_campionato=U19S/M&codice_fase=1&codice_girone=86357'
+};
