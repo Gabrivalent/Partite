@@ -1653,7 +1653,7 @@ function monthsWithData() {
 function monthLabel(m) { return new Date(m + '-15T12:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); }
 
 async function pdfToLines(file) {
-  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = '[https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js](https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js)';
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf = await file.arrayBuffer();
   const doc = await pdfjsLib.getDocument({ data: buf }).promise;
   const lines = [];
@@ -2206,15 +2206,6 @@ function bindEvents() {
     if (window.innerWidth < 860) closeMobileDrawer();
   };
 
-  const railToday = $('#railNavToday');
-  if (railToday) railToday.onclick = () => {
-    triggerHaptic('light');
-    const t = iso(new Date());
-    setParam('m', t.slice(0, 7));
-    setParam('s', iso(monday(t)));
-    if (window.innerWidth < 860) closeMobileDrawer();
-  };
-
   const railRes = $('#railNavResoconto');
   if (railRes) railRes.onclick = () => {
     if (window.innerWidth < 860) closeMobileDrawer();
@@ -2223,6 +2214,16 @@ function bindEvents() {
 
   const railSettings = $('#railNavSettings');
   if (railSettings) railSettings.onclick = openSettingsModal;
+
+  const todayTopBtn = $('#todayBtn');
+  if (todayTopBtn) {
+    todayTopBtn.onclick = () => {
+      triggerHaptic('light');
+      const t = iso(new Date());
+      setParam('m', t.slice(0, 7));
+      setParam('s', iso(monday(t)));
+    };
+  }
 
   const bNavHome = $('#bNavHome');
   if (bNavHome) bNavHome.onclick = () => {
