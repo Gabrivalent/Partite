@@ -35,15 +35,11 @@
       <span class="sidebar-brand-label">Menu Partite</span>
     </div>
 
-    <!-- AZIONI PRINCIPALI IN CIMA -->
+    <!-- AZIONI PRINCIPALI IN CIMA (SENZA OGGI, SPOSTATO NELLA TOP BAR) -->
     <nav class="sidebar-nav">
       <button type="button" class="rail-nav-item active" id="railNavHome" title="Partite">
         <span class="icon">🏀</span>
         <span class="label">Partite</span>
-      </button>
-      <button type="button" class="rail-nav-item" id="railNavToday" title="Oggi">
-        <span class="icon">📅</span>
-        <span class="label">Oggi</span>
       </button>
       <button type="button" class="rail-nav-item" id="railNavResoconto" title="Resoconto Compensi">
         <span class="icon">📊</span>
@@ -81,7 +77,7 @@
   <!-- AREA PRINCIPALE CONTENUTO -->
   <div class="app-content-wrapper">
     
-    <!-- TOP BAR SNELITA -->
+    <!-- TOP BAR -->
     <header class="top-bar">
       <div class="top-bar-left">
         <button id="mobileMenuBtn" type="button" class="mobile-menu-btn" title="Apri Menu">☰</button>
@@ -90,6 +86,8 @@
       </div>
 
       <div class="top-bar-actions">
+        <!-- TASTO OGGI ACCANTO A + PARTITA -->
+        <button id="todayBtn" type="button" class="pill-btn-action" title="Vai a Oggi">Oggi</button>
         <button id="add" type="button" class="btn-primary-action auth-only">+ Partita</button>
         <button id="undoBtn" type="button" class="pill-btn-sm auth-only" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
         <button id="quickSaveBtn" class="pill-btn-sm auth-only" title="Salva modifiche (Ctrl+S)">💾</button>
