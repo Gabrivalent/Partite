@@ -467,3 +467,20 @@ body.ro .auth-only {
   border-radius: 16px;
   box-shadow: var(--shadow-sm);
 }
+
+/* Regole per la protezione e sola lettura */
+body.locked .app-content-wrapper { display: none !important; }
+body.locked .bottom-nav-bar { display: none !important; }
+body:not(.locked) .robanner { display: none !important; }
+
+.robanner {
+  margin: 60px auto;
+  max-width: 440px;
+  padding: 30px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 15px;
+  line-height: 1.6;
+  text-align: center;
+}
