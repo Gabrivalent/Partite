@@ -582,6 +582,59 @@ function openMoltModal(name, counts, month) {
   document.getElementById('mp').focus();
 }
 
+function openCompensiDetailModal(name, r, month) {
+  triggerHaptic('light');
+  const key = name.toLowerCase();
+  const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[key]);
+  const totPartite = r.p * v.p;
+  const totAp = r.a * v.a;
+  const totCh = r.c * v.c;
+  const grandTot = totPartite + totAp + totCh;
+
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Dettaglio Compenso">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">${esc(name)}</h3>
+      <button id="detCloseTop" class="pill-btn-sm" style="min-height:28px">✕</button>
+    </div>
+    <div style="background:var(--card);border-radius:12px;padding:12px;margin-bottom:14px;display:grid;gap:8px">
+      <div style="display:flex;justify-content:space-between;font-size:13.5px">
+        <span>Partite (${r.p} × ${v.p}€)</span>
+        <strong>${totPartite}€</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13.5px">
+        <span>Aperture (${r.a} × ${v.a}€)</span>
+        <strong>${totAp}€</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13.5px">
+        <span>Chiusure (${r.c} × ${v.c}€)</span>
+        <strong>${totCh}€</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;border-top:1px solid var(--divider);padding-top:8px;color:#4ade80">
+        <span>Totale Riconosciuto</span>
+        <span>${grandTot}€</span>
+      </div>
+    </div>
+    <div class="mbtns" style="display:flex;gap:8px">
+      ${!state.READONLY ? `<button type="button" id="detEditMolt" class="pill-btn-action" style="flex:1">⚙️ Tariffe</button>` : ''}
+      <button type="button" class="btn-primary-action" id="detClose" style="flex:1">Chiudi</button>
+    </div>
+  </div>`;
+
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#detClose').onclick = () => ov.remove();
+  ov.querySelector('#detCloseTop').onclick = () => ov.remove();
+
+  if (!state.READONLY) {
+    ov.querySelector('#detEditMolt').onclick = () => {
+      ov.remove();
+      openMoltModal(name, { p: r.p, a: r.a, c: r.c }, month);
+    };
+  }
+}
+
 function openQuickCloseModal(matchId) {
   const it = state.items.find(x => x.id === matchId);
   if (!it) return;
@@ -860,20 +913,38 @@ function computeRecapRows(m) {
     if (x.ap === 'si') add(x.apNome, 'a');
     if (x.ch === 'si') add(x.chNome, 'c');
   });
-  return Object.values(rec).sort((a, b) => b.p - a.p || b.a - a.a || a.n.localeCompare(b.n));
+  return Object.values(rec).sort((a, b) => b.p - a.p || (b.a + b.c) - (a.a + a.c) || a.n.localeCompare(b.n));
 }
 
 function recapHTML(m) {
   if (state.READONLY) return '';
 
   const rows = computeRecapRows(m);
-  return `<aside class="recap" data-m="${m}"><h4>Riepilogo del mese</h4>` + (rows.length
-    ? `<table><thead><tr><th>Nome</th><th>Part.</th><th>Ap/Ch</th><th>Totale</th></tr></thead><tbody>${rows.map(r => {
-        const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
-        const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
-        return `<tr><td><button class="nb" data-name="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}" title="Modifica moltiplicatore o filtra">${esc(r.n)}</button></td><td>${pv}</td><td>${av}</td><td>${tot}€</td></tr>`;
-      }).join('')}</tbody></table>`
-    : '<p>Nessun dato (partite con check ✓).</p>') + '</aside>';
+  if (!rows.length) {
+    return `<aside class="recap" data-m="${m}"><h4>Riepilogo del mese</h4><p>Nessun dato (partite con check ✓).</p></aside>`;
+  }
+
+  const itemsHtml = rows.map(r => {
+    const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
+    const tot = (r.p * v.p) + (r.a * v.a) + (r.c * v.c);
+    const subText = `${r.p} part. • ${r.a + r.c} ap/ch`;
+    
+    return `<div class="recap-item-compact" data-compname="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}" title="Clicca per aprire dettaglio">
+      <div class="recap-item-left">
+        <span class="recap-item-name">${esc(r.n)}</span>
+        <span class="recap-item-sub">${subText}</span>
+      </div>
+      <span class="recap-item-amount">${tot}€</span>
+    </div>`;
+  }).join('');
+
+  return `<aside class="recap" data-m="${m}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h4>Riepilogo del mese</h4>
+      <span style="font-size:11px;color:var(--mute)">Tocca per dettagli</span>
+    </div>
+    <div class="recap-list-wrap">${itemsHtml}</div>
+  </aside>`;
 }
 
 function updateRecap(m) { const el = document.querySelector(`.recap[data-m="${m}"]`); if (el) el.outerHTML = recapHTML(m); }
@@ -907,21 +978,21 @@ function card(i, hasConflict, isUrgentIncomplete) {
   const missingReq = isMissingRequirements(i);
 
   const t1Val = (i.t1 && i.t1.trim()) 
-    ? `<span class="val clickable-person" data-quickperson="${esc(i.t1.trim())}" title="Filtra gare di ${esc(i.t1.trim())}">${esc(i.t1.trim())}</span>`
-    : '<span class="empty-req">Da assegnare</span>';
+    ? `<span class="clickable-person" data-quickperson="${esc(i.t1.trim())}">${esc(i.t1.trim())}</span>`
+    : '<span class="empty-req">Manca</span>';
 
   const t2Required = !i.friendly;
   const t2Val = (i.t2 && i.t2.trim())
-    ? `<span class="val clickable-person" data-quickperson="${esc(i.t2.trim())}" title="Filtra gare di ${esc(i.t2.trim())}">${esc(i.t2.trim())}</span>`
-    : (t2Required ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">—</span>');
+    ? `<span class="clickable-person" data-quickperson="${esc(i.t2.trim())}">${esc(i.t2.trim())}</span>`
+    : (t2Required ? '<span class="empty-req">Manca</span>' : '<span class="empty-opt">—</span>');
 
   const arbNeeded = isRefereeNeeded(i.cat, i.friendly);
   const arbVal = (i.arb && i.arb.trim())
-    ? `<span class="val clickable-person" data-quickperson="${esc(i.arb.trim())}" title="Filtra gare di ${esc(i.arb.trim())}">${esc(i.arb.trim())}</span>`
-    : (arbNeeded ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">Federazione</span>');
+    ? `<span class="clickable-person" data-quickperson="${esc(i.arb.trim())}">${esc(i.arb.trim())}</span>`
+    : (arbNeeded ? '<span class="empty-req">Manca</span>' : '<span class="empty-opt">FIP</span>');
 
   const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
-  const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Partita Amichevole">A</span>` : '';
+  const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Amichevole">A</span>` : '';
 
   const outcome = getMatchOutcome(i);
   const scoreHtml = outcome ? `<span class="score-pill ${outcome.type}">${esc(outcome.label)}</span>` : '';
@@ -931,14 +1002,14 @@ function card(i, hasConflict, isUrgentIncomplete) {
 
   let badgeHtml = '';
   if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
-  else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da definire)'}</div>`;
-  else if (hasConflict && !state.READONLY) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO ORARIO</div>`;
-  else if (isUrgentIncomplete && !state.READONLY) badgeHtml = `<div class="urgent-badge">⏰ IMMINENTE INCOMPLETA</div>`;
+  else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da def.)'}</div>`;
+  else if (hasConflict && !state.READONLY) badgeHtml = `<div class="conflict-badge">⚠️ CONFLITTO</div>`;
+  else if (isUrgentIncomplete && !state.READONLY) badgeHtml = `<div class="urgent-badge">⏰ INCOMPLETA</div>`;
 
   return `<div class="match${isCancelled ? ' cancelled' : (isPostponed ? ' postponed' : (ghostOn ? ' ghost' : ''))}${missingReq && !state.READONLY ? ' missing-t1' : ''}${hasConflict && !state.READONLY ? ' conflict-match' : ''}${isUrgentIncomplete && !state.READONLY ? ' urgent-incomplete' : ''}" data-id="${i.id}">
     ${badgeHtml}
     <div class="m-card-header">
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:6px">
         <span class="m-time-pill">${i.time || '--:--'}</span>
         ${catHtml}
         ${friendlyHtml}
@@ -946,17 +1017,26 @@ function card(i, hasConflict, isUrgentIncomplete) {
       <div class="m-actions">
         ${fipBtnHtml}
         ${scoreHtml}
-        ${!state.READONLY && !isCancelled ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Gestisci esito / Check">✓</button>` : ''}
-        ${!state.READONLY && !i.ghost && !isCancelled && !isPostponed ? `<button class="editBtn" data-edit title="Modifica dettagli">✏️</button>` : ''}
+        ${!state.READONLY && !isCancelled ? `<button class="ghostBtn" data-ghost aria-pressed="${!!i.ghost}" title="Esito / Check">✓</button>` : ''}
+        ${!state.READONLY && !i.ghost && !isCancelled && !isPostponed ? `<button class="editBtn" data-edit title="Modifica">✏️</button>` : ''}
       </div>
     </div>
     
     <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita senza titolo'}</div>
 
-    <div class="m-roster">
-      <div class="m-row"><span class="lbl">Tavolo 1</span><span class="val-box">${t1Val}</span></div>
-      <div class="m-row"><span class="lbl">Tavolo 2</span><span class="val-box">${t2Val}</span></div>
-      <div class="m-row"><span class="lbl">Arbitro</span><span class="val-box">${arbVal}</span></div>
+    <div class="m-roster-grid">
+      <div class="m-roster-chip">
+        <span class="chip-lbl">Tavolo 1</span>
+        <span class="chip-val">${t1Val}</span>
+      </div>
+      <div class="m-roster-chip">
+        <span class="chip-lbl">Tavolo 2</span>
+        <span class="chip-val">${t2Val}</span>
+      </div>
+      <div class="m-roster-chip">
+        <span class="chip-lbl">Arbitro</span>
+        <span class="chip-val">${arbVal}</span>
+      </div>
     </div>
   </div>`;
 }
@@ -1362,6 +1442,17 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('click', e => {
+  const compItem = e.target.closest('[data-compname]');
+  if (compItem && !e.target.closest('button')) {
+    e.stopPropagation();
+    openCompensiDetailModal(
+      compItem.dataset.compname,
+      { p: +compItem.dataset.p, a: +compItem.dataset.a, c: +compItem.dataset.c },
+      compItem.dataset.m || ''
+    );
+    return;
+  }
+
   const qPerson = e.target.closest('[data-quickperson]');
   if (qPerson) {
     e.stopPropagation();
@@ -1610,10 +1701,11 @@ function openResocontoModal() {
     rows.forEach(r => {
       const k = r.n.toLowerCase();
       const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[k]);
-      const tot = (r.p * v.p) + ((r.a + r.c) * v.a);
-      if (!grandTotal[k]) grandTotal[k] = { n: r.n, p: 0, ac: 0, tot: 0 };
+      const tot = (r.p * v.p) + (r.a * v.a) + (r.c * v.c);
+      if (!grandTotal[k]) grandTotal[k] = { n: r.n, p: 0, a: 0, c: 0, tot: 0 };
       grandTotal[k].p += r.p;
-      grandTotal[k].ac += (r.a + r.c);
+      grandTotal[k].a += r.a;
+      grandTotal[k].c += r.c;
       grandTotal[k].tot += tot;
       totalSpentGeneral += tot;
     });
@@ -1621,54 +1713,61 @@ function openResocontoModal() {
 
   const grandRows = Object.values(grandTotal).sort((a, b) => b.tot - a.tot || a.n.localeCompare(b.n));
 
-  const grandTableHtml = grandRows.length
-    ? `<table>
-        <thead><tr><th>Nome</th><th>Partite</th><th>Ap/Ch</th><th>Totale</th></tr></thead>
-        <tbody>
-          ${grandRows.map(r => `<tr><td><strong>${esc(r.n)}</strong></td><td>${r.p}</td><td>${r.ac}</td><td><strong>${r.tot}€</strong></td></tr>`).join('')}
-          <tr style="border-top:2px solid var(--ink);font-weight:700"><td>TOTALE GENERALE</td><td colspan="2"></td><td>${totalSpentGeneral}€</td></tr>
-        </tbody>
-      </table>`
-    : '<p>Nessun dato registrato nella stagione.</p>';
+  const grandItemsHtml = grandRows.length
+    ? grandRows.map(r => `
+        <div class="recap-item-compact" data-compname="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" title="Dettaglio">
+          <div class="recap-item-left">
+            <span class="recap-item-name">${esc(r.n)}</span>
+            <span class="recap-item-sub">${r.p} gare • ${r.a} ap • ${r.c} ch</span>
+          </div>
+          <span class="recap-item-amount">${r.tot}€</span>
+        </div>
+      `).join('')
+    : '<p style="color:var(--mute);font-size:13px">Nessun dato registrato nella stagione.</p>';
 
   const monthsBlocksHtml = months.map(m => {
     const rows = computeRecapRows(m);
     let monthSum = 0;
-    const table = rows.length
-      ? `<table>
-          <thead><tr><th>Nome</th><th>Part.</th><th>Ap/Ch</th><th>Totale</th></tr></thead>
-          <tbody>
-            ${rows.map(r => {
-              const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
-              const tot = (r.p * v.p) + ((r.a + r.c) * v.a);
-              monthSum += tot;
-              return `<tr><td>${esc(r.n)}</td><td>${r.p}</td><td>${r.a + r.c}</td><td>${tot}€</td></tr>`;
-            }).join('')}
-            <tr style="border-top:1px solid var(--divider);font-weight:700"><td>Totale Mese</td><td colspan="2"></td><td>${monthSum}€</td></tr>
-          </tbody>
-        </table>`
-      : '<p style="color:var(--mute);font-size:12px">Nessuna partita con check.</p>';
+    const items = rows.length
+      ? rows.map(r => {
+          const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
+          const tot = (r.p * v.p) + (r.a * v.a) + (r.c * v.c);
+          monthSum += tot;
+          return `
+            <div class="recap-item-compact" data-compname="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}" style="background:var(--surface)">
+              <div class="recap-item-left">
+                <span class="recap-item-name" style="font-size:13px">${esc(r.n)}</span>
+                <span class="recap-item-sub">${r.p} gare • ${r.a + r.c} ap/ch</span>
+              </div>
+              <span class="recap-item-amount" style="font-size:13.5px">${tot}€</span>
+            </div>
+          `;
+        }).join('')
+      : '<p style="color:var(--mute);font-size:12px;margin:4px 0">Nessuna gara con check.</p>';
 
     return `<details class="res-month-block">
       <summary style="display:flex;justify-content:space-between;align-items:center">
-        <span>${monthLabel(m)}</span>
+        <span>${monthLabel(m)} (${monthSum}€)</span>
         <button class="waBtn" data-warecap="${m}" type="button">📲 WA</button>
       </summary>
-      <div style="margin-top:8px">${table}</div>
+      <div style="margin-top:8px">${items}</div>
     </details>`;
   }).join('');
 
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Resoconto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0">Resoconto Compensi</h3>
-      <button id="resCloseTop" style="min-height:28px;padding:2px 8px">✕</button>
+      <button id="resCloseTop" class="pill-btn-sm" style="min-height:28px">✕</button>
     </div>
     <div class="grand-total-box">
-      <h4>Totale Generale Compensi</h4>
-      ${grandTableHtml}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h4 style="margin:0">Totale Stagionale</h4>
+        <span style="font-size:17px;font-weight:900;color:#4ade80">${totalSpentGeneral}€</span>
+      </div>
+      <div style="max-height:220px;overflow-y:auto;padding-right:2px">${grandItemsHtml}</div>
     </div>
-    <h4 style="margin:14px 0 8px;font:700 16px var(--font-title);color:var(--mute);text-transform:uppercase">Dettaglio Mesi</h4>
-    <div class="resoconto-months">${monthsBlocksHtml}</div>
+    <h4 style="margin:14px 0 8px;font:700 15px var(--font-title);color:var(--mute);text-transform:uppercase">Dettaglio per Mese</h4>
+    <div class="resoconto-months" style="max-height:240px;overflow-y:auto">${monthsBlocksHtml}</div>
     <div class="mbtns" style="margin-top:16px"><button class="btn-primary-action" id="resClose" style="width:100%">Chiudi</button></div>
   </div>`;
 
@@ -2347,3 +2446,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     setSyncVisualState('green', 'Memoria locale attiva');
   }
 });
+```<FollowUp>
+<Suggest>Come appare la nuova visualizzazione del roster?</Suggest>
+<Suggest>Vuoi testare la modale di dettaglio compensi?</Suggest>
+<Suggest>Passiamo a ottimizzare la barra di ricerca con il tasto di reset rapido?</Suggest>
+</FollowUp>
