@@ -842,9 +842,10 @@ function copyReadOnlyLink() {
 
 function slotHTML(d, k) {
   const label = k === 'ap' ? 'Apertura' : 'Chiusura', wk = state.dayMeta[d] || {}, v = wk[k] || '';
+  const nomeVal = wk[k+'Nome'] || '';
   return `<div class="slot" data-d="${d}" data-k="${k}"><span class="sl">${label}:</span>
     <div class="yn" role="group"><button data-yn="si" aria-pressed="${v === 'si'}">Sì</button><button data-yn="no" aria-pressed="${v === 'no'}">No</button></div>
-    ${v === 'si' ? `<input data-wn list="namesList" value="${esc(wk[k+'Nome'])}" placeholder="Nome">` : ''}</div>`;
+    ${v === 'si' ? (state.READONLY ? `<span class="val clickable-person" data-quickperson="${esc(nomeVal)}" title="Filtra impegni di ${esc(nomeVal)}">${esc(nomeVal) || '—'}</span>` : `<input data-wn list="namesList" value="${esc(nomeVal)}" placeholder="Nome">`) : ''}</div>`;
 }
 
 function computeRecapRows(m) {
@@ -870,17 +871,17 @@ function recapHTML(m) {
     ? `<table><thead><tr><th>Nome</th><th>Part.</th><th>Ap/Ch</th><th>Totale</th></tr></thead><tbody>${rows.map(r => {
         const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
         const pv = r.p * v.p, av = r.a * v.a + r.c * v.c, tot = pv + av;
-        return `<tr><td><button class="nb" data-name="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}">${esc(r.n)}</button></td><td>${pv}</td><td>${av}</td><td>${tot}€</td></tr>`;
+        return `<tr><td><button class="nb" data-name="${esc(r.n)}" data-p="${r.p}" data-a="${r.a}" data-c="${r.c}" data-m="${m}" title="Modifica moltiplicatore o filtra">${esc(r.n)}</button></td><td>${pv}</td><td>${av}</td><td>${tot}€</td></tr>`;
       }).join('')}</tbody></table>`
     : '<p>Nessun dato (partite con check ✓).</p>') + '</aside>';
 }
 
 function updateRecap(m) { const el = document.querySelector(`.recap[data-m="${m}"]`); if (el) el.outerHTML = recapHTML(m); }
-const openClose = d => state.READONLY ? '' : `<div class="oc">${slotHTML(d, 'ap')}${slotHTML(d, 'ch')}</div>`;
+const openClose = d => `<div class="oc">${slotHTML(d, 'ap')}${slotHTML(d, 'ch')}</div>`;
 
 function params() { return new URLSearchParams(state.mem !== null ? state.mem : location.hash.slice(1)); }
 
-/* Scrittura hash sicura: preserva window.location.search se presente */
+/* Scrittura hash sicura: preserva window.location.search */
 function writeHash(p) {
   const s = p.toString();
   const searchPart = window.location.search || '';
@@ -905,11 +906,19 @@ function card(i, hasConflict, isUrgentIncomplete) {
   const ghostOn = !state.READONLY && (!!i.ghost || isCancelled || isPostponed);
   const missingReq = isMissingRequirements(i);
 
-  const t1Val = (i.t1 && i.t1.trim()) ? esc(i.t1) : '<span class="empty-req">Da assegnare</span>';
+  const t1Val = (i.t1 && i.t1.trim()) 
+    ? `<span class="val clickable-person" data-quickperson="${esc(i.t1.trim())}" title="Filtra gare di ${esc(i.t1.trim())}">${esc(i.t1.trim())}</span>`
+    : '<span class="empty-req">Da assegnare</span>';
+
   const t2Required = !i.friendly;
-  const t2Val = (i.t2 && i.t2.trim()) ? esc(i.t2) : (t2Required ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">—</span>');
+  const t2Val = (i.t2 && i.t2.trim())
+    ? `<span class="val clickable-person" data-quickperson="${esc(i.t2.trim())}" title="Filtra gare di ${esc(i.t2.trim())}">${esc(i.t2.trim())}</span>`
+    : (t2Required ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">—</span>');
+
   const arbNeeded = isRefereeNeeded(i.cat, i.friendly);
-  const arbVal = (i.arb && i.arb.trim()) ? esc(i.arb) : (arbNeeded ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">Federazione</span>');
+  const arbVal = (i.arb && i.arb.trim())
+    ? `<span class="val clickable-person" data-quickperson="${esc(i.arb.trim())}" title="Filtra gare di ${esc(i.arb.trim())}">${esc(i.arb.trim())}</span>`
+    : (arbNeeded ? '<span class="empty-req">Da assegnare</span>' : '<span class="empty-opt">Federazione</span>');
 
   const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
   const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Partita Amichevole">A</span>` : '';
@@ -945,9 +954,9 @@ function card(i, hasConflict, isUrgentIncomplete) {
     <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita senza titolo'}</div>
 
     <div class="m-roster">
-      <div class="m-row"><span class="lbl">Tavolo 1</span><span class="val">${t1Val}</span></div>
-      <div class="m-row"><span class="lbl">Tavolo 2</span><span class="val">${t2Val}</span></div>
-      <div class="m-row"><span class="lbl">Arbitro</span><span class="val">${arbVal}</span></div>
+      <div class="m-row"><span class="lbl">Tavolo 1</span><span class="val-box">${t1Val}</span></div>
+      <div class="m-row"><span class="lbl">Tavolo 2</span><span class="val-box">${t2Val}</span></div>
+      <div class="m-row"><span class="lbl">Arbitro</span><span class="val-box">${arbVal}</span></div>
     </div>
   </div>`;
 }
@@ -1324,6 +1333,24 @@ export function render(focusId) {
   }
 }
 
+function applyQuickPersonFilter(name) {
+  const target = (name || '').trim();
+  if (!target) return;
+  const searchInput = $('#searchFilter');
+  if (!searchInput) return;
+
+  if (state.searchQuery.toLowerCase() === target.toLowerCase()) {
+    state.searchQuery = '';
+    searchInput.value = '';
+    toast('Filtro persona rimosso');
+  } else {
+    state.searchQuery = target;
+    searchInput.value = target;
+    toast(`Filtro attivo: ${target}`);
+  }
+  render();
+}
+
 document.addEventListener('input', e => {
   if (state.READONLY) return;
   if (e.target.matches('[data-wn]')) {
@@ -1335,6 +1362,14 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('click', e => {
+  const qPerson = e.target.closest('[data-quickperson]');
+  if (qPerson) {
+    e.stopPropagation();
+    triggerHaptic('light');
+    applyQuickPersonFilter(qPerson.dataset.quickperson);
+    return;
+  }
+
   const pickM = e.target.closest('[data-pickm]');
   if (pickM) {
     e.preventDefault();
@@ -1436,9 +1471,13 @@ document.addEventListener('click', e => {
   }
 
   const nb = e.target.closest('[data-name]');
-  if (nb && !state.READONLY) {
+  if (nb) {
     triggerHaptic('light');
-    openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m);
+    if (state.READONLY) {
+      applyQuickPersonFilter(nb.dataset.name);
+    } else {
+      openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m);
+    }
     return;
   }
 });
@@ -1766,7 +1805,6 @@ function generateMonthPDF(m) {
 function setAuthMode(isAdmin) {
   state.READONLY = !isAdmin;
 
-  // Controllo persistente con sessionStorage
   const isReadOnlyAllowed = sessionStorage.getItem('partite_readonly_allowed') === '1';
 
   if (document.body) {
@@ -1786,7 +1824,6 @@ window.handleAuthClick = async function() {
   if (state.READONLY) {
     promptLogin();
   } else {
-    // Al logout si pulisce sia la sessione cloud che l'accesso sola lettura memorizzato
     sessionStorage.removeItem('partite_readonly_allowed');
     if (sb) await sb.auth.signOut();
     setAuthMode(false);
@@ -2252,7 +2289,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch(e) {}
   }
 
-  // Intercettazione del parametro ?readonly=true e memorizzazione in sessionStorage
   const searchParams = new URLSearchParams(window.location.search);
   const hashParams = params();
   const hasReadOnlyParam = searchParams.get('readonly') === 'true' || hashParams.get('readonly') === 'true';
