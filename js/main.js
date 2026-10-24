@@ -640,7 +640,7 @@ function openQuickCloseModal(matchId) {
       </div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="flex-direction:column;gap:8px;display:flex">
       <button type="button" class="btn-primary-action" id="qcSave" style="width:100%;min-height:42px">✓ Conferma</button>
       <button type="button" id="qcCancel" style="width:100%">Annulla</button>
     </div>
@@ -822,6 +822,22 @@ function copyMonthRecapWhatsApp(m) {
     navigator.clipboard.writeText(out.trim());
     toast('Riepilogo copiato per WhatsApp!', 'success');
   } catch(e) { prompt('Copia il testo:', out); }
+}
+
+function copyReadOnlyLink() {
+  const url = new URL(window.location.origin + window.location.pathname);
+  url.searchParams.set('readonly', 'true');
+  const fullUrl = url.toString();
+  
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      toast('Link sola lettura copiato!', 'success');
+    }).catch(() => {
+      prompt('Copia il link sola lettura:', fullUrl);
+    });
+  } else {
+    prompt('Copia il link sola lettura:', fullUrl);
+  }
 }
 
 function slotHTML(d, k) {
@@ -1857,9 +1873,6 @@ function setAuthMode(isAdmin) {
     authBtn.innerHTML = isAdmin ? '<span class="icon">🔓</span><span class="label">Esci</span>' : '<span class="icon">🔒</span><span class="label">Accedi</span>';
     authBtn.title = isAdmin ? 'Termina sessione amministratore' : 'Accedi come Amministratore per modificare';
   }
-  document.querySelectorAll('.robanner').forEach(el => {
-    el.style.display = state.READONLY ? 'block' : 'none';
-  });
   render();
 }
 
@@ -2193,7 +2206,8 @@ function openSettingsModal() {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
       <button type="button" id="sBtnTheme" style="padding:10px;font-size:13px;border-radius:10px">🎨 Tema / Stile</button>
-      <button type="button" id="sBtnFip" style="padding:10px;font-size:13px;border-radius:10px">🔗 Link FIP</button>
+      <button type="button" id="sBtnShareRo" style="padding:10px;font-size:13px;border-radius:10px">🔗 Link Condivisione</button>
+      <button type="button" id="sBtnFip" style="padding:10px;font-size:13px;border-radius:10px">🌐 Link FIP</button>
       <button type="button" id="sBtnPrint" style="padding:10px;font-size:13px;border-radius:10px">🖨️ Stampa PDF</button>
       <button type="button" id="sBtnExport" style="padding:10px;font-size:13px;border-radius:10px">📤 Esporta JSON</button>
       ${isAuth ? `
@@ -2212,6 +2226,7 @@ function openSettingsModal() {
   ov.querySelector('#setCloseTop').onclick = () => ov.remove();
 
   ov.querySelector('#sBtnTheme').onclick = () => { ov.remove(); openThemeModal(); };
+  ov.querySelector('#sBtnShareRo').onclick = () => { ov.remove(); copyReadOnlyLink(); };
   ov.querySelector('#sBtnFip').onclick = () => { ov.remove(); openFipLinksModal(); };
   ov.querySelector('#sBtnPrint').onclick = () => { ov.remove(); openPrintModal(); };
   ov.querySelector('#sBtnExport').onclick = () => { ov.remove(); openExportMultiModal(); };
@@ -2400,8 +2415,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const forceReadonly = urlParams.get('readonly') === 'true';
 
   if (forceReadonly) {
-    state.READONLY = true;
-    if (document.body) document.body.classList.remove('ro');
+    setAuthMode(false);
   } else if (sb) {
     const { data: { session } } = await sb.auth.getSession();
     setAuthMode(!!session);
