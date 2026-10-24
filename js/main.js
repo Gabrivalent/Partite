@@ -879,11 +879,19 @@ function updateRecap(m) { const el = document.querySelector(`.recap[data-m="${m}
 const openClose = d => state.READONLY ? '' : `<div class="oc">${slotHTML(d, 'ap')}${slotHTML(d, 'ch')}</div>`;
 
 function params() { return new URLSearchParams(state.mem !== null ? state.mem : location.hash.slice(1)); }
+
+/* Scrittura hash sicura: preserva window.location.search se presente */
 function writeHash(p) {
   const s = p.toString();
-  try { history.replaceState(null, '', location.pathname + (s ? '#' + s : '')); state.mem = null; }
-  catch(e) { state.mem = s; }
+  const searchPart = window.location.search || '';
+  try {
+    history.replaceState(null, '', location.pathname + searchPart + (s ? '#' + s : ''));
+    state.mem = null;
+  } catch(e) {
+    state.mem = s;
+  }
 }
+
 function setParam(k, v) {
   const p = params();
   v ? p.set(k, v) : p.delete(k);
@@ -1758,13 +1766,12 @@ function generateMonthPDF(m) {
 function setAuthMode(isAdmin) {
   state.READONLY = !isAdmin;
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const hashParams = params();
-  const hasReadOnlyParam = searchParams.get('readonly') === 'true' || hashParams.get('readonly') === 'true';
+  // Controllo persistente con sessionStorage
+  const isReadOnlyAllowed = sessionStorage.getItem('partite_readonly_allowed') === '1';
 
   if (document.body) {
     document.body.classList.toggle('ro', state.READONLY);
-    document.body.classList.toggle('locked', !isAdmin && !hasReadOnlyParam);
+    document.body.classList.toggle('locked', !isAdmin && !isReadOnlyAllowed);
   }
 
   const authBtn = $('#authBtn');
@@ -1779,9 +1786,11 @@ window.handleAuthClick = async function() {
   if (state.READONLY) {
     promptLogin();
   } else {
+    // Al logout si pulisce sia la sessione cloud che l'accesso sola lettura memorizzato
+    sessionStorage.removeItem('partite_readonly_allowed');
     if (sb) await sb.auth.signOut();
     setAuthMode(false);
-    toast('Disconnesso: sola lettura');
+    toast('Disconnesso: accesso bloccato');
   }
 };
 
@@ -2241,6 +2250,15 @@ window.addEventListener('DOMContentLoaded', async () => {
         window.Telegram.WebApp.setHeaderColor('#131415');
       }
     } catch(e) {}
+  }
+
+  // Intercettazione del parametro ?readonly=true e memorizzazione in sessionStorage
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = params();
+  const hasReadOnlyParam = searchParams.get('readonly') === 'true' || hashParams.get('readonly') === 'true';
+
+  if (hasReadOnlyParam) {
+    sessionStorage.setItem('partite_readonly_allowed', '1');
   }
 
   bindEvents();
