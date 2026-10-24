@@ -467,19 +467,3 @@ body.ro .auth-only {
   border-radius: 16px;
   box-shadow: var(--shadow-sm);
 }
-
-body:not(.ro) .robanner { display: none !important; }
-body.ro .app-content-wrapper { display: none !important; }
-body.ro .bottom-nav-bar { display: none !important; }
-
-.robanner {
-  margin: 60px auto;
-  max-width: 440px;
-  padding: 30px;
-  border-radius: 20px;
-  background: var(--surface);
-  box-shadow: var(--shadow-lg);
-  font-size: 15px;
-  line-height: 1.6;
-  text-align: center;
-}
