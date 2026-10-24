@@ -1669,114 +1669,6 @@ function monthsWithData() {
 }
 function monthLabel(m) { return new Date(m + '-15T12:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); }
 
-async function pdfToLines(file) {
-  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const buf = await file.arrayBuffer();
-  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
-  const lines = [];
-  for (let p = 1; p <= doc.numPages; p++) {
-    const page = await doc.getPage(p);
-    const tc = await page.getTextContent();
-    const rows = {};
-    tc.items.forEach(it => {
-      const y = Math.round(it.transform[5] / 3) * 3;
-      (rows[y] = rows[y] || []).push(it);
-    });
-    Object.keys(rows).map(Number).sort((a, b) => b - a).forEach(y => {
-      const txt = rows[y].sort((a, b) => a.transform[4] - b.transform[4]).map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
-      if (txt) lines.push(txt);
-    });
-  }
-  return lines;
-}
-
-function normName(s) {
-  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function extractHomeMatches(lines, teamName) {
-  const needle = normName(teamName);
-  const out = [];
-  let detectedCat = '';
-  for (let l of lines.slice(0, 15)) {
-    const m = l.match(/Under\s*(\d{1,2})|U\s*(\d{1,2})|Serie\s*([A-D])|Divisione/i);
-    if (m) {
-      if (m[1] || m[2]) detectedCat = 'U' + (m[1] || m[2]);
-      else if (m[3]) detectedCat = 'Serie ' + m[3].toUpperCase();
-      break;
-    }
-  }
-  const dtRegex = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[\s\-–—T]+(\d{1,2}:\d{2}))?\b/;
-  for (let i = 0; i < lines.length; i++) {
-    const lineNorm = normName(lines[i]);
-    if (needle && lineNorm.includes(needle)) {
-      const homeTeam = lines[i].replace(/^\d+\s*/, '').trim();
-      let awayTeam = '';
-      let matchDate = null;
-      let matchTime = '';
-      for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
-        const nextLine = lines[j].trim();
-        const dtMatch = nextLine.match(dtRegex);
-        if (dtMatch && !matchDate) {
-          let [, d, mo, y, t] = dtMatch;
-          if (y.length === 2) y = '20' + y;
-          matchDate = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
-          if (t) matchTime = t;
-        }
-        if (!awayTeam && nextLine && !dtMatch && !nextLine.match(/^(Palestra|PALASPORT|PALABURSI|PALAZZETTO|Via|pag\.|00\d{4}|\d+ Giornata)/i)) {
-          if (!nextLine.match(/^\d+[\s\-]+\d+$/) && !nextLine.includes('(')) awayTeam = nextLine.replace(/^\d+\s*/, '').trim();
-        }
-      }
-      if (!matchDate) {
-        const dtMatch = lines[i].match(dtRegex);
-        if (dtMatch) {
-          let [, d, mo, y, t] = dtMatch;
-          if (y.length === 2) y = '20' + y;
-          matchDate = `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
-          if (t) matchTime = t;
-        }
-      }
-      if (matchDate) {
-        out.push({
-          date: matchDate,
-          time: matchTime,
-          title: (homeTeam + ' - ' + (awayTeam || 'Avversario')).replace(/\s+/g, ' '),
-          cat: detectedCat,
-          friendly: false
-        });
-      }
-    }
-  }
-  const unique = [];
-  const seen = new Set();
-  for (let it of out) {
-    const k = it.date + '_' + it.time + '_' + it.title;
-    if (!seen.has(k)) {
-      seen.add(k);
-      unique.push(it);
-    }
-  }
-  return unique;
-}
-
-function renderPdfPreview() {
-  const wrap = document.getElementById('pdfPreviewWrap'); if (!wrap) return;
-  if (!state.pdfCandidates.length) {
-    wrap.innerHTML = '<p style="color:var(--warn);font-size:13px;padding:6px 0">Nessuna gara in casa trovata.</p>';
-    return;
-  }
-  wrap.innerHTML = `<p style="color:var(--mute);font-size:12px;margin:4px 0 8px">Trovate ${state.pdfCandidates.length} gare:</p>` +
-    state.pdfCandidates.map((c, i) => `<div style="border-bottom:1px solid var(--divider);padding:8px 0;display:flex;flex-direction:column;gap:6px">
-    <input data-pf="title" data-pi="${i}" value="${esc(c.title)}" style="font-weight:700">
-    <div style="display:flex;gap:6px">
-      <input data-pf="date" data-pi="${i}" type="date" value="${c.date || ''}" style="flex:1">
-      <input data-pf="time" data-pi="${i}" type="time" value="${c.time || ''}" style="width:95px">
-      <input data-pf="cat" data-pi="${i}" list="categoriesList" value="${esc(c.cat)}" placeholder="Cat." style="width:75px">
-      <button data-pf="rm" data-pi="${i}" style="min-height:34px;padding:0 10px">✕</button>
-    </div>
-  </div>`).join('');
-}
-
 function performUndo() {
   if (popUndoState()) {
     render();
@@ -1872,7 +1764,6 @@ function setAuthMode(isAdmin) {
 
   if (document.body) {
     document.body.classList.toggle('ro', state.READONLY);
-    // Se è admin O possiede il parametro del link, toglie il blocco; altrimenti mostra l'accesso riservato
     document.body.classList.toggle('locked', !isAdmin && !hasReadOnlyParam);
   }
 
@@ -2085,67 +1976,6 @@ function openCatModal() {
   document.getElementById('newCatInput').focus();
 }
 
-function openPdfImportModal() {
-  if (state.READONLY) return;
-  const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'pdfOv';
-  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Importa PDF">
-    <h3>Importa da PDF</h3>
-    <div class="frow"><label for="pdfFile">File PDF</label><input id="pdfFile" type="file" accept="application/pdf,.pdf"></div>
-    <div class="frow"><label for="pdfTeam">Nome squadra di casa</label><input id="pdfTeam" type="text" placeholder="Es. VIS PERSICETO"></div>
-    <div class="mbtns"><button type="button" id="pdfCancel">Annulla</button><button type="button" class="btn-primary-action" id="pdfGo">Estrai</button></div>
-    <div id="pdfPreviewWrap" style="margin-top:10px;max-height:220px;overflow-y:auto"></div>
-    <div class="mbtns" id="pdfConfirmBtns" style="display:none;margin-top:10px"><button type="button" id="pdfAddAll" class="btn-primary-action" style="width:100%">Aggiungi al calendario</button></div>
-  </div>`;
-  document.body.appendChild(ov);
-  ov.addEventListener('click', e => {
-    if (e.target === ov) { ov.remove(); return; }
-    const rm = e.target.closest('[data-pf="rm"]');
-    if (rm) { state.pdfCandidates.splice(+rm.dataset.pi, 1); renderPdfPreview(); return; }
-  });
-  ov.addEventListener('input', e => {
-    const f = e.target.dataset.pf; if (!f || f === 'rm') return;
-    state.pdfCandidates[+e.target.dataset.pi][f] = e.target.value;
-  });
-  document.getElementById('pdfCancel').onclick = () => ov.remove();
-  document.getElementById('pdfGo').onclick = async () => {
-    const file = document.getElementById('pdfFile').files[0];
-    const team = document.getElementById('pdfTeam').value.trim();
-    if (!file || !team) { toast('Dati mancanti', 'warning'); return; }
-    if (!window.pdfjsLib) { toast('Libreria non caricata', 'warning'); return; }
-    const btn = document.getElementById('pdfGo'); btn.disabled = true; btn.textContent = 'Estrazione…';
-    try {
-      const lines = await pdfToLines(file);
-      state.pdfCandidates = extractHomeMatches(lines, team);
-      document.getElementById('pdfConfirmBtns').style.display = state.pdfCandidates.length ? 'flex' : 'none';
-      renderPdfPreview();
-    } catch(e) { toast('Errore lettura', 'warning'); }
-    btn.disabled = false; btn.textContent = 'Estrai';
-  };
-  document.getElementById('pdfAddAll').onclick = () => {
-    const valid = state.pdfCandidates.filter(c => c.date);
-    pushUndo();
-    valid.forEach(c => {
-      state.items.push({
-        id: uid(),
-        title: c.title,
-        date: c.date,
-        time: c.time || '',
-        cat: c.cat || '',
-        friendly: false,
-        score: '',
-        status: '',
-        t1: '', t2: '', arb: '',
-        ghost: false,
-        ts: Date.now()
-      });
-    });
-    save();
-    ov.remove();
-    render();
-    toast(`${valid.length} gare aggiunte`, 'success');
-  };
-}
-
 function openFipLinksModal() {
   const isAuth = !state.READONLY;
   const ov = document.createElement('div');
@@ -2220,7 +2050,6 @@ function openSettingsModal() {
       <button type="button" id="sBtnExport" style="padding:10px;font-size:13px;border-radius:10px">📤 Esporta JSON</button>
       ${isAuth ? `
         <button type="button" id="sBtnImport" style="padding:10px;font-size:13px;border-radius:10px">📥 Importa JSON</button>
-        <button type="button" id="sBtnPdf" style="padding:10px;font-size:13px;border-radius:10px">📄 Importa PDF</button>
         <button type="button" id="sBtnNames" style="padding:10px;font-size:13px;border-radius:10px">👥 Collaboratori</button>
         <button type="button" id="sBtnCat" style="padding:10px;font-size:13px;border-radius:10px">🏷️ Categorie</button>
       ` : ''}
@@ -2240,7 +2069,6 @@ function openSettingsModal() {
   ov.querySelector('#sBtnExport').onclick = () => { ov.remove(); openExportMultiModal(); };
   if (isAuth) {
     ov.querySelector('#sBtnImport').onclick = () => { ov.remove(); $('#importFile')?.click(); };
-    ov.querySelector('#sBtnPdf').onclick = () => { ov.remove(); openPdfImportModal(); };
     ov.querySelector('#sBtnNames').onclick = () => { ov.remove(); openNamesModal(); };
     ov.querySelector('#sBtnCat').onclick = () => { ov.remove(); openCatModal(); };
   }
