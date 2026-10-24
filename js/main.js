@@ -2446,8 +2446,3 @@ window.addEventListener('DOMContentLoaded', async () => {
     setSyncVisualState('green', 'Memoria locale attiva');
   }
 });
-```<FollowUp>
-<Suggest>Come appare la nuova visualizzazione del roster?</Suggest>
-<Suggest>Vuoi testare la modale di dettaglio compensi?</Suggest>
-<Suggest>Passiamo a ottimizzare la barra di ricerca con il tasto di reset rapido?</Suggest>
-</FollowUp>
