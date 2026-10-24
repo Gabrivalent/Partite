@@ -1865,9 +1865,17 @@ function generateMonthPDF(m) {
 
 function setAuthMode(isAdmin) {
   state.READONLY = !isAdmin;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = params();
+  const hasReadOnlyParam = searchParams.get('readonly') === 'true' || hashParams.get('readonly') === 'true';
+
   if (document.body) {
     document.body.classList.toggle('ro', state.READONLY);
+    // Se è admin O possiede il parametro del link, toglie il blocco; altrimenti mostra l'accesso riservato
+    document.body.classList.toggle('locked', !isAdmin && !hasReadOnlyParam);
   }
+
   const authBtn = $('#authBtn');
   if (authBtn) {
     authBtn.innerHTML = isAdmin ? '<span class="icon">🔓</span><span class="label">Esci</span>' : '<span class="icon">🔒</span><span class="label">Accedi</span>';
@@ -2206,7 +2214,7 @@ function openSettingsModal() {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
       <button type="button" id="sBtnTheme" style="padding:10px;font-size:13px;border-radius:10px">🎨 Tema / Stile</button>
-      <button type="button" id="sBtnShareRo" style="padding:10px;font-size:13px;border-radius:10px">🔗 Link Condivisione</button>
+      <button type="button" id="sBtnShareRo" style="padding:10px;font-size:13px;border-radius:10px">🔗 Link Sola Lettura</button>
       <button type="button" id="sBtnFip" style="padding:10px;font-size:13px;border-radius:10px">🌐 Link FIP</button>
       <button type="button" id="sBtnPrint" style="padding:10px;font-size:13px;border-radius:10px">🖨️ Stampa PDF</button>
       <button type="button" id="sBtnExport" style="padding:10px;font-size:13px;border-radius:10px">📤 Esporta JSON</button>
@@ -2411,14 +2419,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderNamesList();
   renderCategoriesList();
 
-  const urlParams = params();
-  const forceReadonly = urlParams.get('readonly') === 'true';
-
-  if (forceReadonly) {
-    setAuthMode(false);
-  } else if (sb) {
+  if (sb) {
     const { data: { session } } = await sb.auth.getSession();
-    setAuthMode(!!session);
+    const isAdmin = !!session;
+
+    setAuthMode(isAdmin);
 
     sb.auth.onAuthStateChange((_event, session) => {
       setAuthMode(!!session);
