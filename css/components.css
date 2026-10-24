@@ -327,6 +327,15 @@ body.ro .match { cursor: default; }
   padding: 14px 18px;
   box-shadow: var(--shadow-sm);
 }
+
+.clickable-person {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.clickable-person:hover {
+  color: var(--date);
+  text-decoration: underline;
+}
 .recap h4 { margin: 0 0 10px; font: 700 16px var(--font-title); color: var(--acc); text-transform: uppercase; }
 .recap p { margin: 4px 0; font-size: 13px; color: var(--mute); }
 .recap table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
