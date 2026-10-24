@@ -14,7 +14,6 @@ export const state = {
   filterIncomplete: false,
   searchQuery: '',
   undoStack: [],
-  pdfCandidates: [],
   swRegistration: null,
   ready: false,
   mem: null
