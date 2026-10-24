@@ -35,19 +35,19 @@
       <span class="sidebar-brand-label">Menu Partite</span>
     </div>
 
-    <!-- AZIONI PRINCIPALI IN CIMA (SENZA OGGI, SPOSTATO NELLA TOP BAR) -->
+    <!-- AZIONI PRINCIPALI IN CIMA -->
     <nav class="sidebar-nav">
       <button type="button" class="rail-nav-item active" id="railNavHome" title="Partite">
         <span class="icon">🏀</span>
         <span class="label">Partite</span>
       </button>
-      <button type="button" class="rail-nav-item" id="railNavResoconto" title="Resoconto Compensi">
+      <button type="button" class="rail-nav-item auth-only" id="railNavResoconto" title="Resoconto Compensi">
         <span class="icon">📊</span>
         <span class="label">Compensi</span>
       </button>
     </nav>
 
-    <!-- ALBERO CRONOLOGICO ALZATO SUBITO SOTTO -->
+    <!-- ALBERO CRONOLOGICO -->
     <div class="sidebar-tree-container">
       <div class="sidebar-section-title">Archivio Calendario</div>
       <div id="navTree" class="nav-tree"></div>
@@ -86,7 +86,6 @@
       </div>
 
       <div class="top-bar-actions">
-        <!-- TASTO OGGI ACCANTO A + PARTITA -->
         <button id="todayBtn" type="button" class="pill-btn-action" title="Vai a Oggi">Oggi</button>
         <button id="add" type="button" class="btn-primary-action auth-only">+ Partita</button>
         <button id="undoBtn" type="button" class="pill-btn-sm auth-only" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
@@ -126,7 +125,7 @@
   <button type="button" class="b-nav-item b-nav-add auth-only" id="bNavAdd" title="Nuova Partita">
     <span class="b-nav-add-icon">+</span>
   </button>
-  <button type="button" class="b-nav-item" id="bNavResoconto">
+  <button type="button" class="b-nav-item auth-only" id="bNavResoconto">
     <span class="b-nav-icon">📊</span>
     <span class="b-nav-label">Compensi</span>
   </button>
@@ -143,18 +142,6 @@
 
 <!-- TOAST NOTIFICHE -->
 <div id="msg" role="status"></div>
-
-<!-- BANNER DI ACCESSO RISERVATO -->
-<div class="robanner" id="roBanner">
-  <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
-  <h3 style="margin: 0 0 8px; color: var(--ink);">Accesso Riservato</h3>
-  <p style="color: var(--mute); margin: 0 0 16px; font-size: 13px;">
-    Il calendario e le designazioni dei turni sono private. Effettua l'accesso come amministratore per gestire o sbloccare le modifiche.
-  </p>
-  <button type="button" class="primary" onclick="window.handleAuthClick()" style="width: 100%;">
-    Accedi con Account
-  </button>
-</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
