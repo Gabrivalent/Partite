@@ -1,6 +1,5 @@
 import { state } from './state.js';
-import { monday, iso, isMissingRequirements, isWithinOneDayOrLess, getMatchOutcome, getCategoryFipUrl, findConflictingMatches, getConflictClusters, getUrgentIncompleteMatches, getPendingPostponedMatches } from './rules.js';
-import { computeRecapRows } from './export.js';
+import { monday, iso, isMissingRequirements, isWithinOneDayOrLess, isRefereeNeeded, getMatchOutcome, getCategoryFipUrl, findConflictingMatches, getConflictClusters, getUrgentIncompleteMatches, getPendingPostponedMatches } from './rules.js';import { computeRecapRows } from './export.js';
 
 export const $ = s => document.querySelector(s);
 export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
