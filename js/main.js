@@ -2,7 +2,7 @@ import { state, registerStateCallbacks, save, saveD, applyTheme, pushUndo, popUn
 import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback } from './api.js';
 import { iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements } from './rules.js';
 import { copyMonthRecapWhatsApp, generateWhatsAppText } from './export.js';
-import { $, esc, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree } from './render.js';
+import { $, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree } from './render.js';
 import { openEditModal, openAddModal, openQuickCloseModal, openCompensiDetailModal, openViewFileModal, openMoltModal, openResocontoModal, openConflictsModal, openUrgentIncompleteModal, openPendingModal, openSettingsModal, promptLogin } from './modals.js';
 
 function isModalOpen() {
@@ -218,6 +218,7 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('click', e => {
+  // Click su referto presente: visualizza anteprima
   const vfBtn = e.target.closest('[data-viewfile]');
   if (vfBtn) {
     e.stopPropagation();
@@ -225,6 +226,43 @@ document.addEventListener('click', e => {
     if (it && it.fileData) {
       openViewFileModal(it.fileData, it.fileName, it.title, triggerHaptic);
     }
+    return;
+  }
+
+  // Click su referto assente: carica subito
+  const upBtn = e.target.closest('[data-uploadfile]');
+  if (upBtn) {
+    e.stopPropagation();
+    if (state.READONLY) {
+      toast('Nessun referto disponibile per questa gara');
+      return;
+    }
+    const it = state.items.find(x => x.id === upBtn.dataset.uploadfile);
+    if (!it) return;
+
+    const fileSelector = document.createElement('input');
+    fileSelector.type = 'file';
+    fileSelector.accept = 'application/pdf,image/*';
+    fileSelector.onchange = ev => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) {
+        toast('File troppo grande (max 8MB)', 'warning');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = uploadEv => {
+        pushUndo();
+        it.fileData = uploadEv.target.result;
+        it.fileName = file.name;
+        save();
+        render();
+        triggerHaptic('success');
+        toast('Referto caricato con successo!', 'success');
+      };
+      reader.readAsDataURL(file);
+    };
+    fileSelector.click();
     return;
   }
 
@@ -450,7 +488,7 @@ function bindEvents() {
   }
 
   if (sidebar) {
-    sidebar.addEventListener('click', e => {
+    sidebar.addEventListener('click', () => {
       if (window.innerWidth >= 860 && !sidebar.classList.contains('expanded')) {
         sidebar.classList.add('expanded');
         triggerHaptic('light');
@@ -581,7 +619,7 @@ function bindEvents() {
 
   const fInc = $('#filterIncomplete');
   if (fInc) {
-    fInc.onclick = e => {
+    fInc.onclick = () => {
       triggerHaptic('light');
       state.filterIncomplete = !state.filterIncomplete;
       fInc.setAttribute('aria-pressed', String(state.filterIncomplete));
