@@ -1,10 +1,25 @@
 import { state } from './state.js';
-import { monday, iso, isMissingRequirements, isWithinOneDayOrLess, isRefereeNeeded, getMatchOutcome, getCategoryFipUrl, findConflictingMatches, getConflictClusters, getUrgentIncompleteMatches, getPendingPostponedMatches } from './rules.js';import { computeRecapRows } from './export.js';
+import { 
+  monday, 
+  iso, 
+  isMissingRequirements, 
+  isWithinOneDayOrLess, 
+  isRefereeNeeded, 
+  getMatchOutcome, 
+  getCategoryFipUrl, 
+  findConflictingMatches, 
+  getConflictClusters, 
+  getUrgentIncompleteMatches, 
+  getPendingPostponedMatches 
+} from './rules.js';
+import { computeRecapRows } from './export.js';
 
 export const $ = s => document.querySelector(s);
 export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-export function params() { return new URLSearchParams(state.mem !== null ? state.mem : location.hash.slice(1)); }
+export function params() { 
+  return new URLSearchParams(state.mem !== null ? state.mem : location.hash.slice(1)); 
+}
 
 export function writeHash(p) {
   const s = p.toString();
@@ -159,10 +174,11 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const fipUrl = getCategoryFipUrl(i.cat);
   const fipBtnHtml = fipUrl ? `<a href="${esc(fipUrl)}" target="_blank" rel="noopener noreferrer" class="fipBtn" title="Risultati FIP">🌐</a>` : '';
 
+  // Icona referto sempre visibile: grigia se assente (upload), azzurra se presente (visualizza)
   const hasFile = !!(i.fileData);
   const fileBtnHtml = hasFile
-    ? `<button class="reportBtn has-file" data-viewfile="${i.id}" type="button" title="Visualizza Referto Gara">📄 Referto ✓</button>`
-    : '';
+    ? `<button class="reportBtn has-file" data-viewfile="${i.id}" type="button" title="Visualizza Referto Gara">📄</button>`
+    : `<button class="reportBtn no-file" data-uploadfile="${i.id}" type="button" title="Carica Referto Gara">📄</button>`;
 
   let badgeHtml = '';
   if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
