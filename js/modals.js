@@ -1,6 +1,6 @@
 import { COMMON_TIMES } from './config.js';
-import { state, save, saveD, saveMolt, saveNames, saveCategories, saveFipLinks, applyTheme, pushUndo } from './state.js';
-import { sb, cloudPushNow } from './api.js';
+import { state, save, saveMolt, saveNames, saveCategories, saveFipLinks, applyTheme, pushUndo } from './state.js';
+import { sb } from './api.js';
 import { uid, iso, monday, checkPersonRosterConflicts, getConflictClusters, getUrgentIncompleteMatches, getPendingPostponedMatches, isRefereeNeeded } from './rules.js';
 import { monthsWithData, monthLabel, computeRecapRows, exportSelectedMonthsJSON, generateMonthPDF, copyReadOnlyLink } from './export.js';
 import { esc, setParam, renderNamesList, renderCategoriesList } from './render.js';
@@ -940,7 +940,7 @@ export function openExportMultiModal(toast) {
 export function openPrintModal(toast) {
   const months = monthsWithData();
   if (!months.length) { toast('Nessuna gara presente', 'warning'); return; }
-  const cur = params().get('m');
+  const cur = new URLSearchParams(window.location.hash.slice(1)).get('m');
   const def = months.includes(cur) ? cur : months[months.length - 1];
   const ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'printOv';
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Stampa PDF">
