@@ -1,4 +1,157 @@
-/* Card Partita */
+/* ==========================================================================
+   STRUTTURA SETTIMANE & CALENDARIO
+   ========================================================================== */
+
+details.week {
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: border-color .15s ease;
+}
+
+details.week.hl {
+  border-color: var(--hl);
+}
+
+/* Intestazione blocco settimana: risolve il problema di a-capo e sovrapposizione */
+details.week summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  padding: 10px 14px;
+  border-radius: 8px;
+  user-select: none;
+  background: var(--card);
+}
+
+details.week summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Titolo settimana (sinistra) */
+details.week summary .t {
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  color: var(--ink);
+}
+
+/* Conteggio gare e tasto WA (destra allineati su riga singola) */
+details.week summary .n {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--mute);
+  font-weight: 600;
+}
+
+/* Pulsante WhatsApp compatto per la settimana */
+.waBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.waBtn:hover {
+  background: var(--hl);
+  color: #22c55e;
+}
+
+/* Singolo blocco giorno all'interno della settimana */
+.day {
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--divider);
+}
+
+.day h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--date);
+  text-transform: capitalize;
+}
+
+/* Apertura e Chiusura impianto */
+.oc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  background: var(--card);
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.slot .sl {
+  font-weight: 700;
+  color: var(--mute);
+  min-width: 65px;
+}
+
+.slot .yn {
+  display: inline-flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--divider);
+}
+
+.slot .yn button {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 0;
+  background: transparent;
+  color: var(--mute);
+  border: none;
+  box-shadow: none;
+}
+
+.slot .yn button[aria-pressed="true"] {
+  background: var(--hl);
+  color: var(--ink);
+}
+
+.slot input[data-wn] {
+  padding: 2px 8px;
+  font-size: 12px;
+  min-height: 26px;
+  border-radius: 6px;
+  max-width: 140px;
+}
+
+
+/* ==========================================================================
+   CARD PARTITA
+   ========================================================================== */
+
 .match {
   background: var(--surface);
   border: 1px solid var(--divider);
@@ -9,26 +162,32 @@
   transition: transform .12s ease, box-shadow .12s ease, border-color .15s ease;
   cursor: pointer;
 }
+
 .match:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
   border-color: var(--hl);
 }
+
 .match.ghost {
   opacity: 0.55;
   background: rgba(0, 0, 0, 0.2);
 }
+
 .match.cancelled {
   opacity: 0.45;
   border-left: 4px solid #ef4444;
 }
+
 .match.postponed {
   border-left: 4px solid #eab308;
 }
+
 .match.conflict-match {
   border-left: 4px solid #ef4444;
   background: rgba(239, 68, 68, 0.05);
 }
+
 .match.urgent-incomplete {
   border-left: 4px solid #f97316;
   background: rgba(249, 115, 22, 0.05);
@@ -57,11 +216,13 @@
   justify-content: space-between;
   margin-bottom: 6px;
 }
+
 .m-time-pill {
   font-size: 13px;
   font-weight: 800;
   color: var(--date);
 }
+
 .cat-pill {
   font-size: 11px;
   font-weight: 700;
@@ -71,6 +232,7 @@
   color: var(--ink);
   border: 1px solid var(--divider);
 }
+
 .friendly-badge {
   font-size: 10px;
   font-weight: 800;
@@ -85,6 +247,10 @@
   align-items: center;
   gap: 4px;
 }
+
+/* ==========================================================================
+   PULSANTI AZIONE NELLA CARD (Referto, FIP, Esito, Modifica)
+   ========================================================================== */
 
 /* Tasto Referto compatto ad icona singola quadrata */
 .reportBtn {
@@ -104,6 +270,7 @@
   transition: all .15s ease;
   border: 1px solid transparent;
 }
+
 /* Se il referto NON c'è: icona grigia discreta, click per upload */
 .reportBtn.no-file {
   opacity: 0.35;
@@ -114,6 +281,7 @@
   background: var(--hl);
   filter: grayscale(0.2);
 }
+
 /* Se il referto C'È: icona azzurra luminosa, click per anteprima */
 .reportBtn.has-file {
   background: rgba(14, 165, 233, 0.2);
@@ -188,7 +356,11 @@
 .score-pill.loss { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
 .score-pill.suspended { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
 
-/* Roster Compatto a 3 Box Orizzontali */
+
+/* ==========================================================================
+   ROSTER COMPATTO A 3 BOX ORIZZONTALI
+   ========================================================================== */
+
 .m-roster-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -249,7 +421,11 @@
   text-decoration: underline;
 }
 
-/* Box di Upload Referto nella Modale */
+
+/* ==========================================================================
+   BOX CARICAMENTO REFERTO NELLA MODALE
+   ========================================================================== */
+
 .file-upload-box {
   background: var(--card);
   border: 1px dashed var(--divider);
@@ -260,6 +436,7 @@
   flex-direction: column;
   gap: 8px;
 }
+
 .file-upload-loaded {
   display: flex;
   align-items: center;
@@ -269,6 +446,7 @@
   padding: 8px 12px;
   border-radius: 10px;
 }
+
 .file-upload-loaded span {
   font-size: 12.5px;
   font-weight: 700;
@@ -279,7 +457,33 @@
   max-width: 260px;
 }
 
-/* Card Compensi Compatta (Riepilogo Mese e Resoconto Generale) */
+
+/* ==========================================================================
+   RIEPILOGO & COMPENSI (Card Compatte)
+   ========================================================================== */
+
+.recap {
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.recap h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.recap-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
 .recap-item-compact {
   display: flex;
   justify-content: space-between;
@@ -291,26 +495,32 @@
   cursor: pointer;
   transition: background 0.15s ease, transform 0.12s ease;
 }
+
 .recap-item-compact:hover {
   background: var(--card-hover);
 }
+
 .recap-item-compact:active {
   transform: scale(0.98);
 }
+
 .recap-item-left {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+
 .recap-item-name {
   font-weight: 700;
   font-size: 13.5px;
   color: var(--ink);
 }
+
 .recap-item-sub {
   font-size: 11px;
   color: var(--mute);
 }
+
 .recap-item-amount {
   font-weight: 800;
   font-size: 14.5px;
