@@ -1,13 +1,69 @@
 /* ==========================================================================
-   CORREZIONE ALLINEAMENTO SETTIMANE (Evita sovrapposizioni)
+   LISTA E VISTA MESE
    ========================================================================== */
+.selected-month-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.selected-month-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.selected-month-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-transform: capitalize;
+}
+
+.mbody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mweeks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   BLOCCHI SETTIMANA & GIORNO (Con fix allineamento orizzontale)
+   ========================================================================== */
+details.week {
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color .15s ease;
+}
+
+details.week.hl {
+  border-color: var(--hl);
+}
+
 details.week summary {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 10px !important;
+  padding: 10px 14px;
   cursor: pointer;
   user-select: none;
+  background: var(--card);
+}
+
+details.week summary::-webkit-details-marker {
+  display: none;
 }
 
 details.week summary .t {
@@ -15,14 +71,20 @@ details.week summary .t {
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   flex: 1 1 auto !important;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
 }
 
 details.week summary .n {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 8px !important;
   white-space: nowrap !important;
   flex-shrink: 0 !important;
+  font-size: 13px;
+  color: var(--mute);
+  font-weight: 600;
 }
 
 .waBtn {
@@ -30,13 +92,198 @@ details.week summary .n {
   align-items: center !important;
   justify-content: center !important;
   gap: 4px !important;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
   white-space: nowrap !important;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.waBtn:hover {
+  background: var(--hl);
+  color: #22c55e;
+}
+
+.day {
+  padding: 12px 14px;
+  border-top: 1px solid var(--divider);
+}
+
+.day h4 {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--date);
+  text-transform: capitalize;
+}
+
+/* Apertura e Chiusura Impianto */
+.oc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  background: var(--card);
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.slot .sl {
+  font-weight: 700;
+  color: var(--mute);
+  min-width: 65px;
+}
+
+.slot .yn {
+  display: inline-flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--divider);
+}
+
+.slot .yn button {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 0;
+  background: transparent;
+  color: var(--mute);
+  border: none;
+  box-shadow: none;
   cursor: pointer;
 }
 
+.slot .yn button[aria-pressed="true"] {
+  background: var(--hl);
+  color: var(--ink);
+}
+
+.slot input[data-wn] {
+  padding: 2px 8px;
+  font-size: 12px;
+  min-height: 26px;
+  border-radius: 6px;
+  max-width: 140px;
+}
+
+.matches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ==========================================================================
-   ICONA REFERTO COMPATTA (Quadrata ad icona singola)
+   CARD PARTITA
    ========================================================================== */
+.match {
+  background: var(--card);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 10px 12px;
+  position: relative;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .15s ease;
+  cursor: pointer;
+}
+
+.match:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--hl);
+}
+
+.match.ghost {
+  opacity: 0.55;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.match.cancelled {
+  opacity: 0.45;
+  border-left: 4px solid #ef4444;
+}
+
+.match.postponed {
+  border-left: 4px solid #eab308;
+}
+
+.match.conflict-match {
+  border-left: 4px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.match.urgent-incomplete {
+  border-left: 4px solid #f97316;
+  background: rgba(249, 115, 22, 0.05);
+}
+
+/* Badge di stato */
+.cancelled-badge, .postponed-badge, .conflict-badge, .urgent-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.cancelled-badge { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.postponed-badge { background: rgba(234, 179, 8, 0.2); color: #fde047; }
+.conflict-badge { background: rgba(239, 68, 68, 0.25); color: #ef4444; }
+.urgent-badge { background: rgba(249, 115, 22, 0.25); color: #f97316; }
+
+/* Intestazione card */
+.m-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.m-time-pill {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--date);
+}
+
+.cat-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--divider);
+}
+
+.friendly-badge {
+  font-size: 10px;
+  font-weight: 800;
+  background: #a855f7;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.m-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Pulsanti Azione */
 .reportBtn {
   min-height: 30px;
   min-width: 30px;
@@ -56,7 +303,6 @@ details.week summary .n {
   text-decoration: none;
 }
 
-/* Referto assente: icona grigia discreta (click per caricare) */
 .reportBtn.no-file {
   opacity: 0.35;
   filter: grayscale(1);
@@ -67,7 +313,6 @@ details.week summary .n {
   filter: grayscale(0.2);
 }
 
-/* Referto presente: evidenziato azzurro (click per visualizzare) */
 .reportBtn.has-file {
   background: rgba(14, 165, 233, 0.2);
   border: 1px solid rgba(56, 189, 248, 0.5);
@@ -79,7 +324,128 @@ details.week summary .n {
   border-color: #38bdf8;
 }
 
-/* Box caricamento referto nella modale */
+.fipBtn {
+  min-height: 30px;
+  min-width: 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--mute);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: all .15s ease;
+}
+.fipBtn:hover {
+  background: var(--hl);
+  color: var(--date);
+}
+
+.ghostBtn, .editBtn {
+  min-height: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  font-size: 13px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ghostBtn[aria-pressed="true"] {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+
+.m-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-pill {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.score-pill.win { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+.score-pill.loss { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.score-pill.suspended { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+
+/* Roster Riquadri */
+.m-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--divider);
+}
+
+.m-roster-chip {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+}
+
+.m-roster-chip .chip-lbl {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--mute);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+
+.m-roster-chip .chip-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-roster-chip .chip-val.empty-req {
+  color: #f97316;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 11px;
+}
+
+.m-roster-chip .chip-val.empty-opt {
+  color: var(--mute);
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.clickable-person {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.clickable-person:hover {
+  color: var(--date);
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   ALLEGATO REFERTO NELLA MODALE
+   ========================================================================== */
 .file-upload-box {
   background: var(--card);
   border: 1px dashed var(--divider);
@@ -109,4 +475,75 @@ details.week summary .n {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 260px;
+}
+
+/* ==========================================================================
+   RIEPILOGO & COMPENSI LATERALE
+   ========================================================================== */
+.recap {
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.recap h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.recap-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.recap-item-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  background: var(--card);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.recap-item-compact:hover {
+  background: var(--card-hover);
+}
+
+.recap-item-compact:active {
+  transform: scale(0.98);
+}
+
+.recap-item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recap-item-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.recap-item-sub {
+  font-size: 11px;
+  color: var(--mute);
+}
+
+.recap-item-amount {
+  font-weight: 800;
+  font-size: 14.5px;
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
 }
