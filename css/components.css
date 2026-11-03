@@ -1,5 +1,5 @@
 /* ==========================================================================
-   LISTA E VISTA MESE
+   LAYOUT PRINCIPALE A 2 COLONNE (Mese + Sidebar Riepilogo Destra)
    ========================================================================== */
 .selected-month-view {
   display: flex;
@@ -16,7 +16,7 @@
 
 .selected-month-header h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -24,27 +24,38 @@
   text-transform: capitalize;
 }
 
+/* Corpo a 2 colonne: Settimane a sinistra (larghe), Compensi a destra (fissi) */
 .mbody {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 990px) {
+  .mbody {
+    grid-template-columns: 1fr;
+  }
+  .recap {
+    order: -1;
+  }
 }
 
 .mweeks {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 /* ==========================================================================
-   BLOCCHI SETTIMANA & GIORNO (Con fix allineamento orizzontale)
+   BLOCCO SETTIMANA (Allineamento corretto senza sovrapposizioni)
    ========================================================================== */
 details.week {
   background: var(--surface);
   border: 1px solid var(--divider);
   border-radius: 12px;
   overflow: hidden;
-  transition: border-color .15s ease;
+  margin-bottom: 8px;
 }
 
 details.week.hl {
@@ -52,11 +63,11 @@ details.week.hl {
 }
 
 details.week summary {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 10px !important;
-  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
   cursor: pointer;
   user-select: none;
   background: var(--card);
@@ -67,36 +78,35 @@ details.week summary::-webkit-details-marker {
 }
 
 details.week summary .t {
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  flex: 1 1 auto !important;
   font-weight: 700;
   font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
   color: var(--ink);
 }
 
 details.week summary .n {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  white-space: nowrap !important;
-  flex-shrink: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
   font-size: 13px;
   color: var(--mute);
   font-weight: 600;
 }
 
 .waBtn {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 4px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   padding: 3px 8px;
   font-size: 11px;
   font-weight: 700;
   border-radius: 6px;
-  white-space: nowrap !important;
+  white-space: nowrap;
   background: var(--surface);
   border: 1px solid var(--divider);
   color: var(--ink);
@@ -109,6 +119,7 @@ details.week summary .n {
   color: #22c55e;
 }
 
+/* Blocco Giorno */
 .day {
   padding: 12px 14px;
   border-top: 1px solid var(--divider);
@@ -116,7 +127,7 @@ details.week summary .n {
 
 .day h4 {
   margin: 0 0 10px 0;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 800;
   color: var(--date);
   text-transform: capitalize;
@@ -179,23 +190,25 @@ details.week summary .n {
   max-width: 140px;
 }
 
+/* Contenitore verticale delle card: una sotto l'altra */
 .matches {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 /* ==========================================================================
-   CARD PARTITA
+   CARD PARTITA (Aspetto fedele originale a tutta larghezza)
    ========================================================================== */
 .match {
   background: var(--card);
   border: 1px solid var(--divider);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 12px;
   position: relative;
   transition: transform .12s ease, box-shadow .12s ease, border-color .15s ease;
   cursor: pointer;
+  width: 100%;
 }
 
 .match:hover {
@@ -228,7 +241,6 @@ details.week summary .n {
   background: rgba(249, 115, 22, 0.05);
 }
 
-/* Badge di stato */
 .cancelled-badge, .postponed-badge, .conflict-badge, .urgent-badge {
   font-size: 10px;
   font-weight: 800;
@@ -244,12 +256,11 @@ details.week summary .n {
 .conflict-badge { background: rgba(239, 68, 68, 0.25); color: #ef4444; }
 .urgent-badge { background: rgba(249, 115, 22, 0.25); color: #f97316; }
 
-/* Intestazione card */
 .m-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .m-time-pill {
@@ -283,15 +294,15 @@ details.week summary .n {
   gap: 4px;
 }
 
-/* Pulsanti Azione */
+/* Tasto Referto icona quadrata singola */
 .reportBtn {
-  min-height: 30px;
-  min-width: 30px;
-  width: 30px;
-  height: 30px;
+  min-height: 28px;
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  font-size: 14px;
-  border-radius: 8px;
+  font-size: 13.5px;
+  border-radius: 7px;
   background: var(--surface);
   box-shadow: none;
   display: inline-flex;
@@ -325,13 +336,13 @@ details.week summary .n {
 }
 
 .fipBtn {
-  min-height: 30px;
-  min-width: 30px;
-  width: 30px;
-  height: 30px;
+  min-height: 28px;
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  font-size: 14px;
-  border-radius: 8px;
+  font-size: 13.5px;
+  border-radius: 7px;
   background: var(--surface);
   color: var(--mute);
   display: inline-flex;
@@ -346,12 +357,12 @@ details.week summary .n {
 }
 
 .ghostBtn, .editBtn {
-  min-height: 30px;
-  min-width: 30px;
-  height: 30px;
+  min-height: 28px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 6px;
   font-size: 13px;
-  border-radius: 8px;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -363,10 +374,10 @@ details.week summary .n {
 }
 
 .m-title {
-  font-size: 14.5px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   color: var(--ink);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -382,12 +393,12 @@ details.week summary .n {
 .score-pill.loss { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
 .score-pill.suspended { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
 
-/* Roster Riquadri */
+/* Roster: 3 colonne orizzontali compatte */
 .m-roster-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--divider);
 }
@@ -395,7 +406,7 @@ details.week summary .n {
 .m-roster-chip {
   background: var(--surface);
   border-radius: 8px;
-  padding: 4px 6px;
+  padding: 5px 8px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -413,7 +424,7 @@ details.week summary .n {
 }
 
 .m-roster-chip .chip-val {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ink);
   overflow: hidden;
@@ -425,7 +436,7 @@ details.week summary .n {
   color: #f97316;
   font-weight: 700;
   font-style: italic;
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
 .m-roster-chip .chip-val.empty-opt {
@@ -478,19 +489,20 @@ details.week summary .n {
 }
 
 /* ==========================================================================
-   RIEPILOGO & COMPENSI LATERALE
+   RIEPILOGO & COMPENSI (Colonna Fissa a Destra)
    ========================================================================== */
 .recap {
   background: var(--surface);
   border: 1px solid var(--divider);
   border-radius: 14px;
   padding: 14px;
-  margin-bottom: 14px;
+  position: sticky;
+  top: 16px;
 }
 
 .recap h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 800;
   color: var(--ink);
 }
@@ -506,10 +518,9 @@ details.week summary .n {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 9px 12px;
+  padding: 8px 10px;
   background: var(--card);
-  border-radius: 10px;
-  margin-bottom: 6px;
+  border-radius: 9px;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.12s ease;
 }
@@ -525,25 +536,25 @@ details.week summary .n {
 .recap-item-left {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .recap-item-name {
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--ink);
 }
 
 .recap-item-sub {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--mute);
 }
 
 .recap-item-amount {
   font-weight: 800;
-  font-size: 14.5px;
+  font-size: 14px;
   color: #4ade80;
   background: rgba(34, 197, 94, 0.12);
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 6px;
 }
