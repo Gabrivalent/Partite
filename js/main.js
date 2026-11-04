@@ -1,11 +1,30 @@
 // ==========================================================================
-// SELETTORI DOM LOCALI (Non dipendono da altri moduli)
+// 1. SELETTORI DOM LOCALI (Zero dipendenze esterne per evitare errori di modulo)
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 
 // ==========================================================================
-// IMPORT MODULI
+// 2. GESTIONE AUTENTICAZIONE GLOBALE (Immediata per evitare Uncaught TypeError)
+// ==========================================================================
+window.handleAuthClick = async function() {
+  try {
+    const { signInWithGoogle, signOutUser } = await import('./api.js');
+    const { state } = await import('./state.js');
+    const { toast } = await import('./render.js');
+    if (state.user) {
+      await signOutUser();
+      toast('Disconnesso con successo', 'info');
+    } else {
+      await signInWithGoogle();
+    }
+  } catch (err) {
+    console.error('Errore durante autenticazione:', err);
+  }
+};
+
+// ==========================================================================
+// 3. IMPORT MODULI
 // ==========================================================================
 import { 
   state, 
@@ -33,7 +52,6 @@ import { render, toast } from './render.js';
 
 import { 
   openModal, 
-  closeModal, 
   openMonthRecapModal, 
   openPersonStatsModal, 
   openAlertsModal 
@@ -53,30 +71,11 @@ import {
   saveMatchToCloud, 
   saveDayMetaToCloud, 
   deleteMatchFromCloud,
-  applyCloudData,
-  signInWithGoogle,
-  signOutUser
+  applyCloudData 
 } from './api.js';
 
 // ==========================================================================
-// GESTIONE AUTENTICAZIONE GLOBALE
-// ==========================================================================
-window.handleAuthClick = async function() {
-  try {
-    if (state.user) {
-      await signOutUser();
-      toast('Disconnesso con successo', 'info');
-    } else {
-      await signInWithGoogle();
-    }
-  } catch (err) {
-    console.error('Errore durante autenticazione:', err);
-    toast('Errore di autenticazione', 'warning');
-  }
-};
-
-// ==========================================================================
-// CONVERSIONE IMPORTAZIONE JSON
+// 4. PARSER IMPORTAZIONE JSON
 // ==========================================================================
 function fromExportFormat(arr) {
   const newItems = [];
@@ -121,7 +120,7 @@ function fromExportFormat(arr) {
 }
 
 // ==========================================================================
-// REGISTRAZIONE ASCOLTATORI EVENTI
+// 5. REGISTRAZIONE EVENTI
 // ==========================================================================
 function setupEventListeners() {
   // Ricerca globale
@@ -151,7 +150,7 @@ function setupEventListeners() {
     };
   }
 
-  // Undo (Annulla ultima modifica)
+  // Undo (Annulla modifica)
   const undoBtn = $('#undoBtn');
   if (undoBtn) {
     undoBtn.onclick = () => {
@@ -183,7 +182,7 @@ function setupEventListeners() {
     };
   }
 
-  // Pulsante Badge Conflitti / Mancanti
+  // Pulsante Badge Avvisi
   const alertBtn = $('#alertBadgeBtn');
   if (alertBtn) {
     alertBtn.onclick = () => {
@@ -267,7 +266,7 @@ function setupEventListeners() {
     shareBtn.onclick = () => copyReadOnlyLink(toast);
   }
 
-  // Input file invisibile globale per il caricamento diretto del referto dalla card
+  // Input file invisibile globale per il caricamento referto
   let directUploadInput = $('#directReportInput');
   if (!directUploadInput) {
     directUploadInput = document.createElement('input');
@@ -304,7 +303,7 @@ function setupEventListeners() {
     reader.readAsDataURL(file);
   };
 
-  // Navigazione laterale ad albero (Anni, Mesi, Settimane)
+  // Navigazione ad albero laterale (Anni, Mesi, Settimane)
   const navTree = $('#navTree') || $('.nav-tree');
   if (navTree) {
     navTree.onclick = e => {
@@ -371,7 +370,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 2. Tasto WhatsApp singola settimana
+      // 2. Tasto WhatsApp settimana
       const wBtn = e.target.closest('.waBtn');
       if (wBtn) {
         e.stopPropagation();
@@ -385,7 +384,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 3. Tasto WhatsApp riepilogo mese
+      // 3. Tasto WhatsApp mese
       const waMonthBtn = e.target.closest('#waRecapBtn');
       if (waMonthBtn) {
         e.stopPropagation();
@@ -395,7 +394,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 4. Click sul nome per aprire statistiche persona
+      // 4. Click sul nome per aprire statistiche
       const personEl = e.target.closest('.clickable-person');
       if (personEl) {
         e.stopPropagation();
@@ -404,7 +403,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 5. Pulsante Spunta Rapida (Ghost)
+      // 5. Check Rapido (Ghost)
       const gBtn = e.target.closest('.ghostBtn');
       if (gBtn) {
         e.stopPropagation();
@@ -431,7 +430,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 7. Click su card partita
+      // 7. Click sulla card partita
       const matchCard = e.target.closest('.match');
       if (matchCard && !e.target.closest('a') && !e.target.closest('button')) {
         if (state.READONLY) return;
@@ -495,17 +494,29 @@ function setupEventListeners() {
     };
   }
 
+  // Chiusura modali su click sullo sfondo scuro
+  document.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-overlay')) {
+      e.target.classList.remove('open');
+      e.target.style.display = 'none';
+    }
+  });
+
   // Chiusura modali su tasto Escape
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      const openM = $('.modal-overlay.open') || $('.modal.open');
-      if (openM) closeModal();
+      const openModals = $$('.modal-overlay.open, .modal.open, #matchModal');
+      openModals.forEach(m => {
+        m.classList.remove('open');
+        if (m.close && typeof m.close === 'function') m.close();
+        if (m.style) m.style.display = 'none';
+      });
     }
   });
 }
 
 // ==========================================================================
-// AVVIO APPLICAZIONE
+// 6. INIZIALIZZAZIONE E AVVIO
 // ==========================================================================
 async function initApp() {
   const params = new URLSearchParams(window.location.search);
@@ -519,7 +530,7 @@ async function initApp() {
     if (importBtn) importBtn.style.display = 'none';
   }
 
-  // 1. Caricamento rapido dalla memoria locale
+  // Caricamento locale iniziale
   try {
     const rawItems = localStorage.getItem('partite-v1');
     if (rawItems) state.items = JSON.parse(rawItems);
@@ -531,18 +542,15 @@ async function initApp() {
     console.warn('Errore lettura dati da localStorage:', e);
   }
 
-  // 2. Registra tutti i listener eventi
   setupEventListeners();
 
-  // 3. Imposta il mese iniziale se vuoto
   if (!state.currentMonth) {
     state.currentMonth = iso(new Date()).slice(0, 7);
   }
 
-  // 4. Primo rendering
   render();
 
-  // 5. Connessione a Supabase e sincronizzazione Cloud in tempo reale
+  // Sincronizzazione Supabase
   try {
     const isOnline = initSupabase();
     if (isOnline) {
@@ -554,7 +562,7 @@ async function initApp() {
       setSyncStatus('offline');
     }
   } catch (err) {
-    console.error('Errore sincronizzazione Cloud iniziale:', err);
+    console.error('Errore sincronizzazione Cloud:', err);
     setSyncStatus('error');
   }
 }
