@@ -29,7 +29,8 @@ import {
   loadAllDataFromCloud, 
   saveMatchToCloud, 
   saveDayMetaToCloud, 
-  deleteMatchFromCloud 
+  deleteMatchFromCloud,
+  applyCloudData 
 } from './api.js';
 
 function fromExportFormat(arr) {
@@ -75,7 +76,7 @@ function fromExportFormat(arr) {
 }
 
 function setupEventListeners() {
-  // Ricerca globale e filtro categoria
+  // 1. Ricerca globale e filtri
   const qInput = $('#q');
   if (qInput) {
     qInput.oninput = e => {
@@ -92,7 +93,7 @@ function setupEventListeners() {
     };
   }
 
-  // Tasto Nuova Partita
+  // 2. Pulsante Nuova Partita
   const newBtn = $('#newBtn');
   if (newBtn) {
     newBtn.onclick = () => {
@@ -101,7 +102,7 @@ function setupEventListeners() {
     };
   }
 
-  // Tasto Annulla Modifica (Undo)
+  // 3. Undo (Annulla ultima modifica)
   const undoBtn = $('#undoBtn');
   if (undoBtn) {
     undoBtn.onclick = () => {
@@ -112,7 +113,7 @@ function setupEventListeners() {
     };
   }
 
-  // Tasto Oggi
+  // 4. Tasto Oggi (Scroll e highlight)
   const todayBtn = $('#todayBtn');
   if (todayBtn) {
     todayBtn.onclick = () => {
@@ -127,13 +128,13 @@ function setupEventListeners() {
           el.classList.add('hl');
           setTimeout(() => el.classList.remove('hl'), 1500);
         } else {
-          toast('Nessuna gara oggi', 'info');
+          toast('Nessuna gara in programma oggi', 'info');
         }
       }, 100);
     };
   }
 
-  // Pulsante Avvisi / Conflitti / Mancanti
+  // 5. Pulsante Avvisi / Alert
   const alertBtn = $('#alertBadgeBtn');
   if (alertBtn) {
     alertBtn.onclick = () => {
@@ -141,7 +142,7 @@ function setupEventListeners() {
     };
   }
 
-  // Importazione JSON
+  // 6. Importazione File JSON
   const impBtn = $('#importBtn');
   const impF = $('#importFile');
   if (impBtn && impF) {
@@ -161,12 +162,12 @@ function setupEventListeners() {
         try {
           const data = JSON.parse(reader.result);
           if (!Array.isArray(data)) {
-            throw new Error('Il file JSON non contiene un elenco (array) valido.');
+            throw new Error('Il file JSON non contiene un array.');
           }
 
           const { newItems, wi } = fromExportFormat(data);
           if (!newItems.length && !Object.keys(wi).length) {
-            throw new Error('Nessun dato riconosciuto nel file.');
+            throw new Error('Nessun dato valido estratto dal file.');
           }
 
           pushUndo();
@@ -178,7 +179,7 @@ function setupEventListeners() {
           save();
           saveD();
           render();
-          toast(`${newItems.length} partite importate con successo!`, 'success');
+          toast(`${newItems.length} partite importate!`, 'success');
         } catch (err) {
           console.error('Dettaglio errore importazione JSON:', err);
           toast('Errore importazione: ' + err.message, 'warning');
@@ -188,7 +189,7 @@ function setupEventListeners() {
     };
   }
 
-  // Esportazione JSON e PDF
+  // 7. Esportazione JSON e PDF
   const expBtn = $('#exportBtn');
   if (expBtn) {
     expBtn.onclick = () => {
@@ -211,13 +212,13 @@ function setupEventListeners() {
     };
   }
 
-  // Link sola lettura
+  // 8. Condivisione link sola lettura
   const shareBtn = $('#shareBtn');
   if (shareBtn) {
     shareBtn.onclick = () => copyReadOnlyLink(toast);
   }
 
-  // Input file nascosto globale per il caricamento referto da card
+  // 9. Input file invisibile per caricamento diretto del referto
   let directUploadInput = $('#directReportInput');
   if (!directUploadInput) {
     directUploadInput = document.createElement('input');
@@ -254,11 +255,49 @@ function setupEventListeners() {
     reader.readAsDataURL(file);
   };
 
-  // Delegazione eventi su #list (Click partite, tasti e controlli)
+  // 10. Navigazione laterale ad albero (Anni, Mesi, Settimane)
+  const navTree = $('#navTree') || $('.nav-tree');
+  if (navTree) {
+    navTree.onclick = e => {
+      const mLink = e.target.closest('[data-nav-month]');
+      if (mLink) {
+        e.preventDefault();
+        const m = mLink.dataset.navMonth;
+        if (m && state.currentMonth !== m) {
+          state.currentMonth = m;
+          render();
+        }
+        return;
+      }
+
+      const wLink = e.target.closest('.nav-week-link');
+      if (wLink) {
+        e.preventDefault();
+        const wStart = wLink.dataset.weekStart;
+        const mParent = wLink.dataset.month;
+        if (mParent && state.currentMonth !== mParent) {
+          state.currentMonth = mParent;
+          render();
+        }
+        setTimeout(() => {
+          const wEl = $(`[data-week="${wStart}"]`);
+          if (wEl) {
+            wEl.open = true;
+            wEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            wEl.classList.add('hl');
+            setTimeout(() => wEl.classList.remove('hl'), 1500);
+          }
+        }, 50);
+        return;
+      }
+    };
+  }
+
+  // 11. Delegazione eventi dentro l'area centrale (#list)
   const list = $('#list');
   if (list) {
     list.onclick = e => {
-      // 1. Tasto Referto (📄)
+      // Tasto Referto (📄)
       const rBtn = e.target.closest('.reportBtn');
       if (rBtn) {
         e.stopPropagation();
@@ -267,7 +306,6 @@ function setupEventListeners() {
         if (!match) return;
 
         if (match.fileData) {
-          // Se presente, apre l'anteprima in nuova scheda
           const w = window.open('');
           if (w) {
             if (match.fileData.startsWith('data:application/pdf')) {
@@ -277,7 +315,6 @@ function setupEventListeners() {
             }
           }
         } else {
-          // Se assente, avvia la selezione file
           if (state.READONLY) return;
           directUploadInput.dataset.targetMatchId = mId;
           directUploadInput.click();
@@ -285,7 +322,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 2. Tasto WhatsApp singola settimana
+      // Tasto WhatsApp singola settimana
       const wBtn = e.target.closest('.waBtn');
       if (wBtn) {
         e.stopPropagation();
@@ -299,7 +336,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 3. Tasto WhatsApp riepilogo mese
+      // Tasto WhatsApp riepilogo mese
       const waMonthBtn = e.target.closest('#waRecapBtn');
       if (waMonthBtn) {
         e.stopPropagation();
@@ -309,7 +346,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 4. Click sul nome persona per statistiche
+      // Click sul nome per aprire statistiche persona
       const personEl = e.target.closest('.clickable-person');
       if (personEl) {
         e.stopPropagation();
@@ -318,7 +355,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 5. Pulsante Check Rapido (Ghost)
+      // Pulsante Spunta Rapida (Ghost)
       const gBtn = e.target.closest('.ghostBtn');
       if (gBtn) {
         e.stopPropagation();
@@ -334,7 +371,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 6. Pulsante Modifica
+      // Pulsante Modifica
       const edBtn = e.target.closest('.editBtn');
       if (edBtn) {
         e.stopPropagation();
@@ -345,7 +382,7 @@ function setupEventListeners() {
         return;
       }
 
-      // 7. Click sull'intera card partita
+      // Click generico sulla card partita
       const matchCard = e.target.closest('.match');
       if (matchCard && !e.target.closest('a') && !e.target.closest('button')) {
         if (state.READONLY) return;
@@ -355,14 +392,16 @@ function setupEventListeners() {
         return;
       }
 
-      // 8. Click su apertura/chiusura Si/No
+      // Apertura/Chiusura Sì/No
       const ynBtn = e.target.closest('.slot .yn button');
       if (ynBtn) {
         if (state.READONLY) return;
         const slotEl = ynBtn.closest('.slot');
-        const dayStr = ynBtn.closest('.day').dataset.day;
-        const type = slotEl.dataset.type; // 'ap' o 'ch'
-        const val = ynBtn.dataset.val;    // 'si' o 'no'
+        const dayEl = ynBtn.closest('.day');
+        if (!slotEl || !dayEl) return;
+        const dayStr = dayEl.dataset.day;
+        const type = slotEl.dataset.type;
+        const val = ynBtn.dataset.val;
 
         pushUndo();
         state.dayMeta[dayStr] ??= {};
@@ -373,13 +412,15 @@ function setupEventListeners() {
       }
     };
 
-    // Modifica nome addetto apertura/chiusura
+    // Modifica nome referente apertura/chiusura
     list.onchange = e => {
       const input = e.target.closest('input[data-wn]');
       if (input) {
         if (state.READONLY) return;
-        const dayStr = input.closest('.day').dataset.day;
-        const typeName = input.dataset.wn; // 'apNome' o 'chNome'
+        const dayEl = input.closest('.day');
+        if (!dayEl) return;
+        const dayStr = dayEl.dataset.day;
+        const typeName = input.dataset.wn;
         pushUndo();
         state.dayMeta[dayStr] ??= {};
         state.dayMeta[dayStr][typeName] = input.value.trim();
@@ -388,19 +429,33 @@ function setupEventListeners() {
     };
   }
 
-  // Delegazione click colonna destra riepilogo
-  const sidebar = $('#sidebarRecap');
+  // 12. Delegazione click colonna laterale riepilogo
+  const sidebar = $('#sidebarRecap') || $('.recap');
   if (sidebar) {
     sidebar.onclick = e => {
       const row = e.target.closest('.recap-item-compact');
       if (row) {
         const name = row.dataset.name;
         if (name) openPersonStatsModal(name);
+        return;
+      }
+      const recapHeader = e.target.closest('h4');
+      if (recapHeader && state.currentMonth) {
+        openMonthRecapModal(state.currentMonth);
       }
     };
   }
+
+  // 13. Chiusura modali su click esterno o tasto Esc
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      const openM = $('.modal-overlay.open') || $('.modal.open');
+      if (openM) closeModal();
+    }
+  });
 }
 
+// Inizializzazione e caricamento iniziale dell'applicazione
 async function initApp() {
   const params = new URLSearchParams(window.location.search);
   state.READONLY = params.get('readonly') === 'true';
@@ -409,9 +464,11 @@ async function initApp() {
     document.body.classList.add('ro');
     const newBtn = $('#newBtn');
     if (newBtn) newBtn.style.display = 'none';
+    const importBtn = $('#importBtn');
+    if (importBtn) importBtn.style.display = 'none';
   }
 
-  // Caricamento iniziale da LocalStorage
+  // 1. Caricamento rapido dalla memoria locale
   try {
     const rawItems = localStorage.getItem('partite-v1');
     if (rawItems) state.items = JSON.parse(rawItems);
@@ -420,25 +477,34 @@ async function initApp() {
     const rawMolt = localStorage.getItem('partite-m-v1');
     if (rawMolt) state.molt = JSON.parse(rawMolt);
   } catch (e) {
-    console.error('Errore lettura da localStorage', e);
+    console.warn('Errore lettura dati da localStorage:', e);
   }
 
+  // 2. Registra tutti i listener eventi
   setupEventListeners();
 
-  // Inizializza mese corrente
+  // 3. Imposta il mese iniziale (se vuoto, imposta mese corrente)
   if (!state.currentMonth) {
     state.currentMonth = iso(new Date()).slice(0, 7);
   }
 
+  // 4. Primo rendering a schermo
   render();
 
-  // Connessione e sincronizzazione Cloud (Supabase)
+  // 5. Connessione a Supabase e sincronizzazione Cloud in tempo reale
   try {
-    initSupabase();
-    await loadAllDataFromCloud();
-    render();
+    const isOnline = initSupabase();
+    if (isOnline) {
+      setSyncStatus('syncing');
+      await loadAllDataFromCloud();
+      setSyncStatus('connected');
+      render();
+    } else {
+      setSyncStatus('offline');
+    }
   } catch (err) {
-    console.warn('Avvio offline o sincronizzazione fallita:', err);
+    console.error('Errore sincronizzazione Cloud iniziale:', err);
+    setSyncStatus('error');
   }
 }
 
