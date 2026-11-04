@@ -1,4 +1,23 @@
-import { state, $, $$, save, saveD, saveM, saveLocalOnly, pushUndo, undo, setSyncStatus } from './state.js';
+// ==========================================================================
+// SELETTORI DOM LOCALI (Non dipendono da altri moduli)
+// ==========================================================================
+const $ = (sel, el = document) => el.querySelector(sel);
+const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+
+// ==========================================================================
+// IMPORT MODULI
+// ==========================================================================
+import { 
+  state, 
+  save, 
+  saveD, 
+  saveM, 
+  saveLocalOnly, 
+  pushUndo, 
+  undo, 
+  setSyncStatus 
+} from './state.js';
+
 import { 
   uid, 
   iso, 
@@ -9,7 +28,9 @@ import {
   getUrgentIncompleteMatches, 
   getPendingPostponedMatches 
 } from './rules.js';
+
 import { render, toast } from './render.js';
+
 import { 
   openModal, 
   closeModal, 
@@ -17,6 +38,7 @@ import {
   openPersonStatsModal, 
   openAlertsModal 
 } from './modals.js';
+
 import { 
   generateWhatsAppText, 
   copyMonthRecapWhatsApp, 
@@ -24,15 +46,38 @@ import {
   exportSelectedMonthsJSON, 
   generateMonthPDF 
 } from './export.js';
+
 import { 
   initSupabase, 
   loadAllDataFromCloud, 
   saveMatchToCloud, 
   saveDayMetaToCloud, 
   deleteMatchFromCloud,
-  applyCloudData 
+  applyCloudData,
+  signInWithGoogle,
+  signOutUser
 } from './api.js';
 
+// ==========================================================================
+// GESTIONE AUTENTICAZIONE GLOBALE
+// ==========================================================================
+window.handleAuthClick = async function() {
+  try {
+    if (state.user) {
+      await signOutUser();
+      toast('Disconnesso con successo', 'info');
+    } else {
+      await signInWithGoogle();
+    }
+  } catch (err) {
+    console.error('Errore durante autenticazione:', err);
+    toast('Errore di autenticazione', 'warning');
+  }
+};
+
+// ==========================================================================
+// CONVERSIONE IMPORTAZIONE JSON
+// ==========================================================================
 function fromExportFormat(arr) {
   const newItems = [];
   const wi = {};
@@ -75,8 +120,11 @@ function fromExportFormat(arr) {
   return { newItems, wi };
 }
 
+// ==========================================================================
+// REGISTRAZIONE ASCOLTATORI EVENTI
+// ==========================================================================
 function setupEventListeners() {
-  // 1. Ricerca globale e filtri
+  // Ricerca globale
   const qInput = $('#q');
   if (qInput) {
     qInput.oninput = e => {
@@ -85,6 +133,7 @@ function setupEventListeners() {
     };
   }
 
+  // Filtro Categoria
   const fCat = $('#filterCat');
   if (fCat) {
     fCat.onchange = e => {
@@ -93,7 +142,7 @@ function setupEventListeners() {
     };
   }
 
-  // 2. Pulsante Nuova Partita
+  // Nuova Partita
   const newBtn = $('#newBtn');
   if (newBtn) {
     newBtn.onclick = () => {
@@ -102,7 +151,7 @@ function setupEventListeners() {
     };
   }
 
-  // 3. Undo (Annulla ultima modifica)
+  // Undo (Annulla ultima modifica)
   const undoBtn = $('#undoBtn');
   if (undoBtn) {
     undoBtn.onclick = () => {
@@ -113,7 +162,7 @@ function setupEventListeners() {
     };
   }
 
-  // 4. Tasto Oggi (Scroll e highlight)
+  // Pulsante Oggi (Scroll e highlight)
   const todayBtn = $('#todayBtn');
   if (todayBtn) {
     todayBtn.onclick = () => {
@@ -134,7 +183,7 @@ function setupEventListeners() {
     };
   }
 
-  // 5. Pulsante Avvisi / Alert
+  // Pulsante Badge Conflitti / Mancanti
   const alertBtn = $('#alertBadgeBtn');
   if (alertBtn) {
     alertBtn.onclick = () => {
@@ -142,7 +191,7 @@ function setupEventListeners() {
     };
   }
 
-  // 6. Importazione File JSON
+  // Importazione JSON
   const impBtn = $('#importBtn');
   const impF = $('#importFile');
   if (impBtn && impF) {
@@ -162,7 +211,7 @@ function setupEventListeners() {
         try {
           const data = JSON.parse(reader.result);
           if (!Array.isArray(data)) {
-            throw new Error('Il file JSON non contiene un array.');
+            throw new Error('Il file JSON non contiene un elenco (array) valido.');
           }
 
           const { newItems, wi } = fromExportFormat(data);
@@ -179,7 +228,7 @@ function setupEventListeners() {
           save();
           saveD();
           render();
-          toast(`${newItems.length} partite importate!`, 'success');
+          toast(`${newItems.length} partite importate con successo!`, 'success');
         } catch (err) {
           console.error('Dettaglio errore importazione JSON:', err);
           toast('Errore importazione: ' + err.message, 'warning');
@@ -189,7 +238,7 @@ function setupEventListeners() {
     };
   }
 
-  // 7. Esportazione JSON e PDF
+  // Esportazione JSON e PDF
   const expBtn = $('#exportBtn');
   if (expBtn) {
     expBtn.onclick = () => {
@@ -212,13 +261,13 @@ function setupEventListeners() {
     };
   }
 
-  // 8. Condivisione link sola lettura
+  // Condivisione link sola lettura
   const shareBtn = $('#shareBtn');
   if (shareBtn) {
     shareBtn.onclick = () => copyReadOnlyLink(toast);
   }
 
-  // 9. Input file invisibile per caricamento diretto del referto
+  // Input file invisibile globale per il caricamento diretto del referto dalla card
   let directUploadInput = $('#directReportInput');
   if (!directUploadInput) {
     directUploadInput = document.createElement('input');
@@ -255,7 +304,7 @@ function setupEventListeners() {
     reader.readAsDataURL(file);
   };
 
-  // 10. Navigazione laterale ad albero (Anni, Mesi, Settimane)
+  // Navigazione laterale ad albero (Anni, Mesi, Settimane)
   const navTree = $('#navTree') || $('.nav-tree');
   if (navTree) {
     navTree.onclick = e => {
@@ -293,11 +342,11 @@ function setupEventListeners() {
     };
   }
 
-  // 11. Delegazione eventi dentro l'area centrale (#list)
+  // Delegazione eventi su #list
   const list = $('#list');
   if (list) {
     list.onclick = e => {
-      // Tasto Referto (📄)
+      // 1. Tasto Referto (📄)
       const rBtn = e.target.closest('.reportBtn');
       if (rBtn) {
         e.stopPropagation();
@@ -322,7 +371,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Tasto WhatsApp singola settimana
+      // 2. Tasto WhatsApp singola settimana
       const wBtn = e.target.closest('.waBtn');
       if (wBtn) {
         e.stopPropagation();
@@ -336,7 +385,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Tasto WhatsApp riepilogo mese
+      // 3. Tasto WhatsApp riepilogo mese
       const waMonthBtn = e.target.closest('#waRecapBtn');
       if (waMonthBtn) {
         e.stopPropagation();
@@ -346,7 +395,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Click sul nome per aprire statistiche persona
+      // 4. Click sul nome per aprire statistiche persona
       const personEl = e.target.closest('.clickable-person');
       if (personEl) {
         e.stopPropagation();
@@ -355,7 +404,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Pulsante Spunta Rapida (Ghost)
+      // 5. Pulsante Spunta Rapida (Ghost)
       const gBtn = e.target.closest('.ghostBtn');
       if (gBtn) {
         e.stopPropagation();
@@ -371,7 +420,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Pulsante Modifica
+      // 6. Pulsante Modifica
       const edBtn = e.target.closest('.editBtn');
       if (edBtn) {
         e.stopPropagation();
@@ -382,7 +431,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Click generico sulla card partita
+      // 7. Click su card partita
       const matchCard = e.target.closest('.match');
       if (matchCard && !e.target.closest('a') && !e.target.closest('button')) {
         if (state.READONLY) return;
@@ -392,7 +441,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Apertura/Chiusura Sì/No
+      // 8. Apertura/Chiusura Sì/No
       const ynBtn = e.target.closest('.slot .yn button');
       if (ynBtn) {
         if (state.READONLY) return;
@@ -429,7 +478,7 @@ function setupEventListeners() {
     };
   }
 
-  // 12. Delegazione click colonna laterale riepilogo
+  // Delegazione click colonna laterale riepilogo
   const sidebar = $('#sidebarRecap') || $('.recap');
   if (sidebar) {
     sidebar.onclick = e => {
@@ -446,7 +495,7 @@ function setupEventListeners() {
     };
   }
 
-  // 13. Chiusura modali su click esterno o tasto Esc
+  // Chiusura modali su tasto Escape
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       const openM = $('.modal-overlay.open') || $('.modal.open');
@@ -455,7 +504,9 @@ function setupEventListeners() {
   });
 }
 
-// Inizializzazione e caricamento iniziale dell'applicazione
+// ==========================================================================
+// AVVIO APPLICAZIONE
+// ==========================================================================
 async function initApp() {
   const params = new URLSearchParams(window.location.search);
   state.READONLY = params.get('readonly') === 'true';
@@ -483,12 +534,12 @@ async function initApp() {
   // 2. Registra tutti i listener eventi
   setupEventListeners();
 
-  // 3. Imposta il mese iniziale (se vuoto, imposta mese corrente)
+  // 3. Imposta il mese iniziale se vuoto
   if (!state.currentMonth) {
     state.currentMonth = iso(new Date()).slice(0, 7);
   }
 
-  // 4. Primo rendering a schermo
+  // 4. Primo rendering
   render();
 
   // 5. Connessione a Supabase e sincronizzazione Cloud in tempo reale
