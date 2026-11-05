@@ -563,3 +563,12 @@ if (document.readyState === 'loading') {
 } else {
   initApp();
 }
+
+export function closeModal() {
+  const modals = document.querySelectorAll('.modal-overlay.open, .modal.open, #matchModal, #matchModalOverlay');
+  modals.forEach(m => {
+    m.classList.remove('open');
+    if (m.close && typeof m.close === 'function') m.close();
+    if (m.style) m.style.display = 'none';
+  });
+}
