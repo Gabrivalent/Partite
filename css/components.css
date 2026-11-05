@@ -257,6 +257,7 @@ body.ro .match { cursor: default; }
   border-radius: 6px;
   background: rgba(37, 99, 235, 0.16);
   color: #93c5fd;
+  border: 1px solid transparent;
 }
 .m-title {
   font: 700 20px/1.2 var(--font-title);
@@ -308,6 +309,17 @@ body.ro .match { cursor: default; }
   flex-direction: column;
   min-width: 0;
   box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+body:not(.ro) .m-roster-chip:hover {
+  background: var(--hl);
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+body:not(.ro) .m-roster-chip:active {
+  transform: scale(0.96);
 }
 
 .m-roster-chip .chip-lbl {
@@ -349,6 +361,108 @@ body.ro .match { cursor: default; }
 .clickable-person:hover {
   color: var(--date);
   text-decoration: underline;
+}
+
+/* POPOVER ASSEGNAZIONE RAPIDA INLINE */
+.quick-assign-popover {
+  position: fixed;
+  z-index: 1500;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  width: 235px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeIn 0.14s ease;
+}
+
+.qa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px 6px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.qa-title {
+  font: 700 12.5px var(--font-title);
+  text-transform: uppercase;
+  color: var(--date);
+  letter-spacing: 0.5px;
+}
+
+.qa-clear-btn {
+  min-height: 22px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  box-shadow: none;
+}
+.qa-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.28);
+}
+
+.qa-search {
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--divider);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px !important;
+  outline: none;
+}
+.qa-search:focus {
+  border-color: var(--acc);
+}
+
+.qa-list {
+  max-height: 195px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.qa-item {
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: none;
+  text-align: left;
+}
+.qa-item:hover {
+  background: var(--hl);
+}
+.qa-item.active {
+  background: rgba(37, 99, 235, 0.22);
+  color: #60a5fa;
+  font-weight: 700;
+}
+.qa-item.busy {
+  opacity: 0.65;
+}
+.qa-busy-tag {
+  font-size: 10px;
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 700;
 }
 
 /* Stili card compensi compatta (Mobile First) */
@@ -399,16 +513,6 @@ body.ro .match { cursor: default; }
   box-shadow: var(--shadow-sm);
 }
 
-.clickable-person {
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-.clickable-person:hover {
-  color: var(--date);
-  text-decoration: underline;
-}
-/* Tasto Referto nella Card Partita */
-/* Tasto Referto compatto ad icona */
 .reportBtn {
   min-height: 30px;
   min-width: 30px;
@@ -427,7 +531,6 @@ body.ro .match { cursor: default; }
   border: 1px solid transparent;
 }
 
-/* Quando il referto NON c'è: icona grigia/discreta */
 .reportBtn.no-file {
   opacity: 0.35;
   filter: grayscale(1);
@@ -438,7 +541,6 @@ body.ro .match { cursor: default; }
   filter: grayscale(0.2);
 }
 
-/* Quando il referto C'È: icona azzurra evidenziata */
 .reportBtn.has-file {
   background: rgba(14, 165, 233, 0.2);
   border: 1px solid rgba(56, 189, 248, 0.5);
@@ -450,7 +552,6 @@ body.ro .match { cursor: default; }
   border-color: #38bdf8;
 }
 
-/* Box caricamento allegato nella modale */
 .file-upload-box {
   background: var(--card);
   border: 1px dashed var(--divider);
