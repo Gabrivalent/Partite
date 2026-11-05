@@ -174,7 +174,6 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const fipUrl = getCategoryFipUrl(i.cat);
   const fipBtnHtml = fipUrl ? `<a href="${esc(fipUrl)}" target="_blank" rel="noopener noreferrer" class="fipBtn" title="Risultati FIP">🌐</a>` : '';
 
-  // Icona referto sempre visibile: grigia se assente (upload), azzurra se presente (visualizza)
   const hasFile = !!(i.fileData);
   const fileBtnHtml = hasFile
     ? `<button class="reportBtn has-file" data-viewfile="${i.id}" type="button" title="Visualizza Referto Gara">📄</button>`
@@ -241,7 +240,7 @@ export function renderNavTree(groupedData, activeMonth, activeWeek) {
     const isYearOpen = monthsArr.includes(activeMonth);
 
     let monthsHtml = monthsArr.map(m => {
-      const weeksMap = groupedData[m];
+      const weeksMap = data[m] || {};
       const isCurMonth = m === activeMonth;
       const totGareMese = Object.values(weeksMap).reduce((acc, arr) => acc + arr.length, 0);
 
@@ -275,4 +274,50 @@ export function renderNavTree(groupedData, activeMonth, activeWeek) {
   });
 
   treeEl.innerHTML = html;
+}
+
+export function renderHistoryView(filterQuery = '') {
+  const wrap = document.getElementById('historyListWrap');
+  if (!wrap) return;
+
+  const q = filterQuery.toLowerCase().trim();
+  const list = (state.history || []).filter(e => !q || (e.text || '').toLowerCase().includes(q));
+
+  if (!list.length) {
+    wrap.innerHTML = '<p style="color:var(--mute);text-align:center;padding:48px 16px;font-weight:600">Nessuna modifica registrata.</p>';
+    return;
+  }
+
+  const icons = {
+    add: '➕',
+    edit: '✏️',
+    status: '🏁',
+    del: '🗑️',
+    import: '📥'
+  };
+
+  const groups = {};
+  list.forEach(item => {
+    const d = new Date(item.ts);
+    const dayKey = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    (groups[dayKey] ??= []).push(item);
+  });
+
+  wrap.innerHTML = Object.keys(groups).map(day => `
+    <div class="history-day-group">
+      <div class="history-day-title">${day.charAt(0).toUpperCase() + day.slice(1)}</div>
+      ${groups[day].map(item => {
+        const timeStr = new Date(item.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        return `
+          <div class="history-entry-row">
+            <div class="history-entry-left">
+              <span class="history-badge-icon">${icons[item.type] || '📝'}</span>
+              <span>${esc(item.text)}</span>
+            </div>
+            <div class="history-entry-right">${timeStr}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `).join('');
 }
