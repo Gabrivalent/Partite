@@ -103,7 +103,7 @@ input, select, textarea {
   width: 100%;
 }
 
-/* --- SIDEBAR CORRETTA E PULITA --- */
+/* --- SIDEBAR CORRETTA E PERFETTAMENTE ALLINEATA --- */
 .app-sidebar {
   width: 64px;
   background: var(--surface);
@@ -128,7 +128,6 @@ input, select, textarea {
   display: none;
 }
 
-/* Apertura al passaggio del mouse con leggero ritardo naturale o se espansa con pin */
 @media (min-width: 860px) {
   .app-layout {
     padding-left: 64px;
@@ -136,7 +135,7 @@ input, select, textarea {
 
   .app-sidebar:hover {
     width: 270px;
-    transition-delay: 0.25s;
+    transition-delay: 0.35s;
     overflow-y: auto;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -149,13 +148,11 @@ input, select, textarea {
   }
 }
 
-/* Stato forzato aperto su mobile o tramite toggle */
 .app-sidebar.expanded {
   width: 270px;
   overflow-y: auto;
 }
 
-/* Top bar della sidebar (Bottone hamburger e titolo) */
 .sidebar-top {
   display: flex;
   align-items: center;
@@ -163,7 +160,6 @@ input, select, textarea {
   padding: 12px 0;
   min-height: 56px;
   width: 100%;
-  transition: padding 0.2s ease, justify-content 0.2s ease;
 }
 
 .app-sidebar:hover .sidebar-top,
@@ -179,37 +175,31 @@ input, select, textarea {
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.1s ease;
 }
 
 .app-sidebar:hover .sidebar-brand-label,
 .app-sidebar.expanded .sidebar-brand-label {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.1s;
+  transition: opacity 0.2s ease 0.15s;
 }
 
-/* Sezione centrale di navigazione */
+/* Navigazione e pulsanti */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 8px 0;
-  align-items: center;
   width: 100%;
-  transition: padding 0.2s ease, align-items 0.2s ease;
+  align-items: center;
 }
 
-.app-sidebar:hover .sidebar-nav,
-.app-sidebar.expanded .sidebar-nav {
-  align-items: stretch;
-  padding: 8px;
-}
-
-/* Pulsanti e voci di menu */
 .rail-icon-btn, .rail-nav-item {
   width: 44px;
   height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 12px;
   border: none;
   background: transparent;
@@ -217,23 +207,55 @@ input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 0 !important;
   cursor: pointer;
-  transition: background .15s ease, color .15s ease, width 0.2s ease, padding 0.2s ease;
-  white-space: nowrap;
+  transition: background .15s ease, color .15s ease;
   box-shadow: none;
   margin: 0 auto;
+  position: relative;
+  overflow: hidden;
 }
 
-.app-sidebar:hover .rail-nav-item,
-.app-sidebar:hover .rail-icon-btn,
-.app-sidebar.expanded .rail-nav-item,
-.app-sidebar.expanded .rail-icon-btn {
-  width: 100%;
-  justify-content: flex-start;
-  padding: 0 14px;
+.rail-nav-item .icon {
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  margin: 0;
+}
+
+@media (min-width: 860px) {
+  .app-sidebar:hover .rail-nav-item,
+  .app-sidebar.expanded .rail-nav-item {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    padding: 0 14px !important;
+    gap: 14px;
+    margin: 0;
+  }
+  
+  .app-sidebar:hover .rail-nav-item .icon,
+  .app-sidebar.expanded .rail-nav-item .icon {
+    width: 24px;
+    min-width: 24px;
+  }
+}
+
+.app-sidebar.expanded .rail-nav-item {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  padding: 0 14px !important;
   gap: 14px;
   margin: 0;
+}
+
+.app-sidebar.expanded .rail-nav-item .icon {
+  width: 24px;
+  min-width: 24px;
 }
 
 .rail-icon-btn:hover, .rail-nav-item:hover {
@@ -251,15 +273,6 @@ input, select, textarea {
   color: var(--acc);
   font-weight: 700;
   box-shadow: var(--shadow-sm);
-}
-
-.rail-nav-item .icon {
-  font-size: 20px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
 }
 
 .rail-nav-item .label,
@@ -283,7 +296,7 @@ input, select, textarea {
 .app-sidebar.expanded .sidebar-tree-container {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.1s;
+  transition: opacity 0.2s ease 0.15s;
 }
 
 body.ro .rail-nav-item.auth-only,
@@ -305,7 +318,6 @@ body.ro .auth-only {
   margin-bottom: 8px;
 }
 
-/* Sezione inferiore (Sync e Auth) */
 .sidebar-bottom {
   margin-top: auto;
   padding: 10px 0;
@@ -315,7 +327,6 @@ body.ro .auth-only {
   border-top: 1px solid var(--divider);
   align-items: center;
   width: 100%;
-  transition: padding 0.2s ease, align-items 0.2s ease;
 }
 
 .app-sidebar:hover .sidebar-bottom,
@@ -333,7 +344,6 @@ body.ro .auth-only {
   width: 44px;
   border-radius: 8px;
   margin: 0 auto;
-  transition: width 0.2s ease, padding 0.2s ease, justify-content 0.2s ease;
 }
 
 .app-sidebar:hover .rail-sync-wrap,
@@ -367,7 +377,6 @@ body.ro .auth-only {
   white-space: nowrap;
   box-shadow: none;
   margin: 0 auto;
-  transition: width 0.2s ease, padding 0.2s ease, justify-content 0.2s ease;
 }
 
 .app-sidebar:hover .rail-auth-btn,
@@ -379,7 +388,7 @@ body.ro .auth-only {
   margin: 0;
 }
 
-/* --- RESTO DELL'APP (Inalterato) --- */
+/* --- RESTO DELL'APP --- */
 .app-content-wrapper {
   flex: 1;
   min-width: 0;
