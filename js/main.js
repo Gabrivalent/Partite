@@ -1,37 +1,28 @@
 // ==========================================================================
-// 1. SELETTORI E UTILITY GLOBALI (Zero dipendenze esterne)
+// 1. SELETTORI E UTILITY GLOBALI
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 
-// Fallback globale haptic feedback accessibile da qualsiasi modulo
 window.triggerHaptic = function() {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     try { navigator.vibrate(10); } catch(e) {}
   }
 };
 
-// ==========================================================================
-// 2. GESTIONE AUTENTICAZIONE GLOBALE
-// ==========================================================================
 window.handleAuthClick = () => {
-  if (typeof promptLogin === 'function') {
-    promptLogin();
-  } else {
-    import('./modals.js').then(m => {
-      if (m.promptLogin) m.promptLogin();
-    }).catch(console.error);
-  }
+  import('./modals.js').then(m => {
+    if (m.promptLogin) m.promptLogin();
+  }).catch(console.error);
 };
 
 // ==========================================================================
-// 3. IMPORT MODULI
+// 2. IMPORT MODULI
 // ==========================================================================
 import { 
   state, 
   save, 
   saveD, 
-  saveLocalOnly, 
   pushUndo, 
   popUndoState, 
   refreshUndoBtn 
@@ -59,27 +50,18 @@ import {
   openAddModal, 
   openEditModal, 
   openConflictsModal, 
-  openUrgentIncompleteModal, 
   openViewFileModal, 
-  openResocontoModal, 
-  openQuickCloseModal,
-  promptLogin 
+  openResocontoModal 
 } from './modals.js';
 
 import { 
   generateWhatsAppText, 
-  copyMonthRecapWhatsApp, 
   copyReadOnlyLink, 
   exportSelectedMonthsJSON, 
   generateMonthPDF 
 } from './export.js';
 
-import { 
-  applyCloudData, 
-  cloudPullSafe, 
-  cloudPushNow, 
-  registerCloudCallback 
-} from './api.js';
+import * as api from './api.js';
 
 window.state = state;
 
@@ -99,7 +81,87 @@ function toast(msg, type = 'info') {
 }
 
 // ==========================================================================
-// 4. FUNZIONE CENTRALE DI RENDERING
+// 3. PARSER UNIVERSALE IMPORTAZIONE JSON (Gestisce ogni variante di formato)
+// ==========================================================================
+function parseImportJSON(data) {
+  const newItems = [];
+  const wi = {};
+
+  if (!Array.isArray(data)) {
+    // Se è un oggetto con chiave items/partite
+    if (data && typeof data === 'object') {
+      if (Array.isArray(data.items)) data = data.items;
+      else if (Array.isArray(data.partite)) data = data.partite;
+      else throw new Error("Il file JSON non contiene un elenco valido");
+    } else {
+      throw new Error("Il file JSON non contiene un elenco valido");
+    }
+  }
+
+  data.forEach(entry => {
+    if (!entry) return;
+
+    // Formato 1: Struttura a giorni { data: 'YYYY-MM-DD', partite: [...], apertura: {...}, chiusura: {...} }
+    if (entry.data && (entry.partite || entry.apertura || entry.chiusura)) {
+      const dateStr = entry.data;
+
+      if (entry.apertura || entry.chiusura) {
+        wi[dateStr] = {
+          ap: (entry.apertura && (entry.apertura.si === true || entry.apertura.si === 'si')) ? 'si' : 'no',
+          apNome: (entry.apertura && entry.apertura.nome) ? entry.apertura.nome : '',
+          ch: (entry.chiusura && (entry.chiusura.si === true || entry.chiusura.si === 'si')) ? 'si' : 'no',
+          chNome: (entry.chiusura && entry.chiusura.nome) ? entry.chiusura.nome : ''
+        };
+      }
+
+      if (Array.isArray(entry.partite)) {
+        entry.partite.forEach(p => {
+          newItems.push({
+            id: p.id || uid(),
+            date: dateStr,
+            time: p.orario || p.time || '18:00',
+            title: p.partita || p.title || '',
+            cat: p.cat || '',
+            t1: p.tavolo1 || p.t1 || '',
+            t2: p.tavolo2 || p.t2 || '',
+            arb: p.arbitro || p.arb || '',
+            friendly: !!(p.amichevole || p.friendly),
+            score: p.score || '',
+            status: p.status || '',
+            fileData: p.fileData || null,
+            fileName: p.fileName || null,
+            ghost: !!p.ghost
+          });
+        });
+      }
+    } 
+    // Formato 2: Singolo oggetto partita { date: 'YYYY-MM-DD', time: '18:00', title: '...' }
+    else if (entry.date || entry.data) {
+      const dateStr = entry.date || entry.data;
+      newItems.push({
+        id: entry.id || uid(),
+        date: dateStr,
+        time: entry.time || entry.orario || '18:00',
+        title: entry.title || entry.partita || '',
+        cat: entry.cat || '',
+        t1: entry.t1 || entry.tavolo1 || '',
+        t2: entry.t2 || entry.tavolo2 || '',
+        arb: entry.arb || entry.arbitro || '',
+        friendly: !!(entry.friendly || entry.amichevole),
+        score: entry.score || '',
+        status: entry.status || '',
+        fileData: entry.fileData || null,
+        fileName: entry.fileName || null,
+        ghost: !!entry.ghost
+      });
+    }
+  });
+
+  return { newItems, wi };
+}
+
+// ==========================================================================
+// 4. RENDERING PRINCIPALE
 // ==========================================================================
 export function render() {
   const listEl = $('#list');
@@ -138,7 +200,7 @@ export function render() {
   if (weeksMap.size === 0) {
     listEl.innerHTML = `
       <div style="text-align:center; padding: 40px 10px; color: var(--muted, #888);">
-        Nessuna partita programmata per questo mese o filtro selezionato.
+        Nessuna partita per il mese di ${mParam}.
       </div>`;
   } else {
     let html = '';
@@ -198,66 +260,17 @@ export function render() {
 
   try {
     if (typeof renderNavTree === 'function') renderNavTree();
-  } catch (err) {
-    console.warn('renderNavTree warning:', err);
-  }
+  } catch (err) {}
 
   try {
     if (typeof updateAlertStatusBadge === 'function') updateAlertStatusBadge();
     if (typeof updateIncompleteBadge === 'function') updateIncompleteBadge();
     if (typeof refreshUndoBtn === 'function') refreshUndoBtn();
-  } catch (err) {
-    console.warn('Badge warning:', err);
-  }
+  } catch (err) {}
 }
 
 // ==========================================================================
-// 5. PARSER IMPORTAZIONE JSON
-// ==========================================================================
-function fromExportFormat(arr) {
-  const newItems = [];
-  const wi = {};
-
-  arr.forEach(d => {
-    if (!d || !d.data) return;
-    const dateStr = d.data;
-    
-    if (d.apertura || d.chiusura) {
-      wi[dateStr] = {
-        ap: (d.apertura && (d.apertura.si === true || d.apertura.si === 'si')) ? 'si' : 'no',
-        apNome: (d.apertura && d.apertura.nome) ? d.apertura.nome : '',
-        ch: (d.chiusura && (d.chiusura.si === true || d.chiusura.si === 'si')) ? 'si' : 'no',
-        chNome: (d.chiusura && d.chiusura.nome) ? d.chiusura.nome : ''
-      };
-    }
-
-    if (Array.isArray(d.partite)) {
-      d.partite.forEach(p => {
-        newItems.push({
-          id: uid(),
-          date: dateStr,
-          time: p.orario || '',
-          title: p.partita || '',
-          cat: p.cat || '',
-          t1: p.tavolo1 || '',
-          t2: p.tavolo2 || '',
-          arb: p.arbitro || '',
-          friendly: !!p.amichevole,
-          score: p.score || '',
-          status: p.status || '',
-          fileData: p.fileData || null,
-          fileName: p.fileName || null,
-          ghost: false
-        });
-      });
-    }
-  });
-
-  return { newItems, wi };
-}
-
-// ==========================================================================
-// 6. REGISTRAZIONE EVENTI
+// 5. REGISTRAZIONE EVENTI & GESTIONE IMPORTAZIONE FILE
 // ==========================================================================
 function setupEventListeners() {
   const qInput = $('#q');
@@ -302,16 +315,6 @@ function setupEventListeners() {
       state.currentMonth = mStr;
       if (typeof setParam === 'function') setParam('m', mStr);
       render();
-      setTimeout(() => {
-        const el = $(`[data-day="${nowIso}"]`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('hl');
-          setTimeout(() => el.classList.remove('hl'), 1500);
-        } else {
-          toast('Nessuna gara oggi', 'info');
-        }
-      }, 100);
     };
   }
 
@@ -322,50 +325,71 @@ function setupEventListeners() {
     };
   }
 
+  // --- IMPORTAZIONE JSON DIRETTA E IMMEDIATA ---
   const impBtn = $('#importBtn');
   const impF = $('#importFile');
   if (impBtn && impF) {
     impBtn.onclick = () => {
-      if (state.READONLY) return;
+      if (state.READONLY) {
+        alert("Modalità sola lettura attiva.");
+        return;
+      }
+      impF.value = '';
       impF.click();
     };
 
     impF.onchange = e => {
-      if (state.READONLY) return;
       const file = e.target.files[0];
-      e.target.value = '';
       if (!file) return;
 
       const reader = new FileReader();
       reader.onload = () => {
         try {
-          const data = JSON.parse(reader.result);
-          if (!Array.isArray(data)) throw new Error('File JSON non valido');
+          const raw = JSON.parse(reader.result);
+          const { newItems, wi } = parseImportJSON(raw);
 
-          const { newItems, wi } = fromExportFormat(data);
-          if (!newItems.length && !Object.keys(wi).length) throw new Error('Nessuna partita trovata');
+          if (!newItems.length && !Object.keys(wi).length) {
+            alert('Nessuna partita o dato trovato nel file selezionato.');
+            return;
+          }
 
           pushUndo();
+
+          // Sostituisci o unisci per ID
           const map = new Map((state.items || []).map(i => [i.id, i]));
           newItems.forEach(i => map.set(i.id, i));
           state.items = [...map.values()];
+          
           state.dayMeta = state.dayMeta || {};
           Object.assign(state.dayMeta, wi);
 
+          // Salva in locale
           save();
           saveD();
-          if (typeof cloudPushNow === 'function') cloudPushNow();
+
+          // Se la prima partita ha una data valida, vai a quel mese per vederle subito
+          if (newItems.length > 0 && newItems[0].date) {
+            state.currentMonth = newItems[0].date.slice(0, 7);
+            if (typeof setParam === 'function') setParam('m', state.currentMonth);
+          }
+
+          // Invia al cloud se disponibile
+          if (typeof api.cloudPushNow === 'function') {
+            api.cloudPushNow().catch(console.warn);
+          }
+
           render();
-          toast(`${newItems.length} partite importate!`, 'success');
+          toast(`${newItems.length} partite caricate con successo!`, 'success');
         } catch (err) {
           console.error(err);
-          toast('Errore: ' + err.message, 'warning');
+          alert('Errore durante la lettura del JSON: ' + err.message);
         }
       };
       reader.readAsText(file);
     };
   }
 
+  // Esportazioni
   const expBtn = $('#exportBtn');
   if (expBtn) {
     expBtn.onclick = () => {
@@ -387,6 +411,7 @@ function setupEventListeners() {
     shareBtn.onclick = () => copyReadOnlyLink(toast);
   }
 
+  // Click su partite
   const list = $('#list');
   if (list) {
     list.onclick = e => {
@@ -395,14 +420,8 @@ function setupEventListeners() {
         e.stopPropagation();
         const mId = rBtn.dataset.id;
         const match = (state.items || []).find(x => x.id === mId);
-        if (!match) return;
-
-        if (match.fileData) {
-          openViewFileModal(match.fileData, match.fileName || 'Referto');
-        } else {
-          if (state.READONLY) return;
-          openEditModal(match);
-        }
+        if (match && match.fileData) openViewFileModal(match.fileData, match.fileName);
+        else if (match && !state.READONLY) openEditModal(match);
         return;
       }
 
@@ -423,22 +442,7 @@ function setupEventListeners() {
       if (personEl) {
         e.stopPropagation();
         const name = personEl.dataset.name;
-        if (name && typeof openResocontoModal === 'function') openResocontoModal(name);
-        return;
-      }
-
-      const gBtn = e.target.closest('.ghostBtn');
-      if (gBtn) {
-        e.stopPropagation();
-        if (state.READONLY) return;
-        const mId = gBtn.dataset.id;
-        const match = (state.items || []).find(x => x.id === mId);
-        if (match) {
-          pushUndo();
-          match.ghost = !match.ghost;
-          save();
-          render();
-        }
+        if (name) openResocontoModal(name);
         return;
       }
 
@@ -473,8 +477,7 @@ function setupEventListeners() {
 
     list.onchange = e => {
       const input = e.target.closest('input[data-wn]');
-      if (input) {
-        if (state.READONLY) return;
+      if (input && !state.READONLY) {
         const dayEl = input.closest('.day');
         if (!dayEl) return;
         const dayStr = dayEl.dataset.day;
@@ -500,35 +503,17 @@ function setupEventListeners() {
           if (typeof setParam === 'function') setParam('m', m);
           render();
         }
-        return;
-      }
-    };
-  }
-
-  const sidebar = $('#sidebarRecap') || $('.recap');
-  if (sidebar) {
-    sidebar.onclick = e => {
-      const row = e.target.closest('.recap-item-compact');
-      if (row) {
-        const name = row.dataset.name;
-        if (name && typeof openResocontoModal === 'function') openResocontoModal(name);
       }
     };
   }
 }
 
 // ==========================================================================
-// 7. INIZIALIZZAZIONE E AVVIO
+// 6. INIZIALIZZAZIONE
 // ==========================================================================
 async function initApp() {
   const urlP = new URLSearchParams(window.location.search);
   state.READONLY = urlP.get('readonly') === 'true';
-
-  if (state.READONLY) {
-    document.body.classList.add('ro');
-    const newBtn = $('#newBtn');
-    if (newBtn) newBtn.style.display = 'none';
-  }
 
   try {
     const rawItems = localStorage.getItem('partite-v1');
@@ -545,11 +530,8 @@ async function initApp() {
 
     const rawNames = localStorage.getItem('partite-names-v1');
     state.names = rawNames ? JSON.parse(rawNames) : (state.names || []);
-
-    const rawFip = localStorage.getItem('partite-fip-v1');
-    state.fipLinks = rawFip ? JSON.parse(rawFip) : (state.fipLinks || {});
   } catch (e) {
-    console.warn('Errore lettura dati da localStorage:', e);
+    console.warn('Errore localStorage:', e);
   }
 
   state.items = state.items || [];
@@ -557,7 +539,6 @@ async function initApp() {
   state.molt = state.molt || {};
   state.categories = state.categories || {};
   state.names = state.names || [];
-  state.fipLinks = state.fipLinks || {};
 
   if (!state.currentMonth) {
     state.currentMonth = (params && params.m) || iso(new Date()).slice(0, 7);
@@ -567,16 +548,14 @@ async function initApp() {
   render();
 
   try {
-    if (typeof registerCloudCallback === 'function') {
-      registerCloudCallback(() => render());
+    if (typeof api.registerCloudCallback === 'function') {
+      api.registerCloudCallback(() => render());
     }
-    if (typeof cloudPullSafe === 'function') {
-      await cloudPullSafe();
+    if (typeof api.cloudPullSafe === 'function') {
+      await api.cloudPullSafe();
       render();
     }
-  } catch (err) {
-    console.warn('Avvio offline:', err);
-  }
+  } catch (err) {}
 }
 
 if (document.readyState === 'loading') {
