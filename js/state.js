@@ -9,6 +9,7 @@ export const state = {
   names: [],
   categories: [],
   fipLinks: JSON.parse(localStorage.getItem('partite-fip-v1') || JSON.stringify(DEFAULT_FIP_LINKS)),
+  history: JSON.parse(localStorage.getItem('partite-history-v1') || '[]'),
   isDirty: false,
   filterCat: '',
   filterIncomplete: false,
@@ -92,6 +93,20 @@ export const saveFipLinksLocal = () => {
   } catch(e) { console.error('Errore salvataggio fipLinks locale', e); }
   state.isDirty = true;
 };
+
+export function logEvent(type, text) {
+  const item = {
+    id: Math.random().toString(36).slice(2, 9),
+    type,
+    text,
+    ts: Date.now()
+  };
+  state.history.unshift(item);
+  if (state.history.length > 150) state.history.pop();
+  try {
+    localStorage.setItem('partite-history-v1', JSON.stringify(state.history));
+  } catch(e) {}
+}
 
 export const save = () => { saveLocalOnly(); if (onSaveCallback) onSaveCallback(); };
 export const saveD = () => { saveDLocalOnly(); if (onSaveCallback) onSaveCallback(); };
