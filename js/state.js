@@ -1,113 +1,185 @@
-import { STORAGE_KEYS, DEFAULT_FIP_LINKS } from './config.js';
+// ==========================================================================
+// STATE MANAGEMENT & PERSISTENCE
+// ==========================================================================
 
 export const state = {
-  READONLY: true,
-  currentTheme: localStorage.getItem(STORAGE_KEYS.THEME) || 'default',
   items: [],
   dayMeta: {},
   molt: {},
+  categories: {},
   names: [],
-  categories: [],
-  fipLinks: JSON.parse(localStorage.getItem('partite-fip-v1') || JSON.stringify(DEFAULT_FIP_LINKS)),
-  isDirty: false,
-  filterCat: '',
-  filterIncomplete: false,
+  fipLinks: {},
+  theme: 'light',
+  user: null,
+  READONLY: false,
+  currentMonth: '',
   searchQuery: '',
-  undoStack: [],
-  swRegistration: null,
-  ready: false,
-  mem: null
+  filterCat: 'all',
+  undoStack: []
 };
 
-try { state.items = JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)) || []; } catch(e) {}
-try { state.dayMeta = JSON.parse(localStorage.getItem(STORAGE_KEYS.DAYS)) || {}; } catch(e) {}
-try { state.molt = JSON.parse(localStorage.getItem(STORAGE_KEYS.MOLT)) || {}; } catch(e) {}
-try { state.names = JSON.parse(localStorage.getItem(STORAGE_KEYS.NAMES)) || []; } catch(e) {}
-try { state.categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATEGORIES)) || []; } catch(e) {}
+let stateCallbacks = [];
 
-let onSaveCallback = null;
-let onBadgeUpdateCallback = null;
-
-export function registerStateCallbacks({ onSave, onBadgeUpdate }) {
-  onSaveCallback = onSave;
-  onBadgeUpdateCallback = onBadgeUpdate;
+export function registerStateCallbacks(cb) {
+  if (typeof cb === 'function') {
+    stateCallbacks.push(cb);
+  }
 }
 
-export const saveLocalOnly = () => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(state.items));
-  } catch(e) { console.error('Errore salvataggio items locale', e); }
-  if (onBadgeUpdateCallback) onBadgeUpdateCallback();
-  state.isDirty = true;
-};
+function notifyCallbacks() {
+  stateCallbacks.forEach(cb => {
+    try { cb(); } catch (e) { console.error(e); }
+  });
+}
 
-export const saveDLocalOnly = () => {
+// --------------------------------------------------------------------------
+// SALVATAGGIO LOCALE ITEMS (Con protezione QuotaExceededError)
+// --------------------------------------------------------------------------
+export function saveLocalOnly() {
   try {
-    localStorage.setItem(STORAGE_KEYS.DAYS, JSON.stringify(state.dayMeta));
-  } catch(e) { console.error('Errore salvataggio dayMeta locale', e); }
-  state.isDirty = true;
-};
+    localStorage.setItem('partite-v1', JSON.stringify(state.items));
+  } catch (err) {
+    if (err.name === 'QuotaExceededError' || err.code === 22) {
+      console.warn('Quota localStorage superata: salvataggio compresso senza allegati pesanti');
+      try {
+        const stripped = (state.items || []).map(item => {
+          if (!item.fileData) return item;
+          const copy = { ...item };
+          delete copy.fileData;
+          return copy;
+        });
+        localStorage.setItem('partite-v1', JSON.stringify(stripped));
+      } catch (e2) {
+        console.error('Impossibile salvare in localStorage:', e2);
+      }
+    } else {
+      console.error('Errore salvataggio items locale', err);
+    }
+  }
+}
 
-export const saveMoltLocal = () => {
+export function save() {
+  saveLocalOnly();
+  notifyCallbacks();
+}
+
+// --------------------------------------------------------------------------
+// SALVATAGGIO METADATI GIORNO (Apertura / Chiusura)
+// --------------------------------------------------------------------------
+export function saveDLocalOnly() {
   try {
-    localStorage.setItem(STORAGE_KEYS.MOLT, JSON.stringify(state.molt));
-  } catch(e) { console.error('Errore salvataggio molt locale', e); }
-  state.isDirty = true;
-};
+    localStorage.setItem('partite-d-v1', JSON.stringify(state.dayMeta));
+  } catch (err) {
+    console.error('Errore salvataggio dayMeta locale', err);
+  }
+}
 
-export const saveNamesLocal = () => {
+export function saveD() {
+  saveDLocalOnly();
+  notifyCallbacks();
+}
+
+// --------------------------------------------------------------------------
+// ALTRE CHIAVI DI STATO
+// --------------------------------------------------------------------------
+export function saveMoltLocal() {
   try {
-    localStorage.setItem(STORAGE_KEYS.NAMES, JSON.stringify(state.names));
-  } catch(e) { console.error('Errore salvataggio names locale', e); }
-  state.isDirty = true;
-};
+    localStorage.setItem('partite-m-v1', JSON.stringify(state.molt));
+  } catch (err) {
+    console.error('Errore salvataggio moltiplicatori', err);
+  }
+}
 
-export const saveCategoriesLocal = () => {
+export function saveMolt() {
+  saveMoltLocal();
+  notifyCallbacks();
+}
+
+export function saveCategoriesLocal() {
   try {
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(state.categories));
-  } catch(e) { console.error('Errore salvataggio categories locale', e); }
-  state.isDirty = true;
-};
+    localStorage.setItem('partite-cats-v1', JSON.stringify(state.categories));
+  } catch (err) {
+    console.error('Errore salvataggio categorie', err);
+  }
+}
 
-export const saveFipLinksLocal = () => {
+export function saveCategories() {
+  saveCategoriesLocal();
+  notifyCallbacks();
+}
+
+export function saveNamesLocal() {
+  try {
+    localStorage.setItem('partite-names-v1', JSON.stringify(state.names));
+  } catch (err) {
+    console.error('Errore salvataggio nomi', err);
+  }
+}
+
+export function saveNames() {
+  saveNamesLocal();
+  notifyCallbacks();
+}
+
+export function saveFipLinksLocal() {
   try {
     localStorage.setItem('partite-fip-v1', JSON.stringify(state.fipLinks));
-  } catch(e) { console.error('Errore salvataggio fipLinks locale', e); }
-  state.isDirty = true;
-};
-
-export const save = () => { saveLocalOnly(); if (onSaveCallback) onSaveCallback(); };
-export const saveD = () => { saveDLocalOnly(); if (onSaveCallback) onSaveCallback(); };
-export const saveMolt = () => { saveMoltLocal(); if (onSaveCallback) onSaveCallback(); };
-export const saveNames = () => { saveNamesLocal(); if (onSaveCallback) onSaveCallback(); };
-export const saveCategories = () => { saveCategoriesLocal(); if (onSaveCallback) onSaveCallback(); };
-export const saveFipLinks = () => { saveFipLinksLocal(); if (onSaveCallback) onSaveCallback(); };
-
-export function applyTheme(themeName) {
-  state.currentTheme = themeName;
-  if (themeName === 'default') document.body.removeAttribute('data-theme');
-  else document.body.setAttribute('data-theme', themeName);
-  localStorage.setItem(STORAGE_KEYS.THEME, themeName);
+  } catch (err) {
+    console.error('Errore salvataggio fipLinks', err);
+  }
 }
 
+export function saveFipLinks() {
+  saveFipLinksLocal();
+  notifyCallbacks();
+}
+
+// --------------------------------------------------------------------------
+// GESTIONE UNDO
+// --------------------------------------------------------------------------
 export function pushUndo() {
-  state.undoStack.push(JSON.stringify({ items: state.items, dayMeta: state.dayMeta }));
-  if (state.undoStack.length > 20) state.undoStack.shift();
-  refreshUndoBtn();
-}
-
-export function refreshUndoBtn() {
-  const b = document.querySelector('#undoBtn');
-  if (b) b.disabled = !state.undoStack.length;
+  if (state.READONLY) return;
+  try {
+    const snapshot = {
+      items: JSON.parse(JSON.stringify(state.items || [])),
+      dayMeta: JSON.parse(JSON.stringify(state.dayMeta || {}))
+    };
+    state.undoStack = state.undoStack || [];
+    state.undoStack.push(snapshot);
+    if (state.undoStack.length > 20) state.undoStack.shift();
+    refreshUndoBtn();
+  } catch (e) {
+    console.warn('Impossibile salvare snapshot undo', e);
+  }
 }
 
 export function popUndoState() {
-  if (state.READONLY || !state.undoStack.length) return false;
-  const prev = JSON.parse(state.undoStack.pop());
-  state.items = prev.items;
-  state.dayMeta = prev.dayMeta;
-  save();
-  saveD();
+  if (!state.undoStack || !state.undoStack.length) return false;
+  const snap = state.undoStack.pop();
+  if (!snap) return false;
+
+  state.items = snap.items;
+  state.dayMeta = snap.dayMeta;
+
+  saveLocalOnly();
+  saveDLocalOnly();
   refreshUndoBtn();
   return true;
+}
+
+export function refreshUndoBtn() {
+  const btn = document.getElementById('undoBtn');
+  if (!btn) return;
+  const count = (state.undoStack && state.undoStack.length) || 0;
+  btn.disabled = count === 0;
+  btn.title = count > 0 ? `Annulla (${count})` : 'Niente da annullare';
+}
+
+// --------------------------------------------------------------------------
+// TEMA
+// --------------------------------------------------------------------------
+export function applyTheme(themeName) {
+  const t = themeName || state.theme || 'light';
+  state.theme = t;
+  document.documentElement.setAttribute('data-theme', t);
 }
