@@ -224,11 +224,11 @@ export function renderNavTree(groupedData, activeMonth, activeWeek) {
   const treeEl = document.getElementById('navTree');
   if (!treeEl) return;
 
-  const years = {};
-  Object.keys(groupedData).sort().forEach(m => {
-    const y = m.slice(0, 4);
-    (years[y] ??= []).push(m);
-  });
+const years = {};
+Object.keys(groupedData || {}).sort().forEach(m => {
+  const y = m.slice(0, 4);
+  (years[y] ??= []).push(m);
+});
 
   const fmtMonth = mStr => new Date(mStr + '-15T12:00').toLocaleDateString('it-IT', { month: 'long' });
 
