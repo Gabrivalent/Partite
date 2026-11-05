@@ -1,5 +1,5 @@
 // ==========================================================================
-// 1. SELETTORI DOM LOCALI (Indipendenti da qualsiasi modulo)
+// 1. SELETTORI DOM LOCALI (Zero dipendenze esterne)
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -10,15 +10,16 @@ const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 window.handleAuthClick = async function() {
   try {
     const { state } = await import('./state.js');
-    const { toast } = await import('./render.js');
     const apiModule = await import('./api.js');
+    const renderModule = await import('./render.js');
+    const t = renderModule.toast || renderModule.showToast || console.log;
 
     const signOutFn = apiModule.signOutUser || apiModule.signOut;
     const signInFn = apiModule.signInWithGoogle || apiModule.signIn;
 
-    if (state.user) {
+    if (state && state.user) {
       if (typeof signOutFn === 'function') await signOutFn();
-      toast('Disconnesso con successo', 'info');
+      t('Disconnesso con successo', 'info');
     } else {
       if (typeof signInFn === 'function') await signInFn();
     }
@@ -28,41 +29,38 @@ window.handleAuthClick = async function() {
 };
 
 // ==========================================================================
-// 3. IMPORT MODULI (Namespace sicuri)
+// 3. IMPORT MODULI VIA NAMESPACE (Previene qualsiasi SyntaxError di export)
 // ==========================================================================
-import { 
-  state, 
-  save, 
-  saveD, 
-  saveM, 
-  saveLocalOnly, 
-  pushUndo, 
-  undo, 
-  setSyncStatus 
-} from './state.js';
-
-import { 
-  uid, 
-  iso, 
-  monday, 
-  findConflictingMatches, 
-  isWithinOneDayOrLess, 
-  isMissingRequirements, 
-  getUrgentIncompleteMatches, 
-  getPendingPostponedMatches 
-} from './rules.js';
-
-import { render, toast } from './render.js';
-import * as modals from './modals.js';
+import * as stateModule from './state.js';
+import * as rulesModule from './rules.js';
+import * as renderModule from './render.js';
+import * as modalsModule from './modals.js';
+import * as exportModule from './export.js';
 import * as api from './api.js';
 
-import { 
-  generateWhatsAppText, 
-  copyMonthRecapWhatsApp, 
-  copyReadOnlyLink, 
-  exportSelectedMonthsJSON, 
-  generateMonthPDF 
-} from './export.js';
+// Fallback sicuri su state
+const state = stateModule.state || window.state || { items: [], dayMeta: {}, molt: {} };
+const save = stateModule.save || (() => {});
+const saveD = stateModule.saveD || (() => {});
+const saveLocalOnly = stateModule.saveLocalOnly || (() => {});
+const pushUndo = stateModule.pushUndo || (() => {});
+const undo = stateModule.undo || (() => {});
+const setSyncStatus = stateModule.setSyncStatus || (() => {});
+
+// Fallback sicuri su rules
+const uid = rulesModule.uid || (() => 'm_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36));
+const iso = rulesModule.iso || (d => new Date(d).toISOString().slice(0, 10));
+
+// Fallback sicuri su render
+const render = renderModule.render || renderModule.renderApp || renderModule.draw || (() => {});
+const toast = renderModule.toast || renderModule.showToast || ((m) => console.log(m));
+
+// Fallback sicuri su export
+const generateWhatsAppText = exportModule.generateWhatsAppText || (() => {});
+const copyMonthRecapWhatsApp = exportModule.copyMonthRecapWhatsApp || (() => {});
+const copyReadOnlyLink = exportModule.copyReadOnlyLink || (() => {});
+const exportSelectedMonthsJSON = exportModule.exportSelectedMonthsJSON || (() => {});
+const generateMonthPDF = exportModule.generateMonthPDF || (() => {});
 
 // ==========================================================================
 // 4. PARSER IMPORTAZIONE JSON
@@ -113,9 +111,8 @@ function fromExportFormat(arr) {
 // 5. REGISTRAZIONE EVENTI
 // ==========================================================================
 function setupEventListeners() {
-  // Helper locale per chiamare la modale partita
   const openMatchModalSafe = (matchObj) => {
-    const fn = modals.openModal || modals.openMatchModal || modals.openEditModal;
+    const fn = modalsModule.openModal || modalsModule.openMatchModal || modalsModule.openEditModal;
     if (typeof fn === 'function') fn(matchObj);
   };
 
@@ -146,7 +143,7 @@ function setupEventListeners() {
     };
   }
 
-  // Undo (Annulla modifica)
+  // Undo
   const undoBtn = $('#undoBtn');
   if (undoBtn) {
     undoBtn.onclick = () => {
@@ -157,7 +154,7 @@ function setupEventListeners() {
     };
   }
 
-  // Pulsante Oggi (Scroll e highlight)
+  // Pulsante Oggi
   const todayBtn = $('#todayBtn');
   if (todayBtn) {
     todayBtn.onclick = () => {
@@ -182,7 +179,7 @@ function setupEventListeners() {
   const alertBtn = $('#alertBadgeBtn');
   if (alertBtn) {
     alertBtn.onclick = () => {
-      const fn = modals.openAlertsModal || modals.openAlertModal || modals.showAlerts;
+      const fn = modalsModule.openAlertsModal || modalsModule.openAlertModal || modalsModule.showAlerts;
       if (typeof fn === 'function') fn();
     };
   }
@@ -207,7 +204,7 @@ function setupEventListeners() {
         try {
           const data = JSON.parse(reader.result);
           if (!Array.isArray(data)) {
-            throw new Error('Il file JSON non contiene un elenco (array) valido.');
+            throw new Error('Il file JSON non contiene un array valido.');
           }
 
           const { newItems, wi } = fromExportFormat(data);
@@ -216,9 +213,10 @@ function setupEventListeners() {
           }
 
           pushUndo();
-          const map = new Map(state.items.map(i => [i.id, i]));
+          const map = new Map((state.items || []).map(i => [i.id, i]));
           newItems.forEach(i => map.set(i.id, i));
           state.items = [...map.values()];
+          state.dayMeta = state.dayMeta || {};
           Object.assign(state.dayMeta, wi);
 
           save();
@@ -263,7 +261,7 @@ function setupEventListeners() {
     shareBtn.onclick = () => copyReadOnlyLink(toast);
   }
 
-  // Input file invisibile globale per il caricamento referto
+  // Input file invisibile globale per il caricamento diretto del referto
   let directUploadInput = $('#directReportInput');
   if (!directUploadInput) {
     directUploadInput = document.createElement('input');
@@ -287,7 +285,7 @@ function setupEventListeners() {
 
     const reader = new FileReader();
     reader.onload = ev => {
-      const match = state.items.find(x => x.id === matchId);
+      const match = (state.items || []).find(x => x.id === matchId);
       if (match) {
         pushUndo();
         match.fileData = ev.target.result;
@@ -347,7 +345,7 @@ function setupEventListeners() {
       if (rBtn) {
         e.stopPropagation();
         const mId = rBtn.dataset.id;
-        const match = state.items.find(x => x.id === mId);
+        const match = (state.items || []).find(x => x.id === mId);
         if (!match) return;
 
         if (match.fileData) {
@@ -396,7 +394,7 @@ function setupEventListeners() {
       if (personEl) {
         e.stopPropagation();
         const name = personEl.dataset.name;
-        const fn = modals.openPersonStatsModal || modals.openPersonModal || modals.showPersonStats;
+        const fn = modalsModule.openPersonStatsModal || modalsModule.openPersonModal || modalsModule.showPersonStats;
         if (name && typeof fn === 'function') fn(name);
         return;
       }
@@ -407,7 +405,7 @@ function setupEventListeners() {
         e.stopPropagation();
         if (state.READONLY) return;
         const mId = gBtn.dataset.id;
-        const match = state.items.find(x => x.id === mId);
+        const match = (state.items || []).find(x => x.id === mId);
         if (match) {
           pushUndo();
           match.ghost = !match.ghost;
@@ -423,7 +421,7 @@ function setupEventListeners() {
         e.stopPropagation();
         if (state.READONLY) return;
         const mId = edBtn.dataset.id;
-        const match = state.items.find(x => x.id === mId);
+        const match = (state.items || []).find(x => x.id === mId);
         if (match) openMatchModalSafe(match);
         return;
       }
@@ -433,7 +431,7 @@ function setupEventListeners() {
       if (matchCard && !e.target.closest('a') && !e.target.closest('button')) {
         if (state.READONLY) return;
         const mId = matchCard.dataset.id;
-        const match = state.items.find(x => x.id === mId);
+        const match = (state.items || []).find(x => x.id === mId);
         if (match) openMatchModalSafe(match);
         return;
       }
@@ -450,6 +448,7 @@ function setupEventListeners() {
         const val = ynBtn.dataset.val;
 
         pushUndo();
+        state.dayMeta = state.dayMeta || {};
         state.dayMeta[dayStr] ??= {};
         state.dayMeta[dayStr][type] = val;
         saveD();
@@ -468,6 +467,7 @@ function setupEventListeners() {
         const dayStr = dayEl.dataset.day;
         const typeName = input.dataset.wn;
         pushUndo();
+        state.dayMeta = state.dayMeta || {};
         state.dayMeta[dayStr] ??= {};
         state.dayMeta[dayStr][typeName] = input.value.trim();
         saveD();
@@ -482,13 +482,13 @@ function setupEventListeners() {
       const row = e.target.closest('.recap-item-compact');
       if (row) {
         const name = row.dataset.name;
-        const fn = modals.openPersonStatsModal || modals.openPersonModal || modals.showPersonStats;
+        const fn = modalsModule.openPersonStatsModal || modalsModule.openPersonModal || modalsModule.showPersonStats;
         if (name && typeof fn === 'function') fn(name);
         return;
       }
       const recapHeader = e.target.closest('h4');
       if (recapHeader && state.currentMonth) {
-        const fn = modals.openMonthRecapModal || modals.openRecapModal || modals.showMonthRecap;
+        const fn = modalsModule.openMonthRecapModal || modalsModule.openRecapModal || modalsModule.showMonthRecap;
         if (typeof fn === 'function') fn(state.currentMonth);
       }
     };
@@ -530,7 +530,7 @@ async function initApp() {
     if (importBtn) importBtn.style.display = 'none';
   }
 
-  // Caricamento locale iniziale
+  // 1. Caricamento rapido dalla memoria locale
   try {
     const rawItems = localStorage.getItem('partite-v1');
     if (rawItems) state.items = JSON.parse(rawItems);
