@@ -45,12 +45,14 @@ export function renderNamesList() {
 }
 
 export function renderCategoriesList() {
-  const container = document.getElementById('categoriesList') || document.querySelector('.categories-list');
-  if (!container) return;
-  const cats = Array.isArray(state.categories) 
-    ? state.categories 
-    : Object.keys(state.categories || {});
-  container.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  const dl = document.getElementById('categoriesList');
+  if (dl) dl.innerHTML = state.categories.map(c => `<option value="${esc(c)}">`).join('');
+  const sel = document.getElementById('filterCat');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Tutte le categorie</option>' + state.categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    sel.value = state.categories.includes(cur) ? cur : '';
+  }
 }
 
 export function updateIncompleteBadge() {
@@ -224,11 +226,11 @@ export function renderNavTree(groupedData, activeMonth, activeWeek) {
   const treeEl = document.getElementById('navTree');
   if (!treeEl) return;
 
-const years = {};
-Object.keys(groupedData || {}).sort().forEach(m => {
-  const y = m.slice(0, 4);
-  (years[y] ??= []).push(m);
-});
+  const years = {};
+  Object.keys(groupedData).sort().forEach(m => {
+    const y = m.slice(0, 4);
+    (years[y] ??= []).push(m);
+  });
 
   const fmtMonth = mStr => new Date(mStr + '-15T12:00').toLocaleDateString('it-IT', { month: 'long' });
 
