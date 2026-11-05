@@ -1,22 +1,26 @@
 // ==========================================================================
-// 1. SELETTORI DOM LOCALI (Zero dipendenze esterne per evitare errori di modulo)
+// 1. SELETTORI DOM LOCALI
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 
 // ==========================================================================
-// 2. GESTIONE AUTENTICAZIONE GLOBALE (Immediata per evitare Uncaught TypeError)
+// 2. GESTIONE AUTENTICAZIONE GLOBALE
 // ==========================================================================
 window.handleAuthClick = async function() {
   try {
-    const { signInWithGoogle, signOutUser } = await import('./api.js');
     const { state } = await import('./state.js');
     const { toast } = await import('./render.js');
+    const apiModule = await import('./api.js');
+
+    const signOutFn = apiModule.signOutUser || apiModule.signOut;
+    const signInFn = apiModule.signInWithGoogle || apiModule.signIn;
+
     if (state.user) {
-      await signOutUser();
+      if (typeof signOutFn === 'function') await signOutFn();
       toast('Disconnesso con successo', 'info');
     } else {
-      await signInWithGoogle();
+      if (typeof signInFn === 'function') await signInFn();
     }
   } catch (err) {
     console.error('Errore durante autenticazione:', err);
@@ -65,10 +69,7 @@ import {
   generateMonthPDF 
 } from './export.js';
 
-import { 
-  initSupabase, 
-  loadAllDataFromCloud 
-} from './api.js';
+import * as api from './api.js';
 
 // ==========================================================================
 // 4. PARSER IMPORTAZIONE JSON
@@ -546,19 +547,29 @@ async function initApp() {
 
   render();
 
-  // Sincronizzazione Supabase
+  // Sincronizzazione Supabase / Cloud sicura
   try {
-    const isOnline = initSupabase();
-    if (isOnline) {
+    const initFn = api.initSupabase || api.initCloud || api.init;
+    const loadFn = api.loadAllDataFromCloud || api.loadCloudData || api.loadData;
+
+    if (typeof initFn === 'function') {
+      const res = initFn();
+      if (res !== false) {
+        setSyncStatus('syncing');
+        if (typeof loadFn === 'function') await loadFn();
+        setSyncStatus('connected');
+        render();
+      } else {
+        setSyncStatus('offline');
+      }
+    } else if (typeof loadFn === 'function') {
       setSyncStatus('syncing');
-      await loadAllDataFromCloud();
+      await loadFn();
       setSyncStatus('connected');
       render();
-    } else {
-      setSyncStatus('offline');
     }
   } catch (err) {
-    console.error('Errore sincronizzazione Cloud:', err);
+    console.warn('Avvio offline o sincronizzazione fallita:', err);
     setSyncStatus('error');
   }
 }
