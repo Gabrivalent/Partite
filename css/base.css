@@ -490,3 +490,126 @@ body:not(.locked) .robanner { display: none !important; }
   z-index: 100;
   border: 1px solid var(--divider);
 }
+
+/* ==========================================================================
+   VISTA FULLSCREEN CRONOLOGIA (STILE GOOGLE CHROME)
+   ========================================================================== */
+.history-fullscreen-view {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: var(--bg);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fadeIn 0.18s ease;
+}
+
+.history-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--divider);
+  gap: 14px;
+  flex-wrap: wrap;
+  box-shadow: var(--shadow-sm);
+}
+
+.history-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.history-topbar-left h2 {
+  margin: 0;
+  font: 700 22px/1 var(--font-title);
+  letter-spacing: .4px;
+}
+
+.history-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#historySearchInput {
+  background: var(--card);
+  border: none;
+  color: var(--ink);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px !important;
+  width: 220px;
+  outline: none;
+  box-shadow: var(--shadow-sm);
+}
+
+#historySearchInput:focus {
+  box-shadow: 0 0 0 2px var(--acc);
+}
+
+.history-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px max(16px, calc((100vw - 840px) / 2));
+}
+
+.history-day-group {
+  margin-bottom: 24px;
+}
+
+.history-day-title {
+  font: 700 13px var(--font-title);
+  text-transform: uppercase;
+  color: var(--date);
+  letter-spacing: .6px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.history-entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 16px;
+  background: var(--card);
+  border-radius: 12px;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: background .15s ease;
+}
+
+.history-entry-row:hover {
+  background: var(--card-hover);
+}
+
+.history-entry-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.history-badge-icon {
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+}
+
+.history-entry-right {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--mute);
+  white-space: nowrap;
+}
