@@ -109,11 +109,11 @@ export function render(focusId) {
     return;
   }
 
-  const nowM = iso(new Date()).slice(0, 7);
+const nowM = iso(new Date()).slice(0, 7);
   let activeM = p.get('m');
   if (!activeM || !months[activeM]) {
-    activeM = months[nowM] ? nowM : keys[keys.length - 1];
-    setParam('m', activeM, render);
+    activeM = months[nowM] ? nowM : keys[0];
+    setParam('m', activeM);
   }
   const activeW = p.get('s');
 
