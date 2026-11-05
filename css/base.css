@@ -113,7 +113,7 @@ input, select, textarea {
   top: 0;
   height: 100vh;
   z-index: 80;
-  transition: width 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
   overflow-x: hidden;
   overflow-y: auto;
   border-right: 1px solid var(--divider);
@@ -123,16 +123,30 @@ input, select, textarea {
   width: 270px;
 }
 
+/* COMPORTAMENTO OVERLAY FLUIDO SU DESKTOP (SENZA SPOSTARE IL CONTENUTO) */
 @media (min-width: 860px) {
-  .app-sidebar:hover {
+  .app-layout {
+    padding-left: 64px;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 900;
+  }
+
+  .app-sidebar:hover,
+  .app-sidebar.expanded {
     width: 270px;
+    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
 
   .app-sidebar:hover .sidebar-brand-label,
   .app-sidebar:hover .rail-nav-item .label,
   .app-sidebar:hover .rail-auth-btn .label,
-  .app-sidebar:hover .sync-text-status,
-  .app-sidebar:hover .sidebar-tree-container {
+  .app-sidebar:hover .sync-text-status {
     display: inline-block;
   }
 
@@ -152,6 +166,7 @@ input, select, textarea {
     margin: 0;
   }
 }
+
 .sidebar-top {
   display: flex;
   align-items: center;
@@ -497,7 +512,6 @@ body.ro .auth-only {
   box-shadow: var(--shadow-sm);
 }
 
-/* Regole per la protezione e sola lettura */
 body.locked .app-content-wrapper { display: none !important; }
 body.locked .bottom-nav-bar { display: none !important; }
 body:not(.locked) .robanner { display: none !important; }
