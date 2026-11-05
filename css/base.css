@@ -677,3 +677,13 @@ body:not(.locked) .robanner { display: none !important; }
   color: var(--mute);
   white-space: nowrap;
 }
+
+/* Nasconde completamente la barra di scorrimento brutta mantenendo la funzionalità di scroll */
+.app-sidebar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE e Edge vecchi */
+}
+
+.app-sidebar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
