@@ -113,7 +113,7 @@ input, select, textarea {
   top: 0;
   height: 100vh;
   z-index: 80;
-  transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
   overflow-x: hidden;
   overflow-y: auto;
   border-right: 1px solid var(--divider);
@@ -123,10 +123,10 @@ input, select, textarea {
   width: 270px;
 }
 
-/* COMPORTAMENTO OVERLAY FLUIDO SU DESKTOP (SENZA SPOSTARE IL CONTENUTO) */
 @media (min-width: 860px) {
   .app-layout {
     padding-left: 64px;
+    transition: padding-left 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .app-sidebar {
@@ -137,6 +137,7 @@ input, select, textarea {
     z-index: 900;
   }
 
+  /* Si apre al passaggio del mouse (overlay) oppure se fissata con ☰ (.expanded) */
   .app-sidebar:hover,
   .app-sidebar.expanded {
     width: 270px;
@@ -226,6 +227,11 @@ input, select, textarea {
 .rail-icon-btn:hover, .rail-nav-item:hover {
   background: var(--hl);
   color: var(--ink);
+}
+
+.app-sidebar.expanded #sidebarToggleBtn {
+  background: rgba(37, 99, 235, 0.2);
+  color: var(--date);
 }
 
 .rail-nav-item.active {
