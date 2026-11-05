@@ -33,21 +33,13 @@ export function registerStateCallbacks({ onSave, onBadgeUpdate }) {
   onBadgeUpdateCallback = onBadgeUpdate;
 }
 
-export function saveLocalOnly() {
+export const saveLocalOnly = () => {
   try {
-    // Prova a salvare normalmente
-    localStorage.setItem('partite-v1', JSON.stringify(state.items));
-  } catch (e) {
-    // Se supera la quota (5MB) a causa dei referti PDF/foto,
-    // salva in locale solo i dati delle partite escludendo i file pesanti
-    try {
-      const lightweightItems = state.items.map(({ fileData, ...rest }) => rest);
-      localStorage.setItem('partite-v1', JSON.stringify(lightweightItems));
-    } catch (err) {
-      console.warn('Spazio localStorage esaurito:', err);
-    }
-  }
-}
+    localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(state.items));
+  } catch(e) { console.error('Errore salvataggio items locale', e); }
+  if (onBadgeUpdateCallback) onBadgeUpdateCallback();
+  state.isDirty = true;
+};
 
 export const saveDLocalOnly = () => {
   try {
