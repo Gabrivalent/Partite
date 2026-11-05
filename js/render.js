@@ -45,14 +45,10 @@ export function renderNamesList() {
 }
 
 export function renderCategoriesList() {
-  const dl = document.getElementById('categoriesList');
-  if (dl) dl.innerHTML = state.categories.map(c => `<option value="${esc(c)}">`).join('');
-  const sel = document.getElementById('filterCat');
-  if (sel) {
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">Tutte le categorie</option>' + state.categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-    sel.value = state.categories.includes(cur) ? cur : '';
-  }
+  const container = document.getElementById('categoriesList') || document.querySelector('.categories-list');
+  if (!container) return;
+  const cats = Array.isArray(state.categories) ? state.categories : Object.keys(state.categories || {});
+  container.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
 export function updateIncompleteBadge() {
