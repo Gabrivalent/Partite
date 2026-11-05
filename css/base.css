@@ -137,7 +137,6 @@ input, select, textarea {
     z-index: 900;
   }
 
-  /* Si apre al passaggio del mouse (overlay) oppure se fissata con ☰ (.expanded) */
   .app-sidebar:hover,
   .app-sidebar.expanded {
     width: 270px;
@@ -147,23 +146,32 @@ input, select, textarea {
   .app-sidebar:hover .sidebar-brand-label,
   .app-sidebar:hover .rail-nav-item .label,
   .app-sidebar:hover .rail-auth-btn .label,
-  .app-sidebar:hover .sync-text-status {
+  .app-sidebar:hover .sync-text-status,
+  .app-sidebar.expanded .sidebar-brand-label,
+  .app-sidebar.expanded .rail-nav-item .label,
+  .app-sidebar.expanded .rail-auth-btn .label,
+  .app-sidebar.expanded .sync-text-status {
     display: inline-block;
   }
 
-  .app-sidebar:hover .sidebar-tree-container {
+  .app-sidebar:hover .sidebar-tree-container,
+  .app-sidebar.expanded .sidebar-tree-container {
     display: block;
   }
 
   .app-sidebar:hover .rail-nav-item,
   .app-sidebar:hover .rail-auth-btn,
-  .app-sidebar:hover .rail-sync-wrap {
+  .app-sidebar:hover .rail-sync-wrap,
+  .app-sidebar.expanded .rail-nav-item,
+  .app-sidebar.expanded .rail-auth-btn,
+  .app-sidebar.expanded .rail-sync-wrap {
     justify-content: flex-start;
     padding: 0 14px;
     gap: 14px;
   }
 
-  .app-sidebar:hover .rail-icon-btn {
+  .app-sidebar:hover .rail-icon-btn,
+  .app-sidebar.expanded .rail-icon-btn {
     margin: 0;
   }
 }
