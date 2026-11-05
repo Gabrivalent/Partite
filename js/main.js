@@ -1,8 +1,8 @@
-import { state, registerStateCallbacks, save, saveD, applyTheme, pushUndo, popUndoState } from './state.js';
+import { state, registerStateCallbacks, save, saveD, applyTheme, pushUndo, popUndoState, logEvent } from './state.js';
 import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback } from './api.js';
 import { uid, iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements } from './rules.js';
 import { copyMonthRecapWhatsApp, generateWhatsAppText } from './export.js';
-import { $, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree } from './render.js';
+import { $, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree, renderHistoryView } from './render.js';
 import { openEditModal, openAddModal, openQuickCloseModal, openCompensiDetailModal, openViewFileModal, openMoltModal, openResocontoModal, openConflictsModal, openUrgentIncompleteModal, openPendingModal, openSettingsModal, promptLogin } from './modals.js';
 
 function isModalOpen() {
@@ -109,7 +109,7 @@ export function render(focusId) {
     return;
   }
 
-const nowM = iso(new Date()).slice(0, 7);
+  const nowM = iso(new Date()).slice(0, 7);
   let activeM = p.get('m');
   if (!activeM || !months[activeM]) {
     activeM = months[nowM] ? nowM : keys[0];
@@ -218,7 +218,6 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('click', e => {
-  // Click su referto presente: visualizza anteprima
   const vfBtn = e.target.closest('[data-viewfile]');
   if (vfBtn) {
     e.stopPropagation();
@@ -229,7 +228,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Click su referto assente: carica subito
   const upBtn = e.target.closest('[data-uploadfile]');
   if (upBtn) {
     e.stopPropagation();
@@ -532,6 +530,50 @@ function bindEvents() {
   const railSettings = $('#railNavSettings');
   if (railSettings) railSettings.onclick = () => openSettingsModal(toast, render);
 
+  const railHistory = $('#railNavHistory');
+  const historyView = $('#historyView');
+  const historyCloseBtn = $('#historyCloseBtn');
+  const historySearch = $('#historySearchInput');
+  const historyClear = $('#historyClearBtn');
+
+  if (railHistory && historyView) {
+    railHistory.onclick = () => {
+      if (window.innerWidth < 860) closeMobileDrawer();
+      triggerHaptic('light');
+      historyView.style.display = 'flex';
+      renderHistoryView();
+    };
+  }
+
+  if (historyCloseBtn && historyView) {
+    historyCloseBtn.onclick = () => {
+      triggerHaptic('light');
+      historyView.style.display = 'none';
+    };
+  }
+
+  if (historySearch) {
+    historySearch.oninput = e => {
+      renderHistoryView(e.target.value);
+    };
+  }
+
+  if (historyClear) {
+    historyClear.onclick = () => {
+      if (state.READONLY) {
+        toast('Funzione riservata agli amministratori');
+        return;
+      }
+      if (confirm('Vuoi davvero cancellare l’intera cronologia modifiche?')) {
+        state.history = [];
+        try { localStorage.removeItem('partite-history-v1'); } catch(e) {}
+        renderHistoryView();
+        triggerHaptic('warning');
+        toast('Cronologia svuotata');
+      }
+    };
+  }
+
   const todayTopBtn = $('#todayBtn');
   if (todayTopBtn) {
     todayTopBtn.onclick = () => {
@@ -644,6 +686,7 @@ function bindEvents() {
           state.items = [...map.values()];
           Object.assign(state.dayMeta, wi);
           save(); saveD(); render();
+          logEvent('import', `Importate ${newItems.length} partite dal file JSON (${file.name || 'file'})`);
           toast(`${newItems.length} partite importate`, 'success');
         } catch(err) { toast('File non valido', 'warning'); }
       };
@@ -653,6 +696,15 @@ function bindEvents() {
 }
 
 window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const historyView = $('#historyView');
+    if (historyView && historyView.style.display !== 'none') {
+      historyView.style.display = 'none';
+      return;
+    }
+    const modals = document.querySelectorAll('.ov');
+    if (modals.length) modals.forEach(m => m.remove());
+  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
     if (e.shiftKey) return;
     e.preventDefault();
@@ -664,10 +716,6 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
     if (!state.READONLY) cloudPushNow().then(() => toast('Modifiche salvate', 'success'));
-  }
-  if (e.key === 'Escape') {
-    const modals = document.querySelectorAll('.ov');
-    if (modals.length) modals.forEach(m => m.remove());
   }
 });
 
