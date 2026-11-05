@@ -53,8 +53,19 @@
       <div id="navTree" class="nav-tree"></div>
     </div>
 
-    <!-- IN FONDO: IMPOSTAZIONI (⚙️), STATO E LOGIN -->
+    <!-- IN FONDO: CRONOLOGIA, IMPOSTAZIONI, STATO E LOGIN -->
     <div class="sidebar-bottom">
+      <button type="button" class="rail-nav-item" id="railNavHistory" title="Cronologia Modifiche">
+        <span class="icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M12 7v5l4 2"/>
+          </svg>
+        </span>
+        <span class="label">Cronologia</span>
+      </button>
+
       <button type="button" class="rail-nav-item" id="railNavSettings" title="Strumenti & Impostazioni">
         <span class="icon">⚙️</span>
         <span class="label">Impostazioni</span>
@@ -110,6 +121,21 @@
     </main>
 
   </div>
+</div>
+
+<!-- VISTA FULLSCREEN CRONOLOGIA MODIFICHE (CHROME STYLE) -->
+<div id="historyView" class="history-fullscreen-view" style="display:none">
+  <div class="history-topbar">
+    <div class="history-topbar-left">
+      <button type="button" id="historyCloseBtn" class="pill-btn-action" title="Torna al calendario">← Calendario</button>
+      <h2>Cronologia Modifiche</h2>
+    </div>
+    <div class="history-topbar-right">
+      <input type="search" id="historySearchInput" placeholder="🔍 Cerca nella cronologia..." autocomplete="off" />
+      <button type="button" id="historyClearBtn" class="pill-btn-sm" style="background:rgba(239,68,68,0.18);color:#fca5a5">Cancella</button>
+    </div>
+  </div>
+  <div class="history-container" id="historyListWrap"></div>
 </div>
 
 <!-- BOTTOM BAR MOBILE -->
