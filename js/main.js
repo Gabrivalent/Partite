@@ -1,6 +1,6 @@
 import { state, registerStateCallbacks, save, saveD, applyTheme, pushUndo, popUndoState } from './state.js';
 import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback } from './api.js';
-import { iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements } from './rules.js';
+import { uid, iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements } from './rules.js';
 import { copyMonthRecapWhatsApp, generateWhatsAppText } from './export.js';
 import { $, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree } from './render.js';
 import { openEditModal, openAddModal, openQuickCloseModal, openCompensiDetailModal, openViewFileModal, openMoltModal, openResocontoModal, openConflictsModal, openUrgentIncompleteModal, openPendingModal, openSettingsModal, promptLogin } from './modals.js';
