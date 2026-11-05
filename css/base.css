@@ -182,7 +182,7 @@ input, select, textarea {
 .app-sidebar.expanded .sidebar-brand-label {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.35s; /* Ritardo dissolvenza etichetta coerente */
+  transition: opacity 0.2s ease 0.35s;
 }
 
 /* Navigazione e pulsanti */
@@ -193,6 +193,12 @@ input, select, textarea {
   padding: 8px 0;
   width: 100%;
   align-items: center;
+}
+
+.app-sidebar:hover .sidebar-nav,
+.app-sidebar.expanded .sidebar-nav {
+  align-items: stretch;
+  padding: 8px;
 }
 
 .rail-icon-btn, .rail-nav-item {
