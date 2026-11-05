@@ -67,11 +67,7 @@ import {
 
 import { 
   initSupabase, 
-  loadAllDataFromCloud, 
-  saveMatchToCloud, 
-  saveDayMetaToCloud, 
-  deleteMatchFromCloud,
-  applyCloudData 
+  loadAllDataFromCloud 
 } from './api.js';
 
 // ==========================================================================
