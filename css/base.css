@@ -185,7 +185,6 @@ input, select, textarea {
   transition: opacity 0.2s ease 0.15s;
 }
 
-/* Navigazione sidebar con reset totale per evitare conflitti con components.css */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -209,8 +208,8 @@ input, select, textarea {
   color: var(--mute) !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
+  justify-content: flex-start !important;
+  padding: 0 10px !important;
   cursor: pointer;
   box-shadow: none !important;
   margin: 0 auto !important;
@@ -218,18 +217,25 @@ input, select, textarea {
   overflow: hidden !important;
 }
 
+@media (max-width: 859px) {
+  .app-sidebar:not(.expanded) .rail-icon-btn, 
+  .app-sidebar:not(.expanded) .rail-nav-item {
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+}
+
 .app-sidebar .rail-nav-item .icon {
   width: 24px !important;
   height: 24px !important;
   min-width: 24px !important;
   min-height: 24px !important;
-  max-width: 24px !important;
-  max-height: 24px !important;
   font-size: 20px !important;
   line-height: 1 !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  flex-shrink: 0 !important;
   margin: 0 !important;
 }
 
@@ -243,12 +249,6 @@ input, select, textarea {
     gap: 14px !important;
     margin: 0 !important;
   }
-  
-  .app-sidebar:hover .rail-nav-item .icon,
-  .app-sidebar.expanded .rail-nav-item .icon {
-    width: 24px !important;
-    min-width: 24px !important;
-  }
 }
 
 .app-sidebar.expanded .rail-nav-item {
@@ -258,11 +258,6 @@ input, select, textarea {
   padding: 0 14px !important;
   gap: 14px !important;
   margin: 0 !important;
-}
-
-.app-sidebar.expanded .rail-nav-item .icon {
-  width: 24px !important;
-  min-width: 24px !important;
 }
 
 .app-sidebar .rail-icon-btn:hover, 
