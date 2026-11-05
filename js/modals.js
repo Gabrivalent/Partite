@@ -1,5 +1,5 @@
 // ==========================================================================
-// 1. UTILITY DOM LOCALI & HAPTIC FEEDBACK (Zero crash di dipendenza)
+// 1. UTILITY DOM LOCALI & HAPTIC FEEDBACK
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -39,9 +39,6 @@ import {
 import { render } from './main.js';
 import * as api from './api.js';
 
-// ==========================================================================
-// 2. FUNZIONI DI SUPPORTO GENERAZIONE OVERLAY MODALI
-// ==========================================================================
 function getOrCreateModalContainer(id, innerHTML) {
   let el = document.getElementById(id);
   if (!el) {
@@ -65,9 +62,6 @@ function hideModal(el) {
   el.style.display = 'none';
 }
 
-// ==========================================================================
-// 3. TIME PICKER PERSONALIZZATO
-// ==========================================================================
 export function buildCustomTimePicker(initialVal = '18:00') {
   const [h, m] = (initialVal || '18:00').split(':');
   let hhOpts = '';
@@ -102,9 +96,6 @@ export function bindTimePickerEvents(container, targetInput) {
   if (mm) mm.onchange = update;
 }
 
-// ==========================================================================
-// 4. MODALE AGGIUNGI / MODIFICA PARTITA
-// ==========================================================================
 export function openAddModal(defaultDate = null) {
   const dVal = defaultDate || (state.currentMonth ? `${state.currentMonth}-01` : iso(new Date()));
   const newMatch = {
@@ -321,9 +312,6 @@ export function openEditModal(matchItem, isNew = false) {
   };
 }
 
-// ==========================================================================
-// 5. MODALE VISUALIZZAZIONE REFERTO / FILE
-// ==========================================================================
 export function openViewFileModal(fileData, fileName = 'Referto') {
   if (!fileData) return;
   triggerHaptic();
@@ -350,9 +338,6 @@ export function openViewFileModal(fileData, fileName = 'Referto') {
   mEl.querySelector('.btn-close').onclick = () => hideModal(mEl);
 }
 
-// ==========================================================================
-// 6. MODALE AVVISI, CONFLITTI E GARE INCOMPLETE
-// ==========================================================================
 export function openConflictsModal() {
   triggerHaptic();
   const conflicts = typeof findConflictingMatches === 'function' ? findConflictingMatches() : [];
@@ -362,7 +347,7 @@ export function openConflictsModal() {
   let body = '';
 
   if (conflicts.length > 0) {
-    body += `<h4 style="color:var(--danger, #e63946); margin-top:0;">⚠️ Conflitti di Orario / Presenza</h4><ul class="alert-list">`;
+    body += `<h4 style="color:var(--danger, #e63946); margin-top:0;">⚠️ Conflitti</h4><ul class="alert-list">`;
     conflicts.forEach(c => {
       body += `<li><strong>${c.name || 'Conflitto'}</strong>: ${c.desc || (c.m1?.title + ' vs ' + c.m2?.title)}</li>`;
     });
@@ -370,15 +355,15 @@ export function openConflictsModal() {
   }
 
   if (urgent.length > 0) {
-    body += `<h4 style="color:var(--warning, #f4a261);">⏳ Gare Imminenti con Dati Mancanti</h4><ul class="alert-list">`;
+    body += `<h4 style="color:var(--warning, #f4a261);">⏳ Gare Imminenti Senza Addetti</h4><ul class="alert-list">`;
     urgent.forEach(m => {
-      body += `<li><strong>${m.date} ${m.time}</strong> - ${m.title} (mancano addetti/arbitro)</li>`;
+      body += `<li><strong>${m.date} ${m.time}</strong> - ${m.title}</li>`;
     });
     body += `</ul>`;
   }
 
   if (postponed.length > 0) {
-    body += `<h4 style="color:var(--info, #457b9d);">🔄 Gare Rinviate o Sospese</h4><ul class="alert-list">`;
+    body += `<h4 style="color:var(--info, #457b9d);">🔄 Rinviate / Sospese</h4><ul class="alert-list">`;
     postponed.forEach(m => {
       body += `<li><strong>${m.date}</strong> - ${m.title} (${m.status})</li>`;
     });
@@ -386,13 +371,13 @@ export function openConflictsModal() {
   }
 
   if (!body) {
-    body = `<p style="text-align:center; color:var(--success, #2a9d8f); padding:20px;">Tutto in ordine! Nessun conflitto né dati mancanti.</p>`;
+    body = `<p style="text-align:center; color:var(--success, #2a9d8f); padding:20px;">Nessun conflitto rilevato.</p>`;
   }
 
   const html = `
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Stato Allarmi e Avvisi</h3>
+        <h3>Avvisi</h3>
         <button class="btn-close">&times;</button>
       </div>
       <div class="modal-body">${body}</div>
@@ -409,17 +394,9 @@ export function openConflictsModal() {
   mEl.querySelector('.btn-close-modal').onclick = close;
 }
 
-export function openUrgentIncompleteModal() {
-  openConflictsModal();
-}
+export function openUrgentIncompleteModal() { openConflictsModal(); }
+export function openPendingModal() { openConflictsModal(); }
 
-export function openPendingModal() {
-  openConflictsModal();
-}
-
-// ==========================================================================
-// 7. MODALE RESOCONTO & STATISTICHE PERSONA
-// ==========================================================================
 export function openResocontoModal(personName = '') {
   triggerHaptic();
   const name = personName.trim();
@@ -484,9 +461,6 @@ export function openCompensiDetailModal(personName = '') {
   openResocontoModal(personName);
 }
 
-// ==========================================================================
-// 8. CHIUSURA RAPIDA APERTURA/CHIUSURA
-// ==========================================================================
 export function openQuickCloseModal(dayStr) {
   triggerHaptic();
   const meta = (state.dayMeta && state.dayMeta[dayStr]) || {};
@@ -533,9 +507,6 @@ export function openQuickCloseModal(dayStr) {
   };
 }
 
-// ==========================================================================
-// 9. MODALI IMPOSTAZIONI, CATEGORIE, NOMI, TEMA E LOGIN SUPABASE OAUTH
-// ==========================================================================
 export function openSettingsModal() {
   triggerHaptic();
   const html = `
@@ -705,7 +676,7 @@ export function openMoltModal() {
         <button class="btn-close">&times;</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:12px; color:var(--muted, #666);">Formato: <code>Nome:Valore</code> (una riga per addetto)</p>
+        <p style="font-size:12px; color:var(--muted, #666);">Formato: <code>Nome:Valore</code></p>
         <textarea id="txtMolt" class="form-input" style="height:150px;">${textVal}</textarea>
       </div>
       <div class="modal-footer">
@@ -798,7 +769,7 @@ export function openExportMultiModal() {
         <button class="btn-close">&times;</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:12px; color:var(--muted, #666);">Seleziona i mesi da scaricare in JSON:</p>
+        <p style="font-size:12px; color:var(--muted, #666);">Seleziona i mesi:</p>
         <div style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
           ${sortedMonths.map(m => `
             <label style="display:flex; gap:8px; align-items:center;">
@@ -823,10 +794,7 @@ export function openExportMultiModal() {
   mEl.querySelector('#btnDoExportMulti').onclick = () => {
     triggerHaptic();
     const selected = [...mEl.querySelectorAll('.cb-export-month:checked')].map(c => c.value);
-    if (!selected.length) {
-      alert('Seleziona almeno un mese.');
-      return;
-    }
+    if (!selected.length) return;
     import('./export.js').then(exp => {
       if (exp.exportSelectedMonthsJSON) exp.exportSelectedMonthsJSON(selected);
       close();
@@ -839,39 +807,20 @@ export function openPrintModal() {
   window.print();
 }
 
-export async function promptLogin() {
+// Nessun redirect esterno: sincronizzazione diretta
+export function promptLogin() {
   triggerHaptic();
-
-  const client = api.sb || window.supabaseClient || window.supabase;
-  if (!client || !client.auth) {
-    alert('Client Supabase non disponibile o offline.');
-    return;
-  }
-
-  if (state.user) {
-    const email = state.user.email || 'Utente';
-    if (confirm(`Attualmente connesso come ${email}.\nVuoi disconnetterti?`)) {
-      try {
-        await client.auth.signOut();
-        state.user = null;
-        if (typeof render === 'function') render();
-      } catch (err) {
-        console.error('Errore disconnessione:', err);
+  if (state.READONLY) {
+    const pwd = window.prompt("Inserisci password amministratore:");
+    if (pwd) {
+      localStorage.setItem('partite-admin-key', pwd);
+      window.location.search = '';
+    }
+  } else {
+    if (confirm("Vuoi forzare il salvataggio su Cloud adesso?")) {
+      if (typeof api.cloudPushNow === 'function') {
+        api.cloudPushNow().then(() => alert("Sincronizzazione completata!"));
       }
     }
-    return;
-  }
-
-  try {
-    const { error } = await client.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin + window.location.pathname
-      }
-    });
-    if (error) throw error;
-  } catch (err) {
-    console.error('Errore autenticazione Google:', err);
-    alert('Errore durante il login: ' + (err.message || err));
   }
 }
