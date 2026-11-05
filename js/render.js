@@ -17,6 +17,42 @@ import { computeRecapRows } from './export.js';
 export const $ = s => document.querySelector(s);
 export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+const CAT_PALETTE = [
+  { bg: 'rgba(37, 99, 235, 0.2)', text: '#93c5fd', border: 'rgba(59, 130, 246, 0.38)' },   // Blu
+  { bg: 'rgba(16, 185, 129, 0.2)', text: '#6ee7b7', border: 'rgba(16, 185, 129, 0.38)' },  // Smeraldo
+  { bg: 'rgba(245, 158, 11, 0.2)', text: '#fcd34d', border: 'rgba(245, 158, 11, 0.38)' },  // Ambra
+  { bg: 'rgba(168, 85, 247, 0.2)', text: '#d8b4fe', border: 'rgba(168, 85, 247, 0.38)' },  // Viola
+  { bg: 'rgba(236, 72, 153, 0.2)', text: '#f9a8d4', border: 'rgba(236, 72, 153, 0.38)' },  // Rosa
+  { bg: 'rgba(6, 182, 212, 0.2)', text: '#67e8f9', border: 'rgba(6, 182, 212, 0.38)' },   // Ciano
+  { bg: 'rgba(249, 115, 22, 0.2)', text: '#fdba74', border: 'rgba(249, 115, 22, 0.38)' },  // Arancio
+  { bg: 'rgba(132, 204, 22, 0.2)', text: '#bef264', border: 'rgba(132, 204, 22, 0.38)' }   // Lime
+];
+
+export function getCatBadgeStyle(cat) {
+  if (!cat) return '';
+  const clean = cat.trim().toUpperCase();
+  const known = {
+    'U19': 0,
+    'U17': 1,
+    'U15': 2,
+    'U14': 3,
+    'U13': 4,
+    'ESO': 5,
+    '2016': 6,
+    '2017': 7
+  };
+  let idx = known[clean];
+  if (idx === undefined) {
+    let hash = 0;
+    for (let i = 0; i < clean.length; i++) {
+      hash = clean.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    idx = Math.abs(hash) % CAT_PALETTE.length;
+  }
+  const p = CAT_PALETTE[idx];
+  return `background:${p.bg};color:${p.text};border-color:${p.border}`;
+}
+
 export function params() { 
   return new URLSearchParams(state.mem !== null ? state.mem : location.hash.slice(1)); 
 }
@@ -165,7 +201,7 @@ export function card(i, hasConflict, isUrgentIncomplete) {
     ? `<span class="clickable-person" data-quickperson="${esc(i.arb.trim())}">${esc(i.arb.trim())}</span>`
     : (arbNeeded ? '<span class="empty-req">Manca</span>' : '<span class="empty-opt">FIP</span>');
 
-  const catHtml = i.cat ? `<span class="cat-pill">${esc(i.cat)}</span>` : '';
+  const catHtml = i.cat ? `<span class="cat-pill" style="${getCatBadgeStyle(i.cat)}">${esc(i.cat)}</span>` : '';
   const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Amichevole">A</span>` : '';
 
   const outcome = getMatchOutcome(i);
@@ -205,15 +241,15 @@ export function card(i, hasConflict, isUrgentIncomplete) {
     <div class="m-title" title="${esc(i.title)}">${esc(i.title) || 'Partita senza titolo'}</div>
 
     <div class="m-roster-grid">
-      <div class="m-roster-chip">
+      <div class="m-roster-chip" data-quickassign="t1" title="Clicca per assegnare Tavolo 1">
         <span class="chip-lbl">Tavolo 1</span>
         <span class="chip-val">${t1Val}</span>
       </div>
-      <div class="m-roster-chip">
+      <div class="m-roster-chip" data-quickassign="t2" title="Clicca per assegnare Tavolo 2">
         <span class="chip-lbl">Tavolo 2</span>
         <span class="chip-val">${t2Val}</span>
       </div>
-      <div class="m-roster-chip">
+      <div class="m-roster-chip" data-quickassign="arb" title="Clicca per assegnare Arbitro">
         <span class="chip-lbl">Arbitro</span>
         <span class="chip-val">${arbVal}</span>
       </div>
