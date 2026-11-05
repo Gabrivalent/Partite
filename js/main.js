@@ -1,5 +1,31 @@
 // ==========================================================================
-// IMPORT DEI MODULI CON I NOMI REALI ESPORTATI
+// 1. SELETTORI E UTILITY GLOBALI (Zero dipendenze)
+// ==========================================================================
+const $ = (sel, el = document) => el.querySelector(sel);
+const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+
+// Fallback vibrazione tattile per evitare crash generati da modals.js
+window.triggerHaptic = window.triggerHaptic || function() {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    try { navigator.vibrate(10); } catch(e) {}
+  }
+};
+
+// ==========================================================================
+// 2. GESTIONE AUTENTICAZIONE GLOBALE
+// ==========================================================================
+window.handleAuthClick = () => {
+  if (typeof promptLogin === 'function') {
+    promptLogin();
+  } else {
+    import('./modals.js').then(m => {
+      if (m.promptLogin) m.promptLogin();
+    }).catch(console.error);
+  }
+};
+
+// ==========================================================================
+// 3. IMPORT MODULI CON I NOMI EFFETTIVAMENTE ESPORTATI
 // ==========================================================================
 import { 
   state, 
@@ -18,7 +44,6 @@ import {
 } from './rules.js';
 
 import { 
-  $, 
   card, 
   esc, 
   params, 
@@ -56,11 +81,8 @@ import {
   registerCloudCallback 
 } from './api.js';
 
-// Espone state e login per click su interfaccia e debug
+// Espone state alla console per debug immediato
 window.state = state;
-window.handleAuthClick = () => {
-  if (typeof promptLogin === 'function') promptLogin();
-};
 
 function toast(msg, type = 'info') {
   let toastEl = $('#toast');
@@ -78,7 +100,7 @@ function toast(msg, type = 'info') {
 }
 
 // ==========================================================================
-// FUNZIONE CENTRALE DI RENDERING (Aggiorna lista partite, sidebar e badge)
+// 4. FUNZIONE CENTRALE DI RENDERING
 // ==========================================================================
 export function render() {
   const listEl = $('#list');
@@ -99,7 +121,7 @@ export function render() {
     return true;
   });
 
-  // Ordina per data e orario
+  // Ordina cronologicamente
   filtered.sort((a, b) => {
     const da = (a.date || '') + (a.time || '');
     const db = (b.date || '') + (b.time || '');
@@ -117,7 +139,7 @@ export function render() {
     dayMap.get(item.date).push(item);
   });
 
-  // 3. Genera l'HTML delle settimane
+  // 3. Genera l'HTML centrale
   if (weeksMap.size === 0) {
     listEl.innerHTML = `
       <div style="text-align:center; padding: 40px 10px; color: var(--muted, #888);">
@@ -180,15 +202,25 @@ export function render() {
     sidebarEl.innerHTML = recapHTML(state.currentMonth);
   }
 
-  // 5. Aggiorna Albero laterale e badge di allerta
-  if (typeof renderNavTree === 'function') renderNavTree();
-  if (typeof updateAlertStatusBadge === 'function') updateAlertStatusBadge();
-  if (typeof updateIncompleteBadge === 'function') updateIncompleteBadge();
-  if (typeof refreshUndoBtn === 'function') refreshUndoBtn();
+  // 5. Aggiorna Albero laterale protetto da crash
+  try {
+    if (typeof renderNavTree === 'function') renderNavTree();
+  } catch (err) {
+    console.warn('Errore in renderNavTree:', err);
+  }
+
+  // 6. Aggiorna badge e tasto Undo
+  try {
+    if (typeof updateAlertStatusBadge === 'function') updateAlertStatusBadge();
+    if (typeof updateIncompleteBadge === 'function') updateIncompleteBadge();
+    if (typeof refreshUndoBtn === 'function') refreshUndoBtn();
+  } catch (err) {
+    console.warn('Errore aggiornamento badge:', err);
+  }
 }
 
 // ==========================================================================
-// IMPORTAZIONE FILE JSON CON CONVERSIONE
+// 5. PARSER IMPORTAZIONE JSON
 // ==========================================================================
 function fromExportFormat(arr) {
   const newItems = [];
@@ -233,7 +265,7 @@ function fromExportFormat(arr) {
 }
 
 // ==========================================================================
-// REGISTRAZIONE EVENTI
+// 6. REGISTRAZIONE EVENTI
 // ==========================================================================
 function setupEventListeners() {
   const qInput = $('#q');
@@ -369,11 +401,11 @@ function setupEventListeners() {
     shareBtn.onclick = () => copyReadOnlyLink(toast);
   }
 
-  // Delegazione click su lista
+  // Delegazione click su lista centrale
   const list = $('#list');
   if (list) {
     list.onclick = e => {
-      // Referto
+      // 1. Referto
       const rBtn = e.target.closest('.reportBtn');
       if (rBtn) {
         e.stopPropagation();
@@ -390,7 +422,7 @@ function setupEventListeners() {
         return;
       }
 
-      // WhatsApp settimana
+      // 2. WhatsApp settimana
       const wBtn = e.target.closest('.waBtn');
       if (wBtn) {
         e.stopPropagation();
@@ -404,7 +436,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Statistiche persona
+      // 3. Statistiche persona
       const personEl = e.target.closest('.clickable-person');
       if (personEl) {
         e.stopPropagation();
@@ -413,7 +445,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Ghost check
+      // 4. Ghost check
       const gBtn = e.target.closest('.ghostBtn');
       if (gBtn) {
         e.stopPropagation();
@@ -429,7 +461,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Modifica card
+      // 5. Modifica card
       const matchCard = e.target.closest('.match');
       if (matchCard && !e.target.closest('a') && !e.target.closest('button')) {
         if (state.READONLY) return;
@@ -439,7 +471,7 @@ function setupEventListeners() {
         return;
       }
 
-      // Apertura / Chiusura
+      // 6. Apertura / Chiusura
       const ynBtn = e.target.closest('.slot .yn button');
       if (ynBtn) {
         if (state.READONLY) return;
@@ -477,10 +509,10 @@ function setupEventListeners() {
     };
   }
 
-  // Navigazione ad albero a sinistra
-  const navTree = $('#navTree') || $('.nav-tree');
-  if (navTree) {
-    navTree.onclick = e => {
+  // Navigazione ad albero laterale
+  const navTreeEl = $('#navTree') || $('.nav-tree');
+  if (navTreeEl) {
+    navTreeEl.onclick = e => {
       const mLink = e.target.closest('[data-nav-month]');
       if (mLink) {
         e.preventDefault();
@@ -509,7 +541,7 @@ function setupEventListeners() {
 }
 
 // ==========================================================================
-// AVVIO APPLICAZIONE
+// 7. INIZIALIZZAZIONE E AVVIO
 // ==========================================================================
 async function initApp() {
   const urlP = new URLSearchParams(window.location.search);
@@ -521,27 +553,48 @@ async function initApp() {
     if (newBtn) newBtn.style.display = 'none';
   }
 
-  // 1. Carica da localStorage
+  // 1. Caricamento locale iniziale sicuro
   try {
     const rawItems = localStorage.getItem('partite-v1');
-    if (rawItems) state.items = JSON.parse(rawItems);
+    state.items = rawItems ? JSON.parse(rawItems) : (state.items || []);
+
     const rawMeta = localStorage.getItem('partite-d-v1');
-    if (rawMeta) state.dayMeta = JSON.parse(rawMeta);
+    state.dayMeta = rawMeta ? JSON.parse(rawMeta) : (state.dayMeta || {});
+
+    const rawMolt = localStorage.getItem('partite-m-v1');
+    state.molt = rawMolt ? JSON.parse(rawMolt) : (state.molt || {});
+
+    const rawCats = localStorage.getItem('partite-cats-v1');
+    state.categories = rawCats ? JSON.parse(rawCats) : (state.categories || {});
+
+    const rawNames = localStorage.getItem('partite-names-v1');
+    state.names = rawNames ? JSON.parse(rawNames) : (state.names || []);
+
+    const rawFip = localStorage.getItem('partite-fip-v1');
+    state.fipLinks = rawFip ? JSON.parse(rawFip) : (state.fipLinks || {});
   } catch (e) {
-    console.warn(e);
+    console.warn('Errore lettura dati da localStorage:', e);
   }
 
-  // 2. Mese iniziale
+  // Garantisce che nessun oggetto fondamentale sia null/undefined
+  state.items = state.items || [];
+  state.dayMeta = state.dayMeta || {};
+  state.molt = state.molt || {};
+  state.categories = state.categories || {};
+  state.names = state.names || [];
+  state.fipLinks = state.fipLinks || {};
+
+  // 2. Imposta mese iniziale
   if (!state.currentMonth) {
     state.currentMonth = (params && params.m) || iso(new Date()).slice(0, 7);
   }
 
   setupEventListeners();
 
-  // 3. Render immediato dei dati locali
+  // 3. Render a schermo immediato
   render();
 
-  // 4. Sincronizzazione cloud sicura con i metodi reali
+  // 4. Sincronizzazione Cloud in background
   try {
     if (typeof registerCloudCallback === 'function') {
       registerCloudCallback(() => render());
@@ -555,7 +608,7 @@ async function initApp() {
   }
 }
 
-// Esecuzione immediata
+// Avvio immediato
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
