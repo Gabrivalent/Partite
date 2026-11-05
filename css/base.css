@@ -116,15 +116,19 @@ input, select, textarea {
   height: 100vh;
   z-index: 900;
   transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  overflow: hidden;
   border-right: 1px solid var(--divider);
   flex-shrink: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 .app-sidebar.expanded {
   width: 270px;
-  overflow-y: auto;
 }
 
 @media (min-width: 860px) {
@@ -134,14 +138,12 @@ input, select, textarea {
 
   .app-sidebar:hover {
     width: 270px;
-    overflow-y: auto;
     transition-delay: 0.35s;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
 
   .app-sidebar.expanded {
     width: 270px;
-    overflow-y: auto;
     transition-delay: 0s;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -676,14 +678,4 @@ body:not(.locked) .robanner { display: none !important; }
   font-weight: 700;
   color: var(--mute);
   white-space: nowrap;
-}
-
-/* Nasconde completamente la barra di scorrimento brutta mantenendo la funzionalità di scroll */
-.app-sidebar {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE e Edge vecchi */
-}
-
-.app-sidebar::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
 }
