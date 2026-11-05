@@ -129,6 +129,13 @@ input, select, textarea {
 
 .app-sidebar.expanded {
   width: 270px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-sidebar.expanded::-webkit-scrollbar {
+  display: none;
 }
 
 @media (min-width: 860px) {
@@ -138,12 +145,14 @@ input, select, textarea {
 
   .app-sidebar:hover {
     width: 270px;
+    overflow-y: auto;
     transition-delay: 0.35s;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
 
   .app-sidebar.expanded {
     width: 270px;
+    overflow-y: auto;
     transition-delay: 0s;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -214,6 +223,11 @@ input, select, textarea {
   flex-direction: column;
   gap: 4px;
   padding: 8px;
+  align-items: center;
+}
+
+.app-sidebar.expanded .sidebar-nav {
+  align-items: stretch;
 }
 
 .rail-icon-btn, .rail-nav-item {
@@ -231,6 +245,17 @@ input, select, textarea {
   transition: background .15s ease, color .15s ease;
   white-space: nowrap;
   box-shadow: none;
+}
+
+.app-sidebar:not(.expanded) .rail-nav-item {
+  width: 44px;
+  margin: 0 auto;
+}
+
+.app-sidebar.expanded .rail-nav-item {
+  justify-content: flex-start;
+  padding: 0 14px;
+  gap: 14px;
 }
 
 .rail-icon-btn {
