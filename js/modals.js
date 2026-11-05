@@ -1,5 +1,5 @@
 // ==========================================================================
-// 1. UTILITY DOM LOCALI & HAPTIC FEEDBACK
+// 1. UTILITY DOM LOCALI & HAPTIC FEEDBACK (Zero crash di dipendenza)
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -534,7 +534,7 @@ export function openQuickCloseModal(dayStr) {
 }
 
 // ==========================================================================
-// 9. MODALI IMPOSTAZIONI, CATEGORIE, NOMI, TEMA E LOGIN
+// 9. MODALI IMPOSTAZIONI, CATEGORIE, NOMI, TEMA E LOGIN SUPABASE OAUTH
 // ==========================================================================
 export function openSettingsModal() {
   triggerHaptic();
@@ -839,20 +839,39 @@ export function openPrintModal() {
   window.print();
 }
 
-export function promptLogin() {
+export async function promptLogin() {
   triggerHaptic();
-  const signOutFn = api.signOutUser || api.signOut || api.logout;
-  const signInFn = api.signInWithGoogle || api.signIn || api.login;
+
+  const client = api.sb || window.supabaseClient || window.supabase;
+  if (!client || !client.auth) {
+    alert('Client Supabase non disponibile o offline.');
+    return;
+  }
 
   if (state.user) {
-    if (confirm(`Attualmente connesso come ${state.user.email || 'Utente'}. Vuoi disconnetterti?`)) {
-      if (typeof signOutFn === 'function') signOutFn();
+    const email = state.user.email || 'Utente';
+    if (confirm(`Attualmente connesso come ${email}.\nVuoi disconnetterti?`)) {
+      try {
+        await client.auth.signOut();
+        state.user = null;
+        if (typeof render === 'function') render();
+      } catch (err) {
+        console.error('Errore disconnessione:', err);
+      }
     }
-  } else {
-    if (typeof signInFn === 'function') {
-      signInFn();
-    } else {
-      alert('Modulo di autenticazione non configurato o offline.');
-    }
+    return;
+  }
+
+  try {
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname
+      }
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error('Errore autenticazione Google:', err);
+    alert('Errore durante il login: ' + (err.message || err));
   }
 }
