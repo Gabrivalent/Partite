@@ -36,7 +36,24 @@ export function registerStateCallbacks({ onSave, onBadgeUpdate }) {
 export const saveLocalOnly = () => {
   try {
     localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(state.items));
-  } catch(e) { console.error('Errore salvataggio items locale', e); }
+  } catch(e) {
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      console.warn('Quota localStorage superata: salvo omettendo fileData pesanti');
+      try {
+        const lightweight = (state.items || []).map(it => {
+          if (!it.fileData) return it;
+          const copy = { ...it };
+          delete copy.fileData;
+          return copy;
+        });
+        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(lightweight));
+      } catch (err2) {
+        console.error('Impossibile salvare in localStorage:', err2);
+      }
+    } else {
+      console.error('Errore salvataggio items locale', e);
+    }
+  }
   if (onBadgeUpdateCallback) onBadgeUpdateCallback();
   state.isDirty = true;
 };
