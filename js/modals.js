@@ -1,5 +1,5 @@
 // ==========================================================================
-// 1. UTILITY DOM LOCALI & HAPTIC FEEDBACK (Zero crash di dipendenza)
+// 1. UTILITY DOM LOCALI & HAPTIC FEEDBACK
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -37,7 +37,7 @@ import {
 } from './rules.js';
 
 import { render } from './main.js';
-import { signInWithGoogle, signOutUser } from './api.js';
+import * as api from './api.js';
 
 // ==========================================================================
 // 2. FUNZIONI DI SUPPORTO GENERAZIONE OVERLAY MODALI
@@ -439,7 +439,6 @@ export function openResocontoModal(personName = '') {
     }
   });
 
-  const molt = (state.molt && state.molt[name]) || 1;
   const totGare = tCount + arbCount;
 
   const html = `
@@ -842,15 +841,18 @@ export function openPrintModal() {
 
 export function promptLogin() {
   triggerHaptic();
+  const signOutFn = api.signOutUser || api.signOut || api.logout;
+  const signInFn = api.signInWithGoogle || api.signIn || api.login;
+
   if (state.user) {
     if (confirm(`Attualmente connesso come ${state.user.email || 'Utente'}. Vuoi disconnetterti?`)) {
-      if (typeof signOutUser === 'function') signOutUser();
+      if (typeof signOutFn === 'function') signOutFn();
     }
   } else {
-    if (typeof signInWithGoogle === 'function') {
-      signInWithGoogle();
+    if (typeof signInFn === 'function') {
+      signInFn();
     } else {
-      alert('Modulo di autenticazione non attivo o offline.');
+      alert('Modulo di autenticazione non configurato o offline.');
     }
   }
 }
