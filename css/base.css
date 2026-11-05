@@ -109,19 +109,22 @@ input, select, textarea {
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 0;
+  bottom: 0;
   height: 100vh;
-  z-index: 80;
+  z-index: 900;
   transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
   border-right: 1px solid var(--divider);
   flex-shrink: 0;
 }
 
 .app-sidebar.expanded {
   width: 270px;
+  overflow-y: auto;
 }
 
 @media (min-width: 860px) {
@@ -129,23 +132,16 @@ input, select, textarea {
     padding-left: 64px;
   }
 
-  .app-sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 900;
-    transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1) 0s;
-  }
-
   .app-sidebar:hover {
     width: 270px;
+    overflow-y: auto;
     transition-delay: 0.35s;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
 
   .app-sidebar.expanded {
     width: 270px;
+    overflow-y: auto;
     transition-delay: 0s;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -489,7 +485,6 @@ body.ro .auth-only {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* SKELETON SCREEN PER CARICAMENTO FLUIDO (Punto 6) */
 .skeleton-card {
   background: var(--surface);
   border-radius: 16px;
