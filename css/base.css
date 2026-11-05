@@ -103,7 +103,7 @@ input, select, textarea {
   width: 100%;
 }
 
-/* --- SIDEBAR CORRETTA E PERFETTAMENTE ALLINEATA --- */
+/* --- SIDEBAR ISOLATA E BLINDATA --- */
 .app-sidebar {
   width: 64px;
   background: var(--surface);
@@ -185,7 +185,7 @@ input, select, textarea {
   transition: opacity 0.2s ease 0.15s;
 }
 
-/* Navigazione e pulsanti */
+/* Navigazione sidebar con reset totale per evitare conflitti con components.css */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -195,30 +195,30 @@ input, select, textarea {
   align-items: center;
 }
 
-.rail-icon-btn, .rail-nav-item {
+.app-sidebar .rail-icon-btn, 
+.app-sidebar .rail-nav-item {
   width: 44px !important;
   height: 44px !important;
   min-width: 44px !important;
   min-height: 44px !important;
   max-width: 44px !important;
   max-height: 44px !important;
-  border-radius: 12px;
-  border: none;
-  background: transparent;
-  color: var(--mute);
+  border-radius: 12px !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--mute) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   padding: 0 !important;
   cursor: pointer;
-  transition: background .15s ease, color .15s ease;
-  box-shadow: none;
+  box-shadow: none !important;
   margin: 0 auto !important;
-  position: relative;
+  position: relative !important;
   overflow: hidden !important;
 }
 
-.rail-nav-item .icon {
+.app-sidebar .rail-nav-item .icon {
   width: 24px !important;
   height: 24px !important;
   min-width: 24px !important;
@@ -226,7 +226,7 @@ input, select, textarea {
   max-width: 24px !important;
   max-height: 24px !important;
   font-size: 20px !important;
-  line-height: 1;
+  line-height: 1 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -240,8 +240,14 @@ input, select, textarea {
     max-width: none !important;
     justify-content: flex-start !important;
     padding: 0 14px !important;
-    gap: 14px;
+    gap: 14px !important;
     margin: 0 !important;
+  }
+  
+  .app-sidebar:hover .rail-nav-item .icon,
+  .app-sidebar.expanded .rail-nav-item .icon {
+    width: 24px !important;
+    min-width: 24px !important;
   }
 }
 
@@ -250,31 +256,37 @@ input, select, textarea {
   max-width: none !important;
   justify-content: flex-start !important;
   padding: 0 14px !important;
-  gap: 14px;
+  gap: 14px !important;
   margin: 0 !important;
 }
 
-.rail-icon-btn:hover, .rail-nav-item:hover {
-  background: var(--hl);
-  color: var(--ink);
+.app-sidebar.expanded .rail-nav-item .icon {
+  width: 24px !important;
+  min-width: 24px !important;
+}
+
+.app-sidebar .rail-icon-btn:hover, 
+.app-sidebar .rail-nav-item:hover {
+  background: var(--hl) !important;
+  color: var(--ink) !important;
 }
 
 .app-sidebar.expanded #sidebarToggleBtn {
-  background: rgba(37, 99, 235, 0.2);
-  color: var(--date);
+  background: rgba(37, 99, 235, 0.2) !important;
+  color: var(--date) !important;
 }
 
-.rail-nav-item.active {
-  background: var(--card);
-  color: var(--acc);
-  font-weight: 700;
-  box-shadow: var(--shadow-sm);
+.app-sidebar .rail-nav-item.active {
+  background: var(--card) !important;
+  color: var(--acc) !important;
+  font-weight: 700 !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 
-.rail-nav-item .label,
-.rail-auth-btn .label,
-.sync-text-status,
-.sidebar-tree-container {
+.app-sidebar .rail-nav-item .label,
+.app-sidebar .rail-auth-btn .label,
+.app-sidebar .sync-text-status,
+.app-sidebar .sidebar-tree-container {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.1s ease;
@@ -358,30 +370,30 @@ body.ro .auth-only {
   white-space: nowrap;
 }
 
-.rail-auth-btn {
-  width: 44px;
-  height: 38px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
+.app-sidebar .rail-auth-btn {
+  width: 44px !important;
+  height: 38px !important;
+  min-width: 44px !important;
+  border-radius: 8px !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--ink) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
   cursor: pointer;
-  white-space: nowrap;
-  box-shadow: none;
-  margin: 0 auto;
+  box-shadow: none !important;
+  margin: 0 auto !important;
 }
 
 .app-sidebar:hover .rail-auth-btn,
 .app-sidebar.expanded .rail-auth-btn {
-  width: 100%;
-  justify-content: flex-start;
-  padding: 0 12px;
-  gap: 12px;
-  margin: 0;
+  width: 100% !important;
+  justify-content: flex-start !important;
+  padding: 0 12px !important;
+  gap: 12px !important;
+  margin: 0 !important;
 }
 
 /* --- RESTO DELL'APP --- */
