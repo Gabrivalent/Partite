@@ -1,11 +1,11 @@
 // ==========================================================================
-// 1. SELETTORI E UTILITY GLOBALI (Zero dipendenze)
+// 1. SELETTORI E UTILITY GLOBALI (Zero dipendenze esterne)
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 
-// Fallback vibrazione tattile per evitare crash generati da modals.js
-window.triggerHaptic = window.triggerHaptic || function() {
+// Fallback globale haptic feedback accessibile da qualsiasi modulo
+window.triggerHaptic = function() {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     try { navigator.vibrate(10); } catch(e) {}
   }
@@ -25,7 +25,7 @@ window.handleAuthClick = () => {
 };
 
 // ==========================================================================
-// 3. IMPORT MODULI CON I NOMI EFFETTIVAMENTE ESPORTATI
+// 3. IMPORT MODULI
 // ==========================================================================
 import { 
   state, 
@@ -81,7 +81,6 @@ import {
   registerCloudCallback 
 } from './api.js';
 
-// Espone state alla console per debug immediato
 window.state = state;
 
 function toast(msg, type = 'info') {
@@ -109,7 +108,6 @@ export function render() {
   const mParam = (params && params.m) || state.currentMonth || iso(new Date()).slice(0, 7);
   state.currentMonth = mParam;
 
-  // 1. Filtra le partite in base al mese, ricerca e categoria
   let filtered = (state.items || []).filter(item => {
     if (!item.date || !item.date.startsWith(mParam)) return false;
     if (state.filterCat && state.filterCat !== 'all' && item.cat !== state.filterCat) return false;
@@ -121,14 +119,12 @@ export function render() {
     return true;
   });
 
-  // Ordina cronologicamente
   filtered.sort((a, b) => {
     const da = (a.date || '') + (a.time || '');
     const db = (b.date || '') + (b.time || '');
     return da.localeCompare(db);
   });
 
-  // 2. Raggruppa per settimane e giorni
   const weeksMap = new Map();
   filtered.forEach(item => {
     const d = new Date(item.date + 'T12:00:00');
@@ -139,7 +135,6 @@ export function render() {
     dayMap.get(item.date).push(item);
   });
 
-  // 3. Genera l'HTML centrale
   if (weeksMap.size === 0) {
     listEl.innerHTML = `
       <div style="text-align:center; padding: 40px 10px; color: var(--muted, #888);">
@@ -196,26 +191,23 @@ export function render() {
     listEl.innerHTML = html;
   }
 
-  // 4. Aggiorna Sidebar Riepilogo
   const sidebarEl = $('#sidebarRecap') || $('.recap-content');
   if (sidebarEl && typeof recapHTML === 'function') {
     sidebarEl.innerHTML = recapHTML(state.currentMonth);
   }
 
-  // 5. Aggiorna Albero laterale protetto da crash
   try {
     if (typeof renderNavTree === 'function') renderNavTree();
   } catch (err) {
-    console.warn('Errore in renderNavTree:', err);
+    console.warn('renderNavTree warning:', err);
   }
 
-  // 6. Aggiorna badge e tasto Undo
   try {
     if (typeof updateAlertStatusBadge === 'function') updateAlertStatusBadge();
     if (typeof updateIncompleteBadge === 'function') updateIncompleteBadge();
     if (typeof refreshUndoBtn === 'function') refreshUndoBtn();
   } catch (err) {
-    console.warn('Errore aggiornamento badge:', err);
+    console.warn('Badge warning:', err);
   }
 }
 
@@ -284,7 +276,6 @@ function setupEventListeners() {
     };
   }
 
-  // Nuova Partita
   const newBtn = $('#newBtn');
   if (newBtn) {
     newBtn.onclick = () => {
@@ -293,7 +284,6 @@ function setupEventListeners() {
     };
   }
 
-  // Tasto Undo
   const undoBtn = $('#undoBtn');
   if (undoBtn) {
     undoBtn.onclick = () => {
@@ -304,7 +294,6 @@ function setupEventListeners() {
     };
   }
 
-  // Tasto Oggi
   const todayBtn = $('#todayBtn');
   if (todayBtn) {
     todayBtn.onclick = () => {
@@ -326,7 +315,6 @@ function setupEventListeners() {
     };
   }
 
-  // Pulsante Avvisi / Conflitti
   const alertBtn = $('#alertBadgeBtn');
   if (alertBtn) {
     alertBtn.onclick = () => {
@@ -334,7 +322,6 @@ function setupEventListeners() {
     };
   }
 
-  // Importazione JSON
   const impBtn = $('#importBtn');
   const impF = $('#importFile');
   if (impBtn && impF) {
@@ -379,7 +366,6 @@ function setupEventListeners() {
     };
   }
 
-  // Esportazioni
   const expBtn = $('#exportBtn');
   if (expBtn) {
     expBtn.onclick = () => {
@@ -401,11 +387,9 @@ function setupEventListeners() {
     shareBtn.onclick = () => copyReadOnlyLink(toast);
   }
 
-  // Delegazione click su lista centrale
   const list = $('#list');
   if (list) {
     list.onclick = e => {
-      // 1. Referto
       const rBtn = e.target.closest('.reportBtn');
       if (rBtn) {
         e.stopPropagation();
@@ -422,7 +406,6 @@ function setupEventListeners() {
         return;
       }
 
-      // 2. WhatsApp settimana
       const wBtn = e.target.closest('.waBtn');
       if (wBtn) {
         e.stopPropagation();
@@ -436,7 +419,6 @@ function setupEventListeners() {
         return;
       }
 
-      // 3. Statistiche persona
       const personEl = e.target.closest('.clickable-person');
       if (personEl) {
         e.stopPropagation();
@@ -445,7 +427,6 @@ function setupEventListeners() {
         return;
       }
 
-      // 4. Ghost check
       const gBtn = e.target.closest('.ghostBtn');
       if (gBtn) {
         e.stopPropagation();
@@ -461,7 +442,6 @@ function setupEventListeners() {
         return;
       }
 
-      // 5. Modifica card
       const matchCard = e.target.closest('.match');
       if (matchCard && !e.target.closest('a') && !e.target.closest('button')) {
         if (state.READONLY) return;
@@ -471,7 +451,6 @@ function setupEventListeners() {
         return;
       }
 
-      // 6. Apertura / Chiusura
       const ynBtn = e.target.closest('.slot .yn button');
       if (ynBtn) {
         if (state.READONLY) return;
@@ -509,7 +488,6 @@ function setupEventListeners() {
     };
   }
 
-  // Navigazione ad albero laterale
   const navTreeEl = $('#navTree') || $('.nav-tree');
   if (navTreeEl) {
     navTreeEl.onclick = e => {
@@ -527,7 +505,6 @@ function setupEventListeners() {
     };
   }
 
-  // Click riepilogo
   const sidebar = $('#sidebarRecap') || $('.recap');
   if (sidebar) {
     sidebar.onclick = e => {
@@ -553,7 +530,6 @@ async function initApp() {
     if (newBtn) newBtn.style.display = 'none';
   }
 
-  // 1. Caricamento locale iniziale sicuro
   try {
     const rawItems = localStorage.getItem('partite-v1');
     state.items = rawItems ? JSON.parse(rawItems) : (state.items || []);
@@ -576,7 +552,6 @@ async function initApp() {
     console.warn('Errore lettura dati da localStorage:', e);
   }
 
-  // Garantisce che nessun oggetto fondamentale sia null/undefined
   state.items = state.items || [];
   state.dayMeta = state.dayMeta || {};
   state.molt = state.molt || {};
@@ -584,17 +559,13 @@ async function initApp() {
   state.names = state.names || [];
   state.fipLinks = state.fipLinks || {};
 
-  // 2. Imposta mese iniziale
   if (!state.currentMonth) {
     state.currentMonth = (params && params.m) || iso(new Date()).slice(0, 7);
   }
 
   setupEventListeners();
-
-  // 3. Render a schermo immediato
   render();
 
-  // 4. Sincronizzazione Cloud in background
   try {
     if (typeof registerCloudCallback === 'function') {
       registerCloudCallback(() => render());
@@ -608,7 +579,6 @@ async function initApp() {
   }
 }
 
-// Avvio immediato
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
