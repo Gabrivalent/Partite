@@ -117,6 +117,7 @@ input, select, textarea {
   overflow-x: hidden;
   overflow-y: auto;
   border-right: 1px solid var(--divider);
+  flex-shrink: 0;
 }
 
 .app-sidebar.expanded {
@@ -126,7 +127,6 @@ input, select, textarea {
 @media (min-width: 860px) {
   .app-layout {
     padding-left: 64px;
-    transition: padding-left 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .app-sidebar {
@@ -138,21 +138,18 @@ input, select, textarea {
     transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1) 0s;
   }
 
-  /* Ritardo di 0.35s prima di iniziare l'apertura al passaggio del mouse */
   .app-sidebar:hover {
     width: 270px;
     transition-delay: 0.35s;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
 
-  /* Se pinnata con ☰ si apre subito senza ritardo */
   .app-sidebar.expanded {
     width: 270px;
     transition-delay: 0s;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
 
-  /* Dissolvenza coordinata per le etichette */
   .sidebar-brand-label,
   .rail-nav-item .label,
   .rail-auth-btn .label,
@@ -484,6 +481,37 @@ body.ro .auth-only {
   margin: 0 auto;
   padding: 14px 10px 90px;
   flex: 1;
+  animation: fadeInContent 0.22s ease-out;
+}
+
+@keyframes fadeInContent {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* SKELETON SCREEN PER CARICAMENTO FLUIDO (Punto 6) */
+.skeleton-card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 16px;
+  height: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.skeleton-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.1) 60%, rgba(255,255,255,0));
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }
 
 .selected-month-view { display: flex; flex-direction: column; gap: 16px; }
@@ -535,9 +563,6 @@ body:not(.locked) .robanner { display: none !important; }
   border: 1px solid var(--divider);
 }
 
-/* ==========================================================================
-   VISTA FULLSCREEN CRONOLOGIA (STILE GOOGLE CHROME)
-   ========================================================================== */
 .history-fullscreen-view {
   position: fixed;
   inset: 0;
