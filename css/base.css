@@ -123,6 +123,35 @@ input, select, textarea {
   width: 270px;
 }
 
+@media (min-width: 860px) {
+  .app-sidebar:hover {
+    width: 270px;
+  }
+
+  .app-sidebar:hover .sidebar-brand-label,
+  .app-sidebar:hover .rail-nav-item .label,
+  .app-sidebar:hover .rail-auth-btn .label,
+  .app-sidebar:hover .sync-text-status,
+  .app-sidebar:hover .sidebar-tree-container {
+    display: inline-block;
+  }
+
+  .app-sidebar:hover .sidebar-tree-container {
+    display: block;
+  }
+
+  .app-sidebar:hover .rail-nav-item,
+  .app-sidebar:hover .rail-auth-btn,
+  .app-sidebar:hover .rail-sync-wrap {
+    justify-content: flex-start;
+    padding: 0 14px;
+    gap: 14px;
+  }
+
+  .app-sidebar:hover .rail-icon-btn {
+    margin: 0;
+  }
+}
 .sidebar-top {
   display: flex;
   align-items: center;
