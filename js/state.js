@@ -6,7 +6,7 @@ export const state = {
   items: [],
   dayMeta: {},
   molt: {},
-  categories: {},
+  categories: [], // <-- DEVE ESSERE UN ARRAY, NON UN OGGETTO
   names: [],
   fipLinks: {},
   theme: 'light',
