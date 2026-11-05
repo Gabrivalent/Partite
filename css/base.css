@@ -103,7 +103,7 @@ input, select, textarea {
   width: 100%;
 }
 
-/* --- SIDEBAR CHROME-STYLE CON RITARDO DI APERTURA 0.35s --- */
+/* --- SIDEBAR CHROME-STYLE FLUIDA (APERTURA RITARDATA 0.35s) --- */
 .app-sidebar {
   width: 64px;
   background: var(--surface);
@@ -135,7 +135,7 @@ input, select, textarea {
 
   .app-sidebar:hover {
     width: 270px;
-    transition-delay: 0.35s; /* Apertura ritardata dopo 1/3 di secondo */
+    transition-delay: 0.35s; /* Ritardo esatto di 1/3 di secondo (0.35s) richiesto */
     overflow-y: auto;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -160,6 +160,7 @@ input, select, textarea {
   padding: 12px 0;
   min-height: 56px;
   width: 100%;
+  transition: justify-content 0.2s ease, padding 0.2s ease;
 }
 
 .app-sidebar:hover .sidebar-top,
@@ -185,7 +186,6 @@ input, select, textarea {
   transition: opacity 0.2s ease 0.35s;
 }
 
-/* Navigazione e pulsanti */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -195,13 +195,8 @@ input, select, textarea {
   align-items: center;
 }
 
-.app-sidebar:hover .sidebar-nav,
-.app-sidebar.expanded .sidebar-nav {
-  align-items: stretch;
-  padding: 8px;
-}
-
-.rail-icon-btn, .rail-nav-item {
+.app-sidebar .rail-icon-btn, 
+.app-sidebar .rail-nav-item {
   width: 44px !important;
   height: 44px !important;
   min-width: 44px !important;
@@ -217,14 +212,22 @@ input, select, textarea {
   justify-content: center !important;
   padding: 0 !important;
   cursor: pointer;
-  transition: background .15s ease, color .15s ease;
   box-shadow: none !important;
   margin: 0 auto !important;
   position: relative !important;
   overflow: hidden !important;
+  transition: width 0.25s ease, padding 0.25s ease, justify-content 0.25s ease;
 }
 
-.rail-nav-item .icon {
+@media (max-width: 859px) {
+  .app-sidebar:not(.expanded) .rail-icon-btn, 
+  .app-sidebar:not(.expanded) .rail-nav-item {
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+}
+
+.app-sidebar .rail-nav-item .icon {
   width: 24px !important;
   height: 24px !important;
   min-width: 24px !important;
@@ -259,7 +262,8 @@ input, select, textarea {
   margin: 0 !important;
 }
 
-.rail-icon-btn:hover, .rail-nav-item:hover {
+.app-sidebar .rail-icon-btn:hover, 
+.app-sidebar .rail-nav-item:hover {
   background: var(--hl) !important;
   color: var(--ink) !important;
 }
@@ -269,17 +273,17 @@ input, select, textarea {
   color: var(--date) !important;
 }
 
-.rail-nav-item.active {
+.app-sidebar .rail-nav-item.active {
   background: var(--card) !important;
   color: var(--acc) !important;
   font-weight: 700 !important;
   box-shadow: var(--shadow-sm) !important;
 }
 
-.rail-nav-item .label,
-.rail-auth-btn .label,
-.sync-text-status,
-.sidebar-tree-container {
+.app-sidebar .rail-nav-item .label,
+.app-sidebar .rail-auth-btn .label,
+.app-sidebar .sync-text-status,
+.app-sidebar .sidebar-tree-container {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.1s ease 0s;
@@ -363,7 +367,7 @@ body.ro .auth-only {
   white-space: nowrap;
 }
 
-.rail-auth-btn {
+.app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 38px !important;
   min-width: 44px !important;
