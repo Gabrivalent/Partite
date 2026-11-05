@@ -1,8 +1,8 @@
-import { state, registerStateCallbacks, save, saveD, applyTheme, pushUndo, popUndoState, logEvent } from './state.js';
+import { state, registerStateCallbacks, save, saveD, saveNames, applyTheme, pushUndo, popUndoState, logEvent } from './state.js';
 import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback } from './api.js';
-import { uid, iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements } from './rules.js';
+import { uid, iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements, checkPersonRosterConflicts } from './rules.js';
 import { copyMonthRecapWhatsApp, generateWhatsAppText } from './export.js';
-import { $, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree, renderHistoryView } from './render.js';
+import { $, esc, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree, renderHistoryView } from './render.js';
 import { openEditModal, openAddModal, openQuickCloseModal, openCompensiDetailModal, openViewFileModal, openMoltModal, openResocontoModal, openConflictsModal, openUrgentIncompleteModal, openPendingModal, openSettingsModal, promptLogin } from './modals.js';
 
 function isModalOpen() {
@@ -67,6 +67,137 @@ registerCloudCallback(() => {
 
 const openClose = d => `<div class="oc">${slotHTML(d, 'ap')}${slotHTML(d, 'ch')}</div>`;
 function updateRecap(m) { const el = document.querySelector(`.recap[data-m="${m}"]`); if (el) el.outerHTML = recapHTML(m); }
+
+function closeQuickAssignPopover() {
+  const old = document.getElementById('quickAssignPop');
+  if (old) old.remove();
+}
+
+function openQuickAssignPopover(chipEl, matchId, roleKey) {
+  closeQuickAssignPopover();
+  const it = state.items.find(x => x.id === matchId);
+  if (!it || state.READONLY) return;
+  if (it.ghost && it.status !== 'rinviata') {
+    toast('Togli il check ✓ per modificare i turni', 'warning');
+    return;
+  }
+
+  const roleLabels = { t1: 'Tavolo 1', t2: 'Tavolo 2', arb: 'Arbitro' };
+  const currentVal = (it[roleKey] || '').trim();
+
+  const pop = document.createElement('div');
+  pop.className = 'quick-assign-popover';
+  pop.id = 'quickAssignPop';
+
+  const getFilteredNames = (q = '') => {
+    const qLow = q.toLowerCase().trim();
+    return state.names.filter(n => !qLow || n.toLowerCase().includes(qLow));
+  };
+
+  const isPersonBusy = personName => {
+    const testT1 = roleKey === 't1' ? personName : (it.t1 || '');
+    const testT2 = roleKey === 't2' ? personName : (it.t2 || '');
+    const testArb = roleKey === 'arb' ? personName : (it.arb || '');
+    const conflicts = checkPersonRosterConflicts(it.id, it.date, it.time, testT1, testT2, testArb, it.cat);
+    return conflicts.some(c => c.toLowerCase().includes(personName.toLowerCase()));
+  };
+
+  const renderListHtml = (q = '') => {
+    const list = getFilteredNames(q);
+    if (!list.length && !q.trim()) {
+      return `<div style="font-size:12px;color:var(--mute);padding:8px;text-align:center">Nessun collaboratore in elenco</div>`;
+    }
+    return list.map(name => {
+      const isCurrent = name.toLowerCase() === currentVal.toLowerCase();
+      const busy = !isCurrent && isPersonBusy(name);
+      return `<button type="button" class="qa-item${isCurrent ? ' active' : ''}${busy ? ' busy' : ''}" data-pickname="${esc(name)}">
+        <span>${esc(name)}</span>
+        ${busy ? '<span class="qa-busy-tag" title="Già impegnato in questa fascia">Occupato</span>' : (isCurrent ? '<span>✓</span>' : '')}
+      </button>`;
+    }).join('');
+  };
+
+  pop.innerHTML = `
+    <div class="qa-header">
+      <span class="qa-title">${roleLabels[roleKey] || 'Ruolo'}</span>
+      ${currentVal ? `<button type="button" class="qa-clear-btn" id="qaClearBtn">Svuota</button>` : ''}
+    </div>
+    <input type="text" class="qa-search" id="qaSearchInput" placeholder="Cerca o scrivi nome..." value="${esc(currentVal)}" autocomplete="off">
+    <div class="qa-list" id="qaListWrap">${renderListHtml('')}</div>
+  `;
+
+  document.body.appendChild(pop);
+
+  const rect = chipEl.getBoundingClientRect();
+  const popWidth = 235;
+  const popHeight = Math.min(290, pop.offsetHeight || 260);
+
+  let left = rect.left;
+  if (left + popWidth > window.innerWidth - 12) {
+    left = window.innerWidth - popWidth - 12;
+  }
+  if (left < 12) left = 12;
+
+  let top = rect.bottom + 6;
+  if (top + popHeight > window.innerHeight - 16) {
+    top = Math.max(12, rect.top - popHeight - 6);
+  }
+
+  pop.style.left = `${left}px`;
+  pop.style.top = `${top}px`;
+
+  const inp = pop.querySelector('#qaSearchInput');
+  const listWrap = pop.querySelector('#qaListWrap');
+  inp.focus();
+  inp.select();
+
+  const applyAssignment = val => {
+    const clean = val.trim();
+    pushUndo();
+    it[roleKey] = clean;
+    if (clean && !state.names.some(n => n.toLowerCase() === clean.toLowerCase())) {
+      state.names.push(clean);
+      state.names.sort((a, b) => a.localeCompare(b));
+      saveNames();
+      renderNamesList();
+    }
+    save();
+    closeQuickAssignPopover();
+    render();
+    triggerHaptic('success');
+    toast(clean ? `${roleLabels[roleKey]}: ${clean}` : `${roleLabels[roleKey]} rimosso`);
+  };
+
+  inp.oninput = e => {
+    listWrap.innerHTML = renderListHtml(e.target.value);
+  };
+
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyAssignment(inp.value);
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      closeQuickAssignPopover();
+    }
+  };
+
+  const clearBtn = pop.querySelector('#qaClearBtn');
+  if (clearBtn) {
+    clearBtn.onclick = e => {
+      e.stopPropagation();
+      applyAssignment('');
+    };
+  }
+
+  listWrap.onclick = e => {
+    e.stopPropagation();
+    const btn = e.target.closest('[data-pickname]');
+    if (btn) {
+      applyAssignment(btn.dataset.pickname);
+    }
+  };
+}
 
 export function render(focusId) {
   state.ready = false;
@@ -218,6 +349,18 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('click', e => {
+  if (!e.target.closest('#quickAssignPop') && !e.target.closest('[data-quickassign]')) {
+    closeQuickAssignPopover();
+  }
+
+  if (e.target.closest('[data-pickm]') || e.target.closest('[data-navw]')) {
+    if (window.innerWidth >= 860) {
+      document.activeElement?.blur();
+      const sidebar = $('#appSidebar');
+      if (sidebar) sidebar.blur();
+    }
+  }
+
   const vfBtn = e.target.closest('[data-viewfile]');
   if (vfBtn) {
     e.stopPropagation();
@@ -286,6 +429,17 @@ document.addEventListener('click', e => {
     return;
   }
 
+  const qAssign = e.target.closest('[data-quickassign]');
+  if (qAssign && !state.READONLY) {
+    e.stopPropagation();
+    const matchCard = qAssign.closest('.match');
+    if (matchCard) {
+      triggerHaptic('light');
+      openQuickAssignPopover(qAssign, matchCard.dataset.id, qAssign.dataset.quickassign);
+    }
+    return;
+  }
+
   const pickM = e.target.closest('[data-pickm]');
   if (pickM) {
     e.preventDefault();
@@ -341,7 +495,7 @@ document.addEventListener('click', e => {
   }
 
   const matchCard = e.target.closest('.match');
-  if (matchCard && !state.READONLY && !e.target.closest('button') && !e.target.closest('a')) {
+  if (matchCard && !state.READONLY && !e.target.closest('button') && !e.target.closest('a') && !e.target.closest('#quickAssignPop')) {
     const it = state.items.find(x => x.id === matchCard.dataset.id);
     if (it?.ghost && it.status !== 'rinviata') {
       toast('Partita con check: togli il ✓ per modificarla');
@@ -481,17 +635,9 @@ function bindEvents() {
     sidebarToggle.onclick = e => {
       e.stopPropagation();
       triggerHaptic('light');
-      sidebar.classList.toggle('expanded');
+      const isPinned = sidebar.classList.toggle('expanded');
+      toast(isPinned ? 'Barra laterale fissata' : 'Barra laterale automatica');
     };
-  }
-
-  if (sidebar) {
-    sidebar.addEventListener('click', () => {
-      if (window.innerWidth >= 860 && !sidebar.classList.contains('expanded')) {
-        sidebar.classList.add('expanded');
-        triggerHaptic('light');
-      }
-    });
   }
 
   const openMobileDrawer = () => {
@@ -697,6 +843,11 @@ function bindEvents() {
 
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    const pop = document.getElementById('quickAssignPop');
+    if (pop) {
+      pop.remove();
+      return;
+    }
     const historyView = $('#historyView');
     if (historyView && historyView.style.display !== 'none') {
       historyView.style.display = 'none';
