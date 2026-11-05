@@ -187,6 +187,13 @@ input, select, textarea {
     transition: opacity 0.15s ease 0s, visibility 0.15s ease 0s;
   }
 
+  .app-sidebar:hover .sidebar-top,
+  .app-sidebar.expanded .sidebar-top {
+    justify-content: flex-start;
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
   .app-sidebar:hover .rail-nav-item,
   .app-sidebar:hover .rail-auth-btn,
   .app-sidebar:hover .rail-sync-wrap,
@@ -196,10 +203,7 @@ input, select, textarea {
     justify-content: flex-start;
     padding: 0 14px;
     gap: 14px;
-  }
-
-  .app-sidebar:hover .rail-icon-btn,
-  .app-sidebar.expanded .rail-icon-btn {
+    width: 100%;
     margin: 0;
   }
 }
@@ -207,9 +211,14 @@ input, select, textarea {
 .sidebar-top {
   display: flex;
   align-items: center;
-  padding: 12px 10px;
-  gap: 12px;
+  justify-content: center;
+  padding: 12px 0;
   min-height: 56px;
+}
+.app-sidebar.expanded .sidebar-top {
+  justify-content: flex-start;
+  padding: 12px 14px;
+  gap: 12px;
 }
 
 .sidebar-brand-label {
@@ -221,17 +230,18 @@ input, select, textarea {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px;
+  gap: 6px;
+  padding: 8px 10px;
   align-items: center;
 }
 
 .app-sidebar.expanded .sidebar-nav {
   align-items: stretch;
+  padding: 8px;
 }
 
 .rail-icon-btn, .rail-nav-item {
-  width: 100%;
+  width: 44px;
   height: 44px;
   border-radius: 12px;
   border: none;
@@ -245,22 +255,16 @@ input, select, textarea {
   transition: background .15s ease, color .15s ease;
   white-space: nowrap;
   box-shadow: none;
-}
-
-.app-sidebar:not(.expanded) .rail-nav-item {
-  width: 44px;
   margin: 0 auto;
 }
 
+.app-sidebar.expanded .rail-icon-btn, 
 .app-sidebar.expanded .rail-nav-item {
+  width: 100%;
   justify-content: flex-start;
   padding: 0 14px;
   gap: 14px;
-}
-
-.rail-icon-btn {
-  width: 44px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .rail-icon-btn:hover, .rail-nav-item:hover {
@@ -315,20 +319,34 @@ body.ro .auth-only {
 
 .sidebar-bottom {
   margin-top: auto;
-  padding: 10px 8px;
+  padding: 10px 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-top: 1px solid var(--divider);
+  align-items: center;
+}
+
+.app-sidebar.expanded .sidebar-bottom {
+  align-items: stretch;
+  padding: 10px 8px;
 }
 
 .rail-sync-wrap {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   height: 38px;
-  padding: 0 10px;
+  width: 44px;
   border-radius: 8px;
+  margin: 0 auto;
+}
+.app-sidebar.expanded .rail-sync-wrap {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 0 10px;
+  margin: 0;
 }
 
 .sync-text-status {
@@ -339,7 +357,7 @@ body.ro .auth-only {
 }
 
 .rail-auth-btn {
-  width: 100%;
+  width: 44px;
   height: 38px;
   border-radius: 8px;
   border: none;
@@ -347,11 +365,19 @@ body.ro .auth-only {
   color: var(--ink);
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  gap: 12px;
+  justify-content: center;
+  padding: 0;
   cursor: pointer;
   white-space: nowrap;
   box-shadow: none;
+  margin: 0 auto;
+}
+.app-sidebar.expanded .rail-auth-btn {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 0 12px;
+  gap: 12px;
+  margin: 0;
 }
 
 .rail-auth-btn .label {
