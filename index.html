@@ -26,7 +26,7 @@
 <body class="ro locked">
 <div class="app-layout">
 
-  <!-- SIDEBAR / ICON RAIL (Desktop) & DRAWER (Mobile) -->
+  <!-- SIDEBAR CORRETTA -->
   <aside class="app-sidebar" id="appSidebar">
     <div class="sidebar-top">
       <button id="sidebarToggleBtn" class="rail-icon-btn" title="Espandi / Comprimi Menu" type="button">
@@ -35,7 +35,6 @@
       <span class="sidebar-brand-label">Menu Partite</span>
     </div>
 
-    <!-- AZIONI PRINCIPALI IN CIMA -->
     <nav class="sidebar-nav">
       <button type="button" class="rail-nav-item active" id="railNavHome" title="Partite">
         <span class="icon">🏀</span>
@@ -47,13 +46,11 @@
       </button>
     </nav>
 
-    <!-- ALBERO CRONOLOGICO -->
     <div class="sidebar-tree-container">
       <div class="sidebar-section-title">Archivio Calendario</div>
       <div id="navTree" class="nav-tree"></div>
     </div>
 
-    <!-- IN FONDO: CRONOLOGIA, IMPOSTAZIONI, STATO E LOGIN -->
     <div class="sidebar-bottom">
       <button type="button" class="rail-nav-item" id="railNavHistory" title="Cronologia Modifiche">
         <span class="icon">
@@ -82,13 +79,9 @@
     </div>
   </aside>
 
-  <!-- BACKDROP MOBILE PER IL DRAWER -->
   <div id="navBackdrop" class="nav-backdrop"></div>
 
-  <!-- AREA PRINCIPALE CONTENUTO -->
   <div class="app-content-wrapper">
-    
-    <!-- TOP BAR -->
     <header class="top-bar">
       <div class="top-bar-left">
         <button id="mobileMenuBtn" type="button" class="mobile-menu-btn" title="Apri Menu">☰</button>
@@ -105,7 +98,6 @@
       </div>
     </header>
 
-    <!-- BARRA RICERCA E FILTRI VELOCI -->
     <div class="filter-strip">
       <div class="search-wrap">
         <input type="search" id="searchFilter" placeholder="🔍 Cerca squadre, ruoli..." autocomplete="off">
@@ -115,15 +107,12 @@
       <button class="waBtn" id="waTodayBtn" type="button" title="Copia turni dei prossimi 7 giorni">📲 WA 7gg</button>
     </div>
 
-    <!-- LISTA GARE & RESOCONTO MENSILE -->
     <main class="content-scroll">
       <div id="list"></div>
     </main>
-
   </div>
 </div>
 
-<!-- VISTA FULLSCREEN CRONOLOGIA MODIFICHE (CHROME STYLE) -->
 <div id="historyView" class="history-fullscreen-view" style="display:none">
   <div class="history-topbar">
     <div class="history-topbar-left">
@@ -138,7 +127,6 @@
   <div class="history-container" id="historyListWrap"></div>
 </div>
 
-<!-- BOTTOM BAR MOBILE -->
 <nav class="bottom-nav-bar" id="bottomNavBar">
   <button type="button" class="b-nav-item active" id="bNavHome">
     <span class="b-nav-icon">🏀</span>
@@ -161,15 +149,11 @@
   </button>
 </nav>
 
-<!-- INPUT FILE NASCOSTO PER IMPORT -->
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <datalist id="namesList"></datalist>
 <datalist id="categoriesList"></datalist>
-
-<!-- TOAST NOTIFICHE -->
 <div id="msg" role="status"></div>
 
-<!-- BANNER DI ACCESSO RISERVATO -->
 <div class="robanner" id="roBanner">
   <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
   <h3 style="margin: 0 0 8px; color: var(--ink);">Accesso Riservato</h3>
