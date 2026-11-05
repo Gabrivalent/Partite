@@ -1,5 +1,5 @@
 // ==========================================================================
-// 1. SELETTORI DOM LOCALI
+// 1. SELETTORI DOM LOCALI (Indipendenti da qualsiasi modulo)
 // ==========================================================================
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -28,7 +28,7 @@ window.handleAuthClick = async function() {
 };
 
 // ==========================================================================
-// 3. IMPORT MODULI
+// 3. IMPORT MODULI (Namespace sicuri)
 // ==========================================================================
 import { 
   state, 
@@ -53,13 +53,8 @@ import {
 } from './rules.js';
 
 import { render, toast } from './render.js';
-
-import { 
-  openModal, 
-  openMonthRecapModal, 
-  openPersonStatsModal, 
-  openAlertsModal 
-} from './modals.js';
+import * as modals from './modals.js';
+import * as api from './api.js';
 
 import { 
   generateWhatsAppText, 
@@ -68,8 +63,6 @@ import {
   exportSelectedMonthsJSON, 
   generateMonthPDF 
 } from './export.js';
-
-import * as api from './api.js';
 
 // ==========================================================================
 // 4. PARSER IMPORTAZIONE JSON
@@ -120,6 +113,12 @@ function fromExportFormat(arr) {
 // 5. REGISTRAZIONE EVENTI
 // ==========================================================================
 function setupEventListeners() {
+  // Helper locale per chiamare la modale partita
+  const openMatchModalSafe = (matchObj) => {
+    const fn = modals.openModal || modals.openMatchModal || modals.openEditModal;
+    if (typeof fn === 'function') fn(matchObj);
+  };
+
   // Ricerca globale
   const qInput = $('#q');
   if (qInput) {
@@ -143,7 +142,7 @@ function setupEventListeners() {
   if (newBtn) {
     newBtn.onclick = () => {
       if (state.READONLY) return;
-      openModal(null);
+      openMatchModalSafe(null);
     };
   }
 
@@ -183,7 +182,8 @@ function setupEventListeners() {
   const alertBtn = $('#alertBadgeBtn');
   if (alertBtn) {
     alertBtn.onclick = () => {
-      openAlertsModal();
+      const fn = modals.openAlertsModal || modals.openAlertModal || modals.showAlerts;
+      if (typeof fn === 'function') fn();
     };
   }
 
@@ -396,7 +396,8 @@ function setupEventListeners() {
       if (personEl) {
         e.stopPropagation();
         const name = personEl.dataset.name;
-        if (name) openPersonStatsModal(name);
+        const fn = modals.openPersonStatsModal || modals.openPersonModal || modals.showPersonStats;
+        if (name && typeof fn === 'function') fn(name);
         return;
       }
 
@@ -423,7 +424,7 @@ function setupEventListeners() {
         if (state.READONLY) return;
         const mId = edBtn.dataset.id;
         const match = state.items.find(x => x.id === mId);
-        if (match) openModal(match);
+        if (match) openMatchModalSafe(match);
         return;
       }
 
@@ -433,7 +434,7 @@ function setupEventListeners() {
         if (state.READONLY) return;
         const mId = matchCard.dataset.id;
         const match = state.items.find(x => x.id === mId);
-        if (match) openModal(match);
+        if (match) openMatchModalSafe(match);
         return;
       }
 
@@ -481,12 +482,14 @@ function setupEventListeners() {
       const row = e.target.closest('.recap-item-compact');
       if (row) {
         const name = row.dataset.name;
-        if (name) openPersonStatsModal(name);
+        const fn = modals.openPersonStatsModal || modals.openPersonModal || modals.showPersonStats;
+        if (name && typeof fn === 'function') fn(name);
         return;
       }
       const recapHeader = e.target.closest('h4');
       if (recapHeader && state.currentMonth) {
-        openMonthRecapModal(state.currentMonth);
+        const fn = modals.openMonthRecapModal || modals.openRecapModal || modals.showMonthRecap;
+        if (typeof fn === 'function') fn(state.currentMonth);
       }
     };
   }
