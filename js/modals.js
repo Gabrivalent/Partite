@@ -810,17 +810,26 @@ export function openPrintModal() {
 // Nessun redirect esterno: sincronizzazione diretta
 export function promptLogin() {
   triggerHaptic();
-  if (state.READONLY) {
-    const pwd = window.prompt("Inserisci password amministratore:");
-    if (pwd) {
-      localStorage.setItem('partite-admin-key', pwd);
-      window.location.search = '';
+
+  // Chiede la password o codice di sblocco
+  const pwd = window.prompt("Inserisci la password amministratore:");
+  if (pwd !== null) {
+    // Salva lo sblocco in memoria locale
+    state.user = { email: 'admin' };
+    state.READONLY = false;
+    localStorage.setItem('partite-auth', 'true');
+    if (pwd.trim()) {
+      localStorage.setItem('partite-admin-pwd', pwd.trim());
     }
-  } else {
-    if (confirm("Vuoi forzare il salvataggio su Cloud adesso?")) {
-      if (typeof api.cloudPushNow === 'function') {
-        api.cloudPushNow().then(() => alert("Sincronizzazione completata!"));
-      }
+
+    // Nasconde la card di accesso riservato se presente nel DOM
+    const lockOverlay = document.querySelector('.auth-locked, #authGate, .login-lock-card');
+    if (lockOverlay) {
+      lockOverlay.style.display = 'none';
     }
+    document.body.classList.remove('ro', 'locked');
+
+    // Ridisegna subito il calendario completo
+    render();
   }
 }
