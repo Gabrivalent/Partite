@@ -226,8 +226,9 @@ export function renderNavTree(groupedData, activeMonth, activeWeek) {
   const treeEl = document.getElementById('navTree');
   if (!treeEl) return;
 
+  const data = groupedData || {};
   const years = {};
-  Object.keys(groupedData).sort().forEach(m => {
+  Object.keys(data).sort().forEach(m => {
     const y = m.slice(0, 4);
     (years[y] ??= []).push(m);
   });
