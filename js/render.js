@@ -47,7 +47,9 @@ export function renderNamesList() {
 export function renderCategoriesList() {
   const container = document.getElementById('categoriesList') || document.querySelector('.categories-list');
   if (!container) return;
-  const cats = Array.isArray(state.categories) ? state.categories : Object.keys(state.categories || {});
+  const cats = Array.isArray(state.categories) 
+    ? state.categories 
+    : Object.keys(state.categories || {});
   container.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
