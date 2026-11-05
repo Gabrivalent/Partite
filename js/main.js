@@ -1,69 +1,194 @@
 // ==========================================================================
-// 1. SELETTORI DOM LOCALI (Zero dipendenze esterne)
+// IMPORT DEI MODULI CON I NOMI REALI ESPORTATI
 // ==========================================================================
-const $ = (sel, el = document) => el.querySelector(sel);
-const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+import { 
+  state, 
+  save, 
+  saveD, 
+  saveLocalOnly, 
+  pushUndo, 
+  popUndoState, 
+  refreshUndoBtn 
+} from './state.js';
 
-// ==========================================================================
-// 2. GESTIONE AUTENTICAZIONE GLOBALE
-// ==========================================================================
-window.handleAuthClick = async function() {
-  try {
-    const { state } = await import('./state.js');
-    const apiModule = await import('./api.js');
-    const renderModule = await import('./render.js');
-    const t = renderModule.toast || renderModule.showToast || console.log;
+import { 
+  uid, 
+  iso, 
+  monday 
+} from './rules.js';
 
-    const signOutFn = apiModule.signOutUser || apiModule.signOut;
-    const signInFn = apiModule.signInWithGoogle || apiModule.signIn;
+import { 
+  $, 
+  card, 
+  esc, 
+  params, 
+  setParam, 
+  slotHTML, 
+  recapHTML, 
+  renderNavTree, 
+  updateAlertStatusBadge, 
+  updateIncompleteBadge 
+} from './render.js';
 
-    if (state && state.user) {
-      if (typeof signOutFn === 'function') await signOutFn();
-      t('Disconnesso con successo', 'info');
-    } else {
-      if (typeof signInFn === 'function') await signInFn();
-    }
-  } catch (err) {
-    console.error('Errore durante autenticazione:', err);
-  }
+import { 
+  openAddModal, 
+  openEditModal, 
+  openConflictsModal, 
+  openUrgentIncompleteModal, 
+  openViewFileModal, 
+  openResocontoModal, 
+  openQuickCloseModal,
+  promptLogin 
+} from './modals.js';
+
+import { 
+  generateWhatsAppText, 
+  copyMonthRecapWhatsApp, 
+  copyReadOnlyLink, 
+  exportSelectedMonthsJSON, 
+  generateMonthPDF 
+} from './export.js';
+
+import { 
+  applyCloudData, 
+  cloudPullSafe, 
+  cloudPushNow, 
+  registerCloudCallback 
+} from './api.js';
+
+// Espone state e login per click su interfaccia e debug
+window.state = state;
+window.handleAuthClick = () => {
+  if (typeof promptLogin === 'function') promptLogin();
 };
 
-// ==========================================================================
-// 3. IMPORT MODULI VIA NAMESPACE (Previene qualsiasi SyntaxError di export)
-// ==========================================================================
-import * as stateModule from './state.js';
-import * as rulesModule from './rules.js';
-import * as renderModule from './render.js';
-import * as modalsModule from './modals.js';
-import * as exportModule from './export.js';
-import * as api from './api.js';
-
-// Fallback sicuri su state
-const state = stateModule.state || window.state || { items: [], dayMeta: {}, molt: {} };
-const save = stateModule.save || (() => {});
-const saveD = stateModule.saveD || (() => {});
-const saveLocalOnly = stateModule.saveLocalOnly || (() => {});
-const pushUndo = stateModule.pushUndo || (() => {});
-const undo = stateModule.undo || (() => {});
-const setSyncStatus = stateModule.setSyncStatus || (() => {});
-
-// Fallback sicuri su rules
-const uid = rulesModule.uid || (() => 'm_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36));
-const iso = rulesModule.iso || (d => new Date(d).toISOString().slice(0, 10));
-
-// Fallback sicuri su render
-const render = renderModule.render || renderModule.renderApp || renderModule.draw || (() => {});
-const toast = renderModule.toast || renderModule.showToast || ((m) => console.log(m));
-
-// Fallback sicuri su export
-const generateWhatsAppText = exportModule.generateWhatsAppText || (() => {});
-const copyMonthRecapWhatsApp = exportModule.copyMonthRecapWhatsApp || (() => {});
-const copyReadOnlyLink = exportModule.copyReadOnlyLink || (() => {});
-const exportSelectedMonthsJSON = exportModule.exportSelectedMonthsJSON || (() => {});
-const generateMonthPDF = exportModule.generateMonthPDF || (() => {});
+function toast(msg, type = 'info') {
+  let toastEl = $('#toast');
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.id = 'toast';
+    document.body.appendChild(toastEl);
+  }
+  toastEl.className = 'toast show ' + type;
+  toastEl.textContent = msg;
+  clearTimeout(toastEl._timer);
+  toastEl._timer = setTimeout(() => {
+    toastEl.className = 'toast';
+  }, 2500);
+}
 
 // ==========================================================================
-// 4. PARSER IMPORTAZIONE JSON
+// FUNZIONE CENTRALE DI RENDERING (Aggiorna lista partite, sidebar e badge)
+// ==========================================================================
+export function render() {
+  const listEl = $('#list');
+  if (!listEl) return;
+
+  const mParam = (params && params.m) || state.currentMonth || iso(new Date()).slice(0, 7);
+  state.currentMonth = mParam;
+
+  // 1. Filtra le partite in base al mese, ricerca e categoria
+  let filtered = (state.items || []).filter(item => {
+    if (!item.date || !item.date.startsWith(mParam)) return false;
+    if (state.filterCat && state.filterCat !== 'all' && item.cat !== state.filterCat) return false;
+    if (state.searchQuery) {
+      const q = state.searchQuery.toLowerCase();
+      const matchText = `${item.title || ''} ${item.cat || ''} ${item.t1 || ''} ${item.t2 || ''} ${item.arb || ''}`.toLowerCase();
+      if (!matchText.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Ordina per data e orario
+  filtered.sort((a, b) => {
+    const da = (a.date || '') + (a.time || '');
+    const db = (b.date || '') + (b.time || '');
+    return da.localeCompare(db);
+  });
+
+  // 2. Raggruppa per settimane e giorni
+  const weeksMap = new Map();
+  filtered.forEach(item => {
+    const d = new Date(item.date + 'T12:00:00');
+    const wStart = monday(d);
+    if (!weeksMap.has(wStart)) weeksMap.set(wStart, new Map());
+    const dayMap = weeksMap.get(wStart);
+    if (!dayMap.has(item.date)) dayMap.set(item.date, []);
+    dayMap.get(item.date).push(item);
+  });
+
+  // 3. Genera l'HTML delle settimane
+  if (weeksMap.size === 0) {
+    listEl.innerHTML = `
+      <div style="text-align:center; padding: 40px 10px; color: var(--muted, #888);">
+        Nessuna partita programmata per questo mese o filtro selezionato.
+      </div>`;
+  } else {
+    let html = '';
+    const sortedWeeks = [...weeksMap.keys()].sort();
+
+    sortedWeeks.forEach(wStart => {
+      const days = weeksMap.get(wStart);
+      const wDate = new Date(wStart + 'T12:00:00');
+      const wEnd = new Date(wDate);
+      wEnd.setDate(wEnd.getDate() + 6);
+
+      const dStartStr = `${wDate.getDate()} ${wDate.toLocaleDateString('it-IT', { month: 'short' })}`;
+      const dEndStr = `${wEnd.getDate()} ${wEnd.toLocaleDateString('it-IT', { month: 'short' })}`;
+
+      html += `<details class="week" data-week="${wStart}" open>`;
+      html += `
+        <summary>
+          <span>Settimana ${dStartStr} - ${dEndStr}</span>
+          <div class="summary-actions">
+            <button class="btn btn-sm waBtn" data-week-start="${wStart}" title="Condividi su WhatsApp">📲 WA</button>
+          </div>
+        </summary>
+        <div class="week-days">`;
+
+      const sortedDays = [...days.keys()].sort();
+      sortedDays.forEach(dayStr => {
+        const matches = days.get(dayStr);
+        const dayDate = new Date(dayStr + 'T12:00:00');
+        const dayName = dayDate.toLocaleDateString('it-IT', { weekday: 'long' });
+        const dayFormatted = `${dayName.charAt(0).toUpperCase() + dayName.slice(1)} ${dayDate.getDate()} ${dayDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}`;
+
+        const meta = (state.dayMeta && state.dayMeta[dayStr]) || {};
+
+        html += `
+          <div class="day" data-day="${dayStr}">
+            <div class="day-head">
+              <span class="day-title">${dayFormatted}</span>
+            </div>
+            ${typeof slotHTML === 'function' ? slotHTML('ap', meta.ap, meta.apNome) : ''}
+            <div class="day-matches">
+              ${matches.map(m => (typeof card === 'function' ? card(m) : '')).join('')}
+            </div>
+            ${typeof slotHTML === 'function' ? slotHTML('ch', meta.ch, meta.chNome) : ''}
+          </div>`;
+      });
+
+      html += `</div></details>`;
+    });
+
+    listEl.innerHTML = html;
+  }
+
+  // 4. Aggiorna Sidebar Riepilogo
+  const sidebarEl = $('#sidebarRecap') || $('.recap-content');
+  if (sidebarEl && typeof recapHTML === 'function') {
+    sidebarEl.innerHTML = recapHTML(state.currentMonth);
+  }
+
+  // 5. Aggiorna Albero laterale e badge di allerta
+  if (typeof renderNavTree === 'function') renderNavTree();
+  if (typeof updateAlertStatusBadge === 'function') updateAlertStatusBadge();
+  if (typeof updateIncompleteBadge === 'function') updateIncompleteBadge();
+  if (typeof refreshUndoBtn === 'function') refreshUndoBtn();
+}
+
+// ==========================================================================
+// IMPORTAZIONE FILE JSON CON CONVERSIONE
 // ==========================================================================
 function fromExportFormat(arr) {
   const newItems = [];
@@ -108,15 +233,9 @@ function fromExportFormat(arr) {
 }
 
 // ==========================================================================
-// 5. REGISTRAZIONE EVENTI
+// REGISTRAZIONE EVENTI
 // ==========================================================================
 function setupEventListeners() {
-  const openMatchModalSafe = (matchObj) => {
-    const fn = modalsModule.openModal || modalsModule.openMatchModal || modalsModule.openEditModal;
-    if (typeof fn === 'function') fn(matchObj);
-  };
-
-  // Ricerca globale
   const qInput = $('#q');
   if (qInput) {
     qInput.oninput = e => {
@@ -125,7 +244,6 @@ function setupEventListeners() {
     };
   }
 
-  // Filtro Categoria
   const fCat = $('#filterCat');
   if (fCat) {
     fCat.onchange = e => {
@@ -139,28 +257,29 @@ function setupEventListeners() {
   if (newBtn) {
     newBtn.onclick = () => {
       if (state.READONLY) return;
-      openMatchModalSafe(null);
+      openAddModal();
     };
   }
 
-  // Undo
+  // Tasto Undo
   const undoBtn = $('#undoBtn');
   if (undoBtn) {
     undoBtn.onclick = () => {
       if (state.READONLY) return;
-      undo();
+      if (typeof popUndoState === 'function') popUndoState();
       render();
       toast('Azione annullata', 'info');
     };
   }
 
-  // Pulsante Oggi
+  // Tasto Oggi
   const todayBtn = $('#todayBtn');
   if (todayBtn) {
     todayBtn.onclick = () => {
       const nowIso = iso(new Date());
       const mStr = nowIso.slice(0, 7);
       state.currentMonth = mStr;
+      if (typeof setParam === 'function') setParam('m', mStr);
       render();
       setTimeout(() => {
         const el = $(`[data-day="${nowIso}"]`);
@@ -169,18 +288,17 @@ function setupEventListeners() {
           el.classList.add('hl');
           setTimeout(() => el.classList.remove('hl'), 1500);
         } else {
-          toast('Nessuna gara in programma oggi', 'info');
+          toast('Nessuna gara oggi', 'info');
         }
       }, 100);
     };
   }
 
-  // Pulsante Badge Avvisi
+  // Pulsante Avvisi / Conflitti
   const alertBtn = $('#alertBadgeBtn');
   if (alertBtn) {
     alertBtn.onclick = () => {
-      const fn = modalsModule.openAlertsModal || modalsModule.openAlertModal || modalsModule.showAlerts;
-      if (typeof fn === 'function') fn();
+      if (typeof openConflictsModal === 'function') openConflictsModal();
     };
   }
 
@@ -203,14 +321,10 @@ function setupEventListeners() {
       reader.onload = () => {
         try {
           const data = JSON.parse(reader.result);
-          if (!Array.isArray(data)) {
-            throw new Error('Il file JSON non contiene un array valido.');
-          }
+          if (!Array.isArray(data)) throw new Error('File JSON non valido');
 
           const { newItems, wi } = fromExportFormat(data);
-          if (!newItems.length && !Object.keys(wi).length) {
-            throw new Error('Nessun dato valido estratto dal file.');
-          }
+          if (!newItems.length && !Object.keys(wi).length) throw new Error('Nessuna partita trovata');
 
           pushUndo();
           const map = new Map((state.items || []).map(i => [i.id, i]));
@@ -221,25 +335,23 @@ function setupEventListeners() {
 
           save();
           saveD();
+          if (typeof cloudPushNow === 'function') cloudPushNow();
           render();
-          toast(`${newItems.length} partite importate con successo!`, 'success');
+          toast(`${newItems.length} partite importate!`, 'success');
         } catch (err) {
-          console.error('Dettaglio errore importazione JSON:', err);
-          toast('Errore importazione: ' + err.message, 'warning');
+          console.error(err);
+          toast('Errore: ' + err.message, 'warning');
         }
       };
       reader.readAsText(file);
     };
   }
 
-  // Esportazione JSON e PDF
+  // Esportazioni
   const expBtn = $('#exportBtn');
   if (expBtn) {
     expBtn.onclick = () => {
-      if (!state.currentMonth) {
-        toast('Seleziona un mese da esportare', 'warning');
-        return;
-      }
+      if (!state.currentMonth) return;
       exportSelectedMonthsJSON([state.currentMonth], toast);
     };
   }
@@ -247,100 +359,21 @@ function setupEventListeners() {
   const pdfBtn = $('#pdfBtn');
   if (pdfBtn) {
     pdfBtn.onclick = () => {
-      if (!state.currentMonth) {
-        toast('Seleziona un mese per il PDF', 'warning');
-        return;
-      }
+      if (!state.currentMonth) return;
       generateMonthPDF(state.currentMonth, toast);
     };
   }
 
-  // Condivisione link sola lettura
   const shareBtn = $('#shareBtn');
   if (shareBtn) {
     shareBtn.onclick = () => copyReadOnlyLink(toast);
   }
 
-  // Input file invisibile globale per il caricamento diretto del referto
-  let directUploadInput = $('#directReportInput');
-  if (!directUploadInput) {
-    directUploadInput = document.createElement('input');
-    directUploadInput.type = 'file';
-    directUploadInput.id = 'directReportInput';
-    directUploadInput.accept = 'application/pdf,image/*';
-    directUploadInput.style.display = 'none';
-    document.body.appendChild(directUploadInput);
-  }
-
-  directUploadInput.onchange = e => {
-    const file = e.target.files[0];
-    const matchId = directUploadInput.dataset.targetMatchId;
-    e.target.value = '';
-    if (!file || !matchId) return;
-
-    if (file.size > 8 * 1024 * 1024) {
-      toast('File troppo grande (max 8MB)', 'warning');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const match = (state.items || []).find(x => x.id === matchId);
-      if (match) {
-        pushUndo();
-        match.fileData = ev.target.result;
-        match.fileName = file.name;
-        save();
-        render();
-        toast('Referto salvato!', 'success');
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Navigazione ad albero laterale (Anni, Mesi, Settimane)
-  const navTree = $('#navTree') || $('.nav-tree');
-  if (navTree) {
-    navTree.onclick = e => {
-      const mLink = e.target.closest('[data-nav-month]');
-      if (mLink) {
-        e.preventDefault();
-        const m = mLink.dataset.navMonth;
-        if (m && state.currentMonth !== m) {
-          state.currentMonth = m;
-          render();
-        }
-        return;
-      }
-
-      const wLink = e.target.closest('.nav-week-link');
-      if (wLink) {
-        e.preventDefault();
-        const wStart = wLink.dataset.weekStart;
-        const mParent = wLink.dataset.month;
-        if (mParent && state.currentMonth !== mParent) {
-          state.currentMonth = mParent;
-          render();
-        }
-        setTimeout(() => {
-          const wEl = $(`[data-week="${wStart}"]`);
-          if (wEl) {
-            wEl.open = true;
-            wEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            wEl.classList.add('hl');
-            setTimeout(() => wEl.classList.remove('hl'), 1500);
-          }
-        }, 50);
-        return;
-      }
-    };
-  }
-
-  // Delegazione eventi su #list
+  // Delegazione click su lista
   const list = $('#list');
   if (list) {
     list.onclick = e => {
-      // 1. Tasto Referto (📄)
+      // Referto
       const rBtn = e.target.closest('.reportBtn');
       if (rBtn) {
         e.stopPropagation();
@@ -349,29 +382,21 @@ function setupEventListeners() {
         if (!match) return;
 
         if (match.fileData) {
-          const w = window.open('');
-          if (w) {
-            if (match.fileData.startsWith('data:application/pdf')) {
-              w.document.write(`<iframe src="${match.fileData}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`);
-            } else {
-              w.document.write(`<img src="${match.fileData}" style="max-width:100%; height:auto; display:block; margin:auto;" />`);
-            }
-          }
+          openViewFileModal(match.fileData, match.fileName || 'Referto');
         } else {
           if (state.READONLY) return;
-          directUploadInput.dataset.targetMatchId = mId;
-          directUploadInput.click();
+          openEditModal(match);
         }
         return;
       }
 
-      // 2. Tasto WhatsApp settimana
+      // WhatsApp settimana
       const wBtn = e.target.closest('.waBtn');
       if (wBtn) {
         e.stopPropagation();
         const wStart = wBtn.dataset.weekStart;
         if (wStart) {
-          const start = new Date(wStart + 'T12:00');
+          const start = new Date(wStart + 'T12:00:00');
           const end = new Date(start);
           end.setDate(end.getDate() + 6);
           generateWhatsAppText(start, end, '', toast);
@@ -379,27 +404,16 @@ function setupEventListeners() {
         return;
       }
 
-      // 3. Tasto WhatsApp mese
-      const waMonthBtn = e.target.closest('#waRecapBtn');
-      if (waMonthBtn) {
-        e.stopPropagation();
-        if (state.currentMonth) {
-          copyMonthRecapWhatsApp(state.currentMonth, toast);
-        }
-        return;
-      }
-
-      // 4. Click sul nome per aprire statistiche
+      // Statistiche persona
       const personEl = e.target.closest('.clickable-person');
       if (personEl) {
         e.stopPropagation();
         const name = personEl.dataset.name;
-        const fn = modalsModule.openPersonStatsModal || modalsModule.openPersonModal || modalsModule.showPersonStats;
-        if (name && typeof fn === 'function') fn(name);
+        if (name && typeof openResocontoModal === 'function') openResocontoModal(name);
         return;
       }
 
-      // 5. Check Rapido (Ghost)
+      // Ghost check
       const gBtn = e.target.closest('.ghostBtn');
       if (gBtn) {
         e.stopPropagation();
@@ -415,28 +429,17 @@ function setupEventListeners() {
         return;
       }
 
-      // 6. Pulsante Modifica
-      const edBtn = e.target.closest('.editBtn');
-      if (edBtn) {
-        e.stopPropagation();
-        if (state.READONLY) return;
-        const mId = edBtn.dataset.id;
-        const match = (state.items || []).find(x => x.id === mId);
-        if (match) openMatchModalSafe(match);
-        return;
-      }
-
-      // 7. Click sulla card partita
+      // Modifica card
       const matchCard = e.target.closest('.match');
       if (matchCard && !e.target.closest('a') && !e.target.closest('button')) {
         if (state.READONLY) return;
         const mId = matchCard.dataset.id;
         const match = (state.items || []).find(x => x.id === mId);
-        if (match) openMatchModalSafe(match);
+        if (match) openEditModal(match);
         return;
       }
 
-      // 8. Apertura/Chiusura Sì/No
+      // Apertura / Chiusura
       const ynBtn = e.target.closest('.slot .yn button');
       if (ynBtn) {
         if (state.READONLY) return;
@@ -457,7 +460,6 @@ function setupEventListeners() {
       }
     };
 
-    // Modifica nome referente apertura/chiusura
     list.onchange = e => {
       const input = e.target.closest('input[data-wn]');
       if (input) {
@@ -475,106 +477,87 @@ function setupEventListeners() {
     };
   }
 
-  // Delegazione click colonna laterale riepilogo
+  // Navigazione ad albero a sinistra
+  const navTree = $('#navTree') || $('.nav-tree');
+  if (navTree) {
+    navTree.onclick = e => {
+      const mLink = e.target.closest('[data-nav-month]');
+      if (mLink) {
+        e.preventDefault();
+        const m = mLink.dataset.navMonth;
+        if (m && state.currentMonth !== m) {
+          state.currentMonth = m;
+          if (typeof setParam === 'function') setParam('m', m);
+          render();
+        }
+        return;
+      }
+    };
+  }
+
+  // Click riepilogo
   const sidebar = $('#sidebarRecap') || $('.recap');
   if (sidebar) {
     sidebar.onclick = e => {
       const row = e.target.closest('.recap-item-compact');
       if (row) {
         const name = row.dataset.name;
-        const fn = modalsModule.openPersonStatsModal || modalsModule.openPersonModal || modalsModule.showPersonStats;
-        if (name && typeof fn === 'function') fn(name);
-        return;
-      }
-      const recapHeader = e.target.closest('h4');
-      if (recapHeader && state.currentMonth) {
-        const fn = modalsModule.openMonthRecapModal || modalsModule.openRecapModal || modalsModule.showMonthRecap;
-        if (typeof fn === 'function') fn(state.currentMonth);
+        if (name && typeof openResocontoModal === 'function') openResocontoModal(name);
       }
     };
   }
-
-  // Chiusura modali su click sullo sfondo scuro
-  document.addEventListener('click', e => {
-    if (e.target.classList.contains('modal-overlay')) {
-      e.target.classList.remove('open');
-      e.target.style.display = 'none';
-    }
-  });
-
-  // Chiusura modali su tasto Escape
-  window.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      const openModals = $$('.modal-overlay.open, .modal.open, #matchModal');
-      openModals.forEach(m => {
-        m.classList.remove('open');
-        if (m.close && typeof m.close === 'function') m.close();
-        if (m.style) m.style.display = 'none';
-      });
-    }
-  });
 }
 
 // ==========================================================================
-// 6. INIZIALIZZAZIONE E AVVIO
+// AVVIO APPLICAZIONE
 // ==========================================================================
 async function initApp() {
-  const params = new URLSearchParams(window.location.search);
-  state.READONLY = params.get('readonly') === 'true';
+  const urlP = new URLSearchParams(window.location.search);
+  state.READONLY = urlP.get('readonly') === 'true';
 
   if (state.READONLY) {
     document.body.classList.add('ro');
     const newBtn = $('#newBtn');
     if (newBtn) newBtn.style.display = 'none';
-    const importBtn = $('#importBtn');
-    if (importBtn) importBtn.style.display = 'none';
   }
 
-  // 1. Caricamento rapido dalla memoria locale
+  // 1. Carica da localStorage
   try {
     const rawItems = localStorage.getItem('partite-v1');
     if (rawItems) state.items = JSON.parse(rawItems);
     const rawMeta = localStorage.getItem('partite-d-v1');
     if (rawMeta) state.dayMeta = JSON.parse(rawMeta);
-    const rawMolt = localStorage.getItem('partite-m-v1');
-    if (rawMolt) state.molt = JSON.parse(rawMolt);
   } catch (e) {
-    console.warn('Errore lettura dati da localStorage:', e);
+    console.warn(e);
+  }
+
+  // 2. Mese iniziale
+  if (!state.currentMonth) {
+    state.currentMonth = (params && params.m) || iso(new Date()).slice(0, 7);
   }
 
   setupEventListeners();
 
-  if (!state.currentMonth) {
-    state.currentMonth = iso(new Date()).slice(0, 7);
-  }
-
+  // 3. Render immediato dei dati locali
   render();
 
-  // Sincronizzazione Supabase / Cloud sicura
+  // 4. Sincronizzazione cloud sicura con i metodi reali
   try {
-    const initFn = api.initSupabase || api.initCloud || api.init;
-    const loadFn = api.loadAllDataFromCloud || api.loadCloudData || api.loadData;
-
-    if (typeof initFn === 'function') {
-      const res = initFn();
-      if (res !== false) {
-        setSyncStatus('syncing');
-        if (typeof loadFn === 'function') await loadFn();
-        setSyncStatus('connected');
-        render();
-      } else {
-        setSyncStatus('offline');
-      }
-    } else if (typeof loadFn === 'function') {
-      setSyncStatus('syncing');
-      await loadFn();
-      setSyncStatus('connected');
+    if (typeof registerCloudCallback === 'function') {
+      registerCloudCallback(() => render());
+    }
+    if (typeof cloudPullSafe === 'function') {
+      await cloudPullSafe();
       render();
     }
   } catch (err) {
-    console.warn('Avvio offline o sincronizzazione fallita:', err);
-    setSyncStatus('error');
+    console.warn('Avvio offline:', err);
   }
 }
 
-document.addEventListener('DOMContentLoaded', initApp);
+// Esecuzione immediata
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
