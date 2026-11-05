@@ -275,9 +275,3 @@ export function renderNavTree(groupedData, activeMonth, activeWeek) {
 
   treeEl.innerHTML = html;
 }
-
-export function triggerHaptic() {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    try { navigator.vibrate(10); } catch(e) {}
-  }
-}
