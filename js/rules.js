@@ -181,3 +181,9 @@ export function getConflictClusters() {
 
   return clusters;
 }
+
+export function triggerHaptic() {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    try { navigator.vibrate(10); } catch(e) {}
+  }
+}
