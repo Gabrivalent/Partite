@@ -333,7 +333,7 @@ body.ro .auth-only {
   padding: 10px 8px;
 }
 
-/* Sync wrap: visibile e centrato da chiuso, con testo visibile e allineato da aperto */
+/* BLOCCO SINCRONIZZAZIONE: Pallino sempre visibile e centrato da chiuso */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -343,6 +343,7 @@ body.ro .auth-only {
   width: 44px;
   border-radius: 8px;
   margin: 0 auto;
+  overflow: visible !important;
 }
 
 .app-sidebar:hover .rail-sync-wrap,
@@ -371,7 +372,7 @@ body.ro .auth-only {
   transition: opacity 0.2s ease;
 }
 
-/* Blocco Auth / Lucchetto leggermente più grande e allineato */
+/* BLOCCO AUTH / LUCCHETTO: Sempre visibile, dimensionato e centrato da chiuso */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
@@ -394,14 +395,23 @@ body.ro .auth-only {
   overflow: hidden !important;
 }
 
-.app-sidebar:hover .rail-auth-btn,
-.app-sidebar.expanded .rail-auth-btn {
-  width: 100% !important;
-  max-width: none !important;
-  justify-content: flex-start !important;
-  padding: 0 14px !important;
-  gap: 14px !important;
-  margin: 0 !important;
+@media (max-width: 859px) {
+  .app-sidebar:not(.expanded) .rail-auth-btn {
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+}
+
+@media (min-width: 860px) {
+  .app-sidebar:hover .rail-auth-btn,
+  .app-sidebar.expanded .rail-auth-btn {
+    width: 100% !important;
+    max-width: none !important;
+    justify-content: flex-start !important;
+    padding: 0 14px !important;
+    gap: 14px !important;
+    margin: 0 !important;
+  }
 }
 
 .app-sidebar .rail-auth-btn .icon {
@@ -415,6 +425,22 @@ body.ro .auth-only {
   justify-content: center !important;
   flex-shrink: 0 !important;
   margin: 0 !important;
+}
+
+.app-sidebar .rail-auth-btn .label {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-sidebar:hover .rail-auth-btn .label,
+.app-sidebar.expanded .rail-auth-btn .label {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease;
 }
 
 /* --- RESTO DELL'APP --- */
