@@ -333,7 +333,7 @@ body.ro .auth-only {
   padding: 10px 8px;
 }
 
-/* Sync wrap: visibile e centrato da chiuso, con testo visibile e allineato da aperto */
+/* Sync wrap: ora il pallino/indicatore di connessione è sempre visibile e centrato da chiuso */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -343,6 +343,7 @@ body.ro .auth-only {
   width: 44px;
   border-radius: 8px;
   margin: 0 auto;
+  overflow: visible !important;
 }
 
 .app-sidebar:hover .rail-sync-wrap,
@@ -371,7 +372,7 @@ body.ro .auth-only {
   transition: opacity 0.2s ease;
 }
 
-/* Blocco Auth / Lucchetto leggermente più grande e allineato */
+/* Blocco Auth / Lucchetto */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
