@@ -1,4 +1,4 @@
-import { state, registerStateCallbacks, save, saveD, saveNames, applyTheme, pushUndo, popUndoState, logEvent } from './state.js';
+import { state, registerStateCallbacks, save, saveD, saveNames, saveCategories, applyTheme, pushUndo, popUndoState, logEvent } from './state.js';
 import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback } from './api.js';
 import { uid, iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements, checkPersonRosterConflicts } from './rules.js';
 import { copyMonthRecapWhatsApp, generateWhatsAppText } from './export.js';
@@ -911,18 +911,22 @@ window.addEventListener('DOMContentLoaded', async () => {
   render();
 
   if (sb) {
-    setSyncVisualState('orange', 'Controllo aggiornamenti...');
-    try {
-      const res = await cloudFetchRaw();
-      if (res && res.data) {
-        applyCloudData(res.data);
-        render();
-        setSyncVisualState('green', 'Sincronizzato Cloud');
-      } else {
-        setSyncVisualState('green');
+    if (!navigator.onLine) {
+      setSyncVisualState('orange', 'Modalità offline attiva');
+    } else {
+      setSyncVisualState('orange', 'Controllo aggiornamenti...');
+      try {
+        const res = await cloudFetchRaw();
+        if (res && res.data) {
+          applyCloudData(res.data);
+          render();
+          setSyncVisualState('green', 'Sincronizzato Cloud');
+        } else {
+          setSyncVisualState('green');
+        }
+      } catch(e) {
+        setSyncVisualState('red', 'Cloud non raggiungibile');
       }
-    } catch(e) {
-      setSyncVisualState('red', 'Cloud non raggiungibile');
     }
 
     setupSupabaseRealtime({
