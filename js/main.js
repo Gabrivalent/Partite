@@ -2,7 +2,7 @@ import { state, registerStateCallbacks, save, saveD, saveNames, saveCategories, 
 import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback } from './api.js';
 import { uid, iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements, checkPersonRosterConflicts } from './rules.js';
 import { copyMonthRecapWhatsApp, generateWhatsAppText } from './export.js';
-import { $, esc, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree, renderHistoryView } from './render.js';
+import { $, esc, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree, renderHistoryView, renderCollaboratorProfile } from './render.js';
 import { openEditModal, openAddModal, openQuickCloseModal, openCompensiDetailModal, openViewFileModal, openMoltModal, openResocontoModal, openConflictsModal, openUrgentIncompleteModal, openPendingModal, openSettingsModal, promptLogin } from './modals.js';
 
 function isModalOpen() {
@@ -353,12 +353,34 @@ document.addEventListener('click', e => {
     closeQuickAssignPopover();
   }
 
-  if (e.target.closest('[data-pickm]') || e.target.closest('[data-navw]')) {
-    if (window.innerWidth >= 860) {
-      document.activeElement?.blur();
-      const sidebar = $('#appSidebar');
-      if (sidebar) sidebar.blur();
+  // Chiusura vista profilo IG
+  if (e.target.id === 'closeProfileView' || e.target.id === 'collaboratorProfileView') {
+    const view = document.getElementById('collaboratorProfileView');
+    if (view) view.style.display = 'none';
+    return;
+  }
+
+  // Cambio Tab nel Profilo IG
+  const igTab = e.target.closest('[data-igtab]');
+  if (igTab) {
+    state.profileActiveTab = igTab.dataset.igtab;
+    if (state.activeCollabProfile) {
+      renderCollaboratorProfile(state.activeCollabProfile);
     }
+    return;
+  }
+
+  const compItem = e.target.closest('[data-compname]');
+  if (compItem && !e.target.closest('button')) {
+    e.stopPropagation();
+    const collabName = compItem.dataset.compname;
+    const resOv = document.getElementById('resocontoOv');
+    if (resOv) resOv.remove();
+
+    state.profileActiveTab = 'posts';
+    state.profileMonthFilter = '';
+    renderCollaboratorProfile(collabName);
+    return;
   }
 
   const vfBtn = e.target.closest('[data-viewfile]');
@@ -404,20 +426,6 @@ document.addEventListener('click', e => {
       reader.readAsDataURL(file);
     };
     fileSelector.click();
-    return;
-  }
-
-  const compItem = e.target.closest('[data-compname]');
-  if (compItem && !e.target.closest('button')) {
-    e.stopPropagation();
-    openCompensiDetailModal(
-      compItem.dataset.compname,
-      { p: +compItem.dataset.p, a: +compItem.dataset.a, c: +compItem.dataset.c },
-      compItem.dataset.m || '',
-      triggerHaptic,
-      toast,
-      updateRecap
-    );
     return;
   }
 
@@ -541,16 +549,14 @@ document.addEventListener('click', e => {
     }
     return;
   }
+});
 
-  const nb = e.target.closest('[data-name]');
-  if (nb) {
-    triggerHaptic('light');
-    if (state.READONLY) {
-      applyQuickPersonFilter(nb.dataset.name);
-    } else {
-      openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m, toast, updateRecap);
+document.addEventListener('change', e => {
+  if (e.target.id === 'profileMonthSelect') {
+    state.profileMonthFilter = e.target.value;
+    if (state.activeCollabProfile) {
+      renderCollaboratorProfile(state.activeCollabProfile);
     }
-    return;
   }
 });
 
@@ -846,6 +852,11 @@ window.addEventListener('keydown', e => {
     const pop = document.getElementById('quickAssignPop');
     if (pop) {
       pop.remove();
+      return;
+    }
+    const profileView = document.getElementById('collaboratorProfileView');
+    if (profileView && profileView.style.display !== 'none') {
+      profileView.style.display = 'none';
       return;
     }
     const historyView = $('#historyView');
