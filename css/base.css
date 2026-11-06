@@ -119,7 +119,8 @@ input, select, textarea {
   overflow: hidden;
   border-right: 1px solid var(--divider);
   flex-shrink: 0;
-  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Transizione immediata e fluida sia in apertura che in chiusura */
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1) 0s;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -135,7 +136,7 @@ input, select, textarea {
 
   .app-sidebar:hover {
     width: 270px;
-    transition-delay: 0.35s; /* Apertura ritardata a 0.35s */
+    transition-delay: 0.35s; /* Ritardo esatto di 0.35s in apertura */
     overflow-y: auto;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -175,13 +176,15 @@ input, select, textarea {
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease;
+  /* Scomparsa immediata senza ritardo alla chiusura */
+  transition: opacity 0.1s ease 0s;
 }
 
 .app-sidebar:hover .sidebar-brand-label,
 .app-sidebar.expanded .sidebar-brand-label {
   opacity: 1;
   visibility: visible;
+  /* Dissolvenza ritardata in apertura */
   transition: opacity 0.2s ease 0.35s;
 }
 
@@ -284,7 +287,7 @@ input, select, textarea {
 .app-sidebar .sidebar-tree-container {
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease;
+  transition: opacity 0.1s ease 0s;
   font-size: 13.5px;
   font-weight: 600;
 }
@@ -338,7 +341,7 @@ body.ro .auth-only {
   padding: 10px 8px;
 }
 
-/* Sync wrap: quando chiuso mostra sempre e solo il pallino verde centrato */
+/* Sincronizzazione: sempre visibile (pallino centrato da chiuso, affiancato al testo da aperto) */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -366,7 +369,7 @@ body.ro .auth-only {
   white-space: nowrap;
 }
 
-/* Blocco Auth / Lucchetto leggermente più grande e perfettamente allineato */
+/* Blocco Auth / Lucchetto ingrandito e allineato */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
