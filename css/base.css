@@ -103,7 +103,7 @@ input, select, textarea {
   width: 100%;
 }
 
-/* --- SIDEBAR UNIFICATA E RESPONSIVE --- */
+/* --- SIDEBAR MODELLATA (STILE GEMINI) --- */
 .app-sidebar {
   width: 64px;
   background: var(--surface);
@@ -128,7 +128,6 @@ input, select, textarea {
   display: none;
 }
 
-/* Su desktop l'hover espande la sidebar */
 @media (min-width: 860px) {
   .app-layout {
     padding-left: 64px;
@@ -142,13 +141,9 @@ input, select, textarea {
   }
 }
 
-/* Su mobile (< 860px) la sidebar è fissa a 64px (o a tutto schermo se classe .expanded gestita da JS) */
-@media (max-width: 859px) {
-  .app-sidebar.expanded {
-    width: 270px !important;
-    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
-    overflow-y: auto;
-  }
+.app-sidebar.expanded {
+  width: 270px;
+  overflow-y: auto;
 }
 
 .sidebar-top {
@@ -196,7 +191,6 @@ input, select, textarea {
   align-items: stretch;
 }
 
-/* Elementi di navigazione (bottoni) */
 .app-sidebar .rail-icon-btn, 
 .app-sidebar .rail-nav-item {
   width: 44px !important;
@@ -269,7 +263,6 @@ input, select, textarea {
   box-shadow: var(--shadow-sm) !important;
 }
 
-/* Etichette di testo nascoste da chiuso, visibili da aperto */
 .app-sidebar .rail-nav-item .label,
 .app-sidebar .rail-auth-btn .label,
 .sidebar-tree-container {
@@ -332,7 +325,7 @@ body.ro .auth-only {
   align-items: stretch;
 }
 
-/* BLOCCO SINCRONIZZAZIONE (Pallino sempre visibile e centrato da chiuso) */
+/* Sincronizzazione (Pallino visibile e centrato da chiuso) */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -379,7 +372,7 @@ body.ro .auth-only {
   transition: opacity 0.2s ease;
 }
 
-/* BLOCCO AUTH / LUCCHETTO (Sempre visibile, centrato e dimensionato correttamente) */
+/* Lucchetto / Auth Button (Visibile e centrato da chiuso) */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
