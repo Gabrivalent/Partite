@@ -103,7 +103,7 @@ input, select, textarea {
   width: 100%;
 }
 
-/* --- SIDEBAR MODELLATA (STILE GEMINI) --- */
+/* --- SIDEBAR CON ICONE FISSE E TESTI A COMPARSA (STILE GEMINI) --- */
 .app-sidebar {
   width: 64px;
   background: var(--surface);
@@ -149,10 +149,9 @@ input, select, textarea {
 .sidebar-top {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  padding: 12px 10px;
-  min-height: 56px;
-  gap: 12px;
+  height: 56px;
+  padding: 0 12px;
+  position: relative;
   width: 100%;
 }
 
@@ -162,87 +161,56 @@ input, select, textarea {
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease;
+  position: absolute;
+  left: 56px;
+  transition: opacity 0.15s ease;
 }
 
 .app-sidebar:hover .sidebar-brand-label,
 .app-sidebar.expanded .sidebar-brand-label {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.1s;
+  transition: opacity 0.2s ease 0.05s;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px;
+  gap: 4px;
+  padding: 6px 0;
   width: 100%;
-  align-items: center;
 }
 
-@media (min-width: 860px) {
-  .app-sidebar:hover .sidebar-nav,
-  .app-sidebar.expanded .sidebar-nav {
-    align-items: stretch;
-  }
-}
-.app-sidebar.expanded .sidebar-nav {
-  align-items: stretch;
-}
-
+/* Pulsanti di navigazione: Icona fissa al centro a sinistra, testo che compare a destra */
 .app-sidebar .rail-icon-btn, 
 .app-sidebar .rail-nav-item {
-  width: 44px !important;
+  width: 100% !important;
   height: 44px !important;
-  min-width: 44px !important;
   min-height: 44px !important;
-  border-radius: 12px !important;
+  border-radius: 0 !important;
   border: none !important;
   background: transparent !important;
   color: var(--mute) !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  position: relative !important;
   padding: 0 !important;
   cursor: pointer;
   box-shadow: none !important;
-  margin: 0 auto !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-@media (min-width: 860px) {
-  .app-sidebar:hover .rail-icon-btn, 
-  .app-sidebar:hover .rail-nav-item,
-  .app-sidebar.expanded .rail-icon-btn, 
-  .app-sidebar.expanded .rail-nav-item {
-    width: 100% !important;
-    justify-content: flex-start !important;
-    padding: 0 14px !important;
-    gap: 14px !important;
-    margin: 0 !important;
-  }
-}
-.app-sidebar.expanded .rail-icon-btn, 
-.app-sidebar.expanded .rail-nav-item {
-  width: 100% !important;
-  justify-content: flex-start !important;
-  padding: 0 14px !important;
-  gap: 14px !important;
   margin: 0 !important;
 }
 
 .app-sidebar .rail-nav-item .icon,
 .app-sidebar .rail-icon-btn .icon {
-  width: 24px !important;
-  height: 24px !important;
-  min-width: 24px !important;
-  display: inline-flex !important;
+  width: 64px !important;
+  min-width: 64px !important;
+  height: 44px !important;
+  display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
   margin: 0 !important;
+  font-size: 20px !important;
 }
 
 .app-sidebar .rail-icon-btn:hover, 
@@ -252,37 +220,40 @@ input, select, textarea {
 }
 
 .app-sidebar.expanded #sidebarToggleBtn {
-  background: rgba(37, 99, 235, 0.2) !important;
+  background: transparent !important;
   color: var(--date) !important;
+}
+.app-sidebar.expanded #sidebarToggleBtn:hover {
+  background: var(--hl) !important;
 }
 
 .app-sidebar .rail-nav-item.active {
   background: var(--card) !important;
   color: var(--acc) !important;
   font-weight: 700 !important;
-  box-shadow: var(--shadow-sm) !important;
+  box-shadow: none !important;
 }
 
+/* Etichette testuali posizionate a destra dell'icona fissa */
 .app-sidebar .rail-nav-item .label,
-.app-sidebar .rail-auth-btn .label,
-.sidebar-tree-container {
+.app-sidebar .rail-auth-btn .label {
+  position: absolute;
+  left: 56px;
+  white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease;
+  transition: opacity 0.15s ease;
   font-size: 13.5px;
   font-weight: 600;
-  white-space: nowrap;
 }
 
 .app-sidebar:hover .rail-nav-item .label,
 .app-sidebar:hover .rail-auth-btn .label,
-.app-sidebar:hover .sidebar-tree-container,
 .app-sidebar.expanded .rail-nav-item .label,
-.app-sidebar.expanded .rail-auth-btn .label,
-.app-sidebar.expanded .sidebar-tree-container {
+.app-sidebar.expanded .rail-auth-btn .label {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.1s;
+  transition: opacity 0.2s ease 0.05s;
 }
 
 body.ro .rail-nav-item.auth-only,
@@ -294,6 +265,16 @@ body.ro .auth-only {
   flex: 1;
   padding: 12px 14px;
   border-top: 1px solid var(--divider);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+}
+
+.app-sidebar:hover .sidebar-tree-container,
+.app-sidebar.expanded .sidebar-tree-container {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease 0.05s;
 }
 
 .sidebar-section-title {
@@ -304,122 +285,83 @@ body.ro .auth-only {
   margin-bottom: 8px;
 }
 
+/* Footer della sidebar (Sincronizzazione e Lucchetto) */
 .sidebar-bottom {
   margin-top: auto;
-  padding: 10px 8px;
+  padding: 8px 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   border-top: 1px solid var(--divider);
-  align-items: center;
   width: 100%;
 }
 
-@media (min-width: 860px) {
-  .app-sidebar:hover .sidebar-bottom,
-  .app-sidebar.expanded .sidebar-bottom {
-    align-items: stretch;
-  }
-}
-.app-sidebar.expanded .sidebar-bottom {
-  align-items: stretch;
-}
-
-/* Sincronizzazione (Pallino visibile e centrato da chiuso) */
+/* Blocco di sincronizzazione */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0;
-  height: 38px;
-  width: 44px;
-  border-radius: 8px;
-  margin: 0 auto;
+  height: 44px;
+  width: 100%;
+  position: relative;
+  padding: 0;
 }
 
-@media (min-width: 860px) {
-  .app-sidebar:hover .rail-sync-wrap,
-  .app-sidebar.expanded .rail-sync-wrap {
-    width: 100%;
-    justify-content: flex-start;
-    padding: 0 10px;
-    gap: 12px;
-    margin: 0;
-  }
-}
-.app-sidebar.expanded .rail-sync-wrap {
-  width: 100%;
-  justify-content: flex-start;
-  padding: 0 10px;
-  gap: 12px;
-  margin: 0;
+.rail-sync-wrap .sync-dot {
+  position: absolute;
+  left: 27px; /* Centrato esattamente nell'area 64px (27px + 10px pallino = 37px centro) */
 }
 
 .sync-text-status {
+  position: absolute;
+  left: 56px;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--mute);
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease;
+  transition: opacity 0.15s ease;
 }
 
 .app-sidebar:hover .sync-text-status,
 .app-sidebar.expanded .sync-text-status {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease 0.05s;
 }
 
-/* Lucchetto / Auth Button (Visibile e centrato da chiuso) */
+/* Pulsante Lucchetto / Auth */
 .app-sidebar .rail-auth-btn {
-  width: 44px !important;
+  width: 100% !important;
   height: 44px !important;
-  min-width: 44px !important;
   min-height: 44px !important;
-  border-radius: 12px !important;
+  border-radius: 0 !important;
   border: none !important;
   background: transparent !important;
   color: var(--ink) !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  position: relative !important;
   padding: 0 !important;
   cursor: pointer;
   box-shadow: none !important;
-  margin: 0 auto !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-@media (min-width: 860px) {
-  .app-sidebar:hover .rail-auth-btn,
-  .app-sidebar.expanded .rail-auth-btn {
-    width: 100% !important;
-    justify-content: flex-start !important;
-    padding: 0 14px !important;
-    gap: 14px !important;
-    margin: 0 !important;
-  }
-}
-.app-sidebar.expanded .rail-auth-btn {
-  width: 100% !important;
-  justify-content: flex-start !important;
-  padding: 0 14px !important;
-  gap: 14px !important;
   margin: 0 !important;
 }
 
 .app-sidebar .rail-auth-btn .icon {
-  width: 24px !important;
-  height: 24px !important;
-  min-width: 24px !important;
+  width: 64px !important;
+  min-width: 64px !important;
+  height: 44px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
   margin: 0 !important;
+  font-size: 20px !important;
+}
+
+.app-sidebar .rail-auth-btn:hover {
+  background: var(--hl) !important;
 }
 
 /* --- RESTO DELL'APP --- */
