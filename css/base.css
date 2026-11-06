@@ -103,7 +103,10 @@ input, select, textarea {
   width: 100%;
 }
 
-/* --- SIDEBAR CORRETTA E ALLINEATA (STILE GEMINI) --- */
+/* =========================================================
+   SIDEBAR STILE GEMINI CON DELAY ANTI-SFIOVAMENTO (0.35s):
+   ICONE FISSE NEI PRIMI 64PX, TESTI ALLA DESTRA DELL'ICONA
+   ========================================================= */
 .app-sidebar {
   width: 64px;
   background: var(--surface);
@@ -116,10 +119,12 @@ input, select, textarea {
   bottom: 0;
   height: 100vh;
   z-index: 900;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
   border-right: 1px solid var(--divider);
   flex-shrink: 0;
-  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Chiusura immediata (0s delay) quando togli il mouse */
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1) 0s, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -133,91 +138,182 @@ input, select, textarea {
     padding-left: 64px;
   }
 
-  .app-sidebar:hover,
+  /* Passando col mouse aspetta 0.35s prima di aprirsi */
+  .app-sidebar:hover {
+    width: 270px;
+    overflow-y: auto;
+    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
+    transition-delay: 0.35s;
+  }
+
+  /* Cliccando su ☰ si apre subito senza aspettare */
   .app-sidebar.expanded {
     width: 270px;
     overflow-y: auto;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
+    transition-delay: 0s;
   }
 }
 
-.app-sidebar.expanded {
-  width: 270px;
-  overflow-y: auto;
-}
-
+/* RIGA SUPERIORE: Bottone ☰ + Menu Partite */
 .sidebar-top {
   display: flex;
   align-items: center;
-  height: 56px;
-  min-height: 56px;
+  justify-content: flex-start;
+  height: 60px;
+  min-height: 60px;
   padding: 0;
-  width: 100%;
-  position: relative;
+  width: 270px;
+  flex-shrink: 0;
+}
+
+.app-sidebar #sidebarToggleBtn {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  margin: 0 12px !important; /* 12px + 40px + 12px = 64px esatti */
+  padding: 0 !important;
+  border-radius: 50% !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--ink) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: none !important;
+  flex-shrink: 0 !important;
+}
+
+.app-sidebar #sidebarToggleBtn:hover {
+  background: var(--hl) !important;
+}
+
+.app-sidebar.expanded #sidebarToggleBtn {
+  background: rgba(37, 99, 235, 0.2) !important;
+  color: var(--date) !important;
+}
+
+.app-sidebar #sidebarToggleBtn .icon {
+  font-size: 20px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .sidebar-brand-label {
   font: 700 17px var(--font-title);
   letter-spacing: .5px;
   white-space: nowrap;
+  color: var(--ink);
   opacity: 0;
-  visibility: hidden;
-  position: absolute;
-  left: 64px;
-  transition: opacity 0.1s ease;
+  pointer-events: none;
+  transition: opacity 0.15s ease 0s;
 }
 
-.app-sidebar:hover .sidebar-brand-label,
-.app-sidebar.expanded .sidebar-brand-label {
+.app-sidebar:hover .sidebar-brand-label {
   opacity: 1;
-  visibility: visible;
-  transition: opacity 0.2s ease 0.05s;
+  pointer-events: auto;
+  transition-delay: 0.38s;
 }
 
+.app-sidebar.expanded .sidebar-brand-label,
+.app-sidebar.open .sidebar-brand-label {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+/* CONTENITORI NAV TOP E BOTTOM */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 0;
+  gap: 6px;
+  padding: 8px 0;
   width: 100%;
+  flex-shrink: 0;
 }
 
-/* Pulsanti di navigazione: Icona fissa nei primi 64px, testo a fianco */
-.app-sidebar .rail-icon-btn, 
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 10px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--divider);
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* BOTTONI DELLA SIDEBAR (Partite, Compensi, Cronologia, Impostazioni, Lucchetto) */
 .app-sidebar .rail-nav-item,
 .app-sidebar .rail-auth-btn {
-  width: 100% !important;
+  width: calc(100% - 16px) !important;
+  min-width: 48px !important;
   height: 44px !important;
   min-height: 44px !important;
-  border-radius: 0 !important;
+  margin: 0 8px !important; /* 8px + 48px icona + 8px = 64px */
+  padding: 0 !important;
+  border-radius: 22px !important;
   border: none !important;
   background: transparent !important;
   color: var(--mute) !important;
   display: flex !important;
+  flex-direction: row !important;
   align-items: center !important;
-  padding: 0 !important;
-  cursor: pointer;
+  justify-content: flex-start !important;
+  gap: 4px !important;
   box-shadow: none !important;
-  margin: 0 !important;
-  position: relative !important;
   overflow: hidden !important;
+  text-align: left !important;
 }
 
+.app-sidebar .rail-auth-btn {
+  color: var(--ink) !important;
+}
+
+/* Icona bloccata nei primi 48px del bottone (centro a 8 + 24 = 32px) */
 .app-sidebar .rail-nav-item .icon,
-.app-sidebar .rail-icon-btn .icon,
 .app-sidebar .rail-auth-btn .icon {
-  width: 64px !important;
-  min-width: 64px !important;
+  width: 48px !important;
+  min-width: 48px !important;
   height: 44px !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
-  margin: 0 !important;
   font-size: 20px !important;
+  margin: 0 !important;
 }
 
-.app-sidebar .rail-icon-btn:hover, 
+/* Scritta sempre a destra dell'icona */
+.app-sidebar .rail-nav-item .label,
+.app-sidebar .rail-auth-btn .label {
+  white-space: nowrap !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease 0s;
+}
+
+.app-sidebar:hover .rail-nav-item .label,
+.app-sidebar:hover .rail-auth-btn .label {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0.38s;
+}
+
+.app-sidebar.expanded .rail-nav-item .label,
+.app-sidebar.expanded .rail-auth-btn .label,
+.app-sidebar.open .rail-nav-item .label,
+.app-sidebar.open .rail-auth-btn .label {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
 .app-sidebar .rail-nav-item:hover,
 .app-sidebar .rail-auth-btn:hover {
   background: var(--hl) !important;
@@ -228,56 +324,77 @@ input, select, textarea {
   background: var(--card) !important;
   color: var(--acc) !important;
   font-weight: 700 !important;
-  box-shadow: none !important;
 }
 
-/* Testi / etichette posizionati a destra dell'area fissa */
-.app-sidebar .rail-nav-item .label,
-.app-sidebar .rail-auth-btn .label,
+/* PALLINO CONNESSO (stessa geometria: 8px margine + 48px box pallino + scritta a destra) */
+.rail-sync-wrap {
+  width: calc(100% - 16px);
+  height: 38px;
+  min-height: 38px;
+  margin: 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.rail-sync-wrap .sync-dot {
+  margin: 0 19px; /* 19px + 10px pallino + 19px = 48px esatti */
+  flex-shrink: 0;
+}
+
 .sync-text-status {
-  position: absolute;
-  left: 64px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mute);
   white-space: nowrap;
   opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.1s ease;
-  font-size: 13.5px;
-  font-weight: 600;
+  pointer-events: none;
+  transition: opacity 0.15s ease 0s;
 }
 
-.app-sidebar:hover .rail-nav-item .label,
-.app-sidebar:hover .rail-auth-btn .label,
-.app-sidebar:hover .sync-text-status,
-.app-sidebar:hover .sidebar-brand-label,
-.app-sidebar.expanded .rail-nav-item .label,
-.app-sidebar.expanded .rail-auth-btn .label,
-.app-sidebar.expanded .sync-text-status,
-.app-sidebar.expanded .sidebar-brand-label {
+.app-sidebar:hover .sync-text-status {
   opacity: 1;
-  visibility: visible;
-  transition: opacity 0.2s ease 0.05s;
+  pointer-events: auto;
+  transition-delay: 0.38s;
 }
 
-body.ro .rail-nav-item.auth-only,
-body.ro .auth-only {
-  display: none !important;
+.app-sidebar.expanded .sync-text-status,
+.app-sidebar.open .sync-text-status {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 
+/* ALBERO ARCHIVIO CALENDARIO */
 .sidebar-tree-container {
   flex: 1;
+  width: 270px;
   padding: 12px 14px;
   border-top: 1px solid var(--divider);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease;
+  pointer-events: none;
   overflow-y: auto;
+  transition: opacity 0.15s ease 0s, visibility 0s linear 0.15s;
 }
 
-.app-sidebar:hover .sidebar-tree-container,
-.app-sidebar.expanded .sidebar-tree-container {
+.app-sidebar:hover .sidebar-tree-container {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.05s;
+  pointer-events: auto;
+  transition: opacity 0.2s ease 0.38s, visibility 0s linear 0.35s;
+}
+
+.app-sidebar.expanded .sidebar-tree-container,
+.app-sidebar.open .sidebar-tree-container {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.2s ease 0.05s, visibility 0s linear 0s;
 }
 
 .sidebar-section-title {
@@ -288,33 +405,12 @@ body.ro .auth-only {
   margin-bottom: 8px;
 }
 
-/* Footer in basso */
-.sidebar-bottom {
-  margin-top: auto;
-  padding: 8px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  border-top: 1px solid var(--divider);
-  width: 100%;
+body.ro .rail-nav-item.auth-only,
+body.ro .auth-only {
+  display: none !important;
 }
 
-/* Blocco di sincronizzazione */
-.rail-sync-wrap {
-  display: flex;
-  align-items: center;
-  height: 44px;
-  width: 100%;
-  position: relative;
-  padding: 0;
-}
-
-.rail-sync-wrap .sync-dot {
-  position: absolute;
-  left: 27px;
-}
-
-/* --- RESTO DELL'APP --- */
+/* --- RESTO DELL'APP (INVARIATO) --- */
 .app-content-wrapper {
   flex: 1;
   min-width: 0;
@@ -353,10 +449,6 @@ body.ro .auth-only {
   font-size: 18px;
   cursor: pointer;
 }
-@media (max-width: 859px) {
-  .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
-}
-
 .page-title {
   font: 700 clamp(22px, 4vw, 28px)/1 var(--font-title);
   margin: 0;
