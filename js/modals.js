@@ -1,5 +1,5 @@
 import { COMMON_TIMES } from './config.js';
-import { state, save, saveMolt, saveNames, saveCategories, saveFipLinks, applyTheme, pushUndo } from './state.js';
+import { state, save, saveMolt, saveNames, saveCategories, saveFipLinks, applyTheme, pushUndo, logEvent } from './state.js';
 import { sb } from './api.js';
 import { uid, iso, monday, checkPersonRosterConflicts, getConflictClusters, getUrgentIncompleteMatches, getPendingPostponedMatches, isRefereeNeeded } from './rules.js';
 import { monthsWithData, monthLabel, computeRecapRows, exportSelectedMonthsJSON, generateMonthPDF, copyReadOnlyLink } from './export.js';
@@ -632,7 +632,11 @@ export function openAddModal(triggerHaptic, toast, onRender) {
       ghost: statusVal === 'rinviata' || statusVal === 'annullata',
       ts: Date.now()
     };
-    pushUndo(); state.items.push(it); save(); ov.remove();
+    pushUndo(); 
+    state.items.push(it); 
+    save();
+    logEvent('add', `Aggiunta partita: ${it.title || 'Senza titolo'} (${it.cat || 'n.d.'}) del ${it.date}`);
+    ov.remove();
     setParam('m', it.date.slice(0, 7), onRender); 
     setParam('s', iso(monday(it.date)), onRender);
     toast('Partita aggiunta!', 'success');
