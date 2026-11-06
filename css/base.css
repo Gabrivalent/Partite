@@ -333,7 +333,7 @@ body.ro .auth-only {
   padding: 10px 8px;
 }
 
-/* Sync wrap: indicatore di connessione visibile e centrato da chiuso */
+/* PALINO DI CONNESSIONE: VISIBILE E CENTRATO ANCHE DA CHIUSO */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -372,7 +372,7 @@ body.ro .auth-only {
   transition: opacity 0.2s ease;
 }
 
-/* BLOCCO AUTH / LUCCHETTO RIPRISTINATO E ALLINEATO */
+/* LUCCHETTO / AUTH BUTTON: VISIBILE E ALLINEATO ANCHE DA CHIUSO */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
@@ -386,8 +386,8 @@ body.ro .auth-only {
   color: var(--ink) !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: flex-start !important;
-  padding: 0 10px !important;
+  justify-content: center !important;
+  padding: 0 !important;
   cursor: pointer;
   box-shadow: none !important;
   margin: 0 auto !important;
