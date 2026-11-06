@@ -119,8 +119,7 @@ input, select, textarea {
   overflow: hidden;
   border-right: 1px solid var(--divider);
   flex-shrink: 0;
-  /* Transizione immediata e fluida sia in apertura che in chiusura */
-  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1) 0s;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -136,14 +135,12 @@ input, select, textarea {
 
   .app-sidebar:hover {
     width: 270px;
-    transition-delay: 0.35s; /* Ritardo esatto di 0.35s in apertura */
     overflow-y: auto;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
 
   .app-sidebar.expanded {
     width: 270px;
-    transition-delay: 0s;
     overflow-y: auto;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -176,16 +173,14 @@ input, select, textarea {
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  /* Scomparsa immediata senza ritardo alla chiusura */
-  transition: opacity 0.1s ease 0s;
+  transition: opacity 0.1s ease;
 }
 
 .app-sidebar:hover .sidebar-brand-label,
 .app-sidebar.expanded .sidebar-brand-label {
   opacity: 1;
   visibility: visible;
-  /* Dissolvenza ritardata in apertura */
-  transition: opacity 0.2s ease 0.35s;
+  transition: opacity 0.2s ease;
 }
 
 .sidebar-nav {
@@ -283,26 +278,23 @@ input, select, textarea {
 
 .app-sidebar .rail-nav-item .label,
 .app-sidebar .rail-auth-btn .label,
-.app-sidebar .sync-text-status,
-.app-sidebar .sidebar-tree-container {
+.sidebar-tree-container {
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease 0s;
+  transition: opacity 0.1s ease;
   font-size: 13.5px;
   font-weight: 600;
 }
 
 .app-sidebar:hover .rail-nav-item .label,
 .app-sidebar:hover .rail-auth-btn .label,
-.app-sidebar:hover .sync-text-status,
 .app-sidebar:hover .sidebar-tree-container,
 .app-sidebar.expanded .rail-nav-item .label,
 .app-sidebar.expanded .rail-auth-btn .label,
-.app-sidebar.expanded .sync-text-status,
 .app-sidebar.expanded .sidebar-tree-container {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.35s;
+  transition: opacity 0.2s ease;
 }
 
 body.ro .rail-nav-item.auth-only,
@@ -341,7 +333,7 @@ body.ro .auth-only {
   padding: 10px 8px;
 }
 
-/* Sincronizzazione: sempre visibile (pallino centrato da chiuso, affiancato al testo da aperto) */
+/* Sync wrap: visibile e centrato da chiuso, con testo visibile e allineato da aperto */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -367,9 +359,19 @@ body.ro .auth-only {
   font-weight: 600;
   color: var(--mute);
   white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
 }
 
-/* Blocco Auth / Lucchetto ingrandito e allineato */
+.app-sidebar:hover .sync-text-status,
+.app-sidebar.expanded .sync-text-status {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease;
+}
+
+/* Blocco Auth / Lucchetto leggermente più grande e allineato */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
