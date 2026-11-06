@@ -103,7 +103,7 @@ input, select, textarea {
   width: 100%;
 }
 
-/* --- SIDEBAR CON ICONE FISSE E TESTI A COMPARSA (STILE GEMINI) --- */
+/* --- SIDEBAR CORRETTA E ALLINEATA (STILE GEMINI) --- */
 .app-sidebar {
   width: 64px;
   background: var(--surface);
@@ -150,9 +150,10 @@ input, select, textarea {
   display: flex;
   align-items: center;
   height: 56px;
-  padding: 0 12px;
-  position: relative;
+  min-height: 56px;
+  padding: 0;
   width: 100%;
+  position: relative;
 }
 
 .sidebar-brand-label {
@@ -162,8 +163,8 @@ input, select, textarea {
   opacity: 0;
   visibility: hidden;
   position: absolute;
-  left: 56px;
-  transition: opacity 0.15s ease;
+  left: 64px;
+  transition: opacity 0.1s ease;
 }
 
 .app-sidebar:hover .sidebar-brand-label,
@@ -181,9 +182,10 @@ input, select, textarea {
   width: 100%;
 }
 
-/* Pulsanti di navigazione: Icona fissa al centro a sinistra, testo che compare a destra */
+/* Pulsanti di navigazione: Icona fissa nei primi 64px, testo a fianco */
 .app-sidebar .rail-icon-btn, 
-.app-sidebar .rail-nav-item {
+.app-sidebar .rail-nav-item,
+.app-sidebar .rail-auth-btn {
   width: 100% !important;
   height: 44px !important;
   min-height: 44px !important;
@@ -193,15 +195,17 @@ input, select, textarea {
   color: var(--mute) !important;
   display: flex !important;
   align-items: center !important;
-  position: relative !important;
   padding: 0 !important;
   cursor: pointer;
   box-shadow: none !important;
   margin: 0 !important;
+  position: relative !important;
+  overflow: hidden !important;
 }
 
 .app-sidebar .rail-nav-item .icon,
-.app-sidebar .rail-icon-btn .icon {
+.app-sidebar .rail-icon-btn .icon,
+.app-sidebar .rail-auth-btn .icon {
   width: 64px !important;
   min-width: 64px !important;
   height: 44px !important;
@@ -214,17 +218,10 @@ input, select, textarea {
 }
 
 .app-sidebar .rail-icon-btn:hover, 
-.app-sidebar .rail-nav-item:hover {
+.app-sidebar .rail-nav-item:hover,
+.app-sidebar .rail-auth-btn:hover {
   background: var(--hl) !important;
   color: var(--ink) !important;
-}
-
-.app-sidebar.expanded #sidebarToggleBtn {
-  background: transparent !important;
-  color: var(--date) !important;
-}
-.app-sidebar.expanded #sidebarToggleBtn:hover {
-  background: var(--hl) !important;
 }
 
 .app-sidebar .rail-nav-item.active {
@@ -234,23 +231,28 @@ input, select, textarea {
   box-shadow: none !important;
 }
 
-/* Etichette testuali posizionate a destra dell'icona fissa */
+/* Testi / etichette posizionati a destra dell'area fissa */
 .app-sidebar .rail-nav-item .label,
-.app-sidebar .rail-auth-btn .label {
+.app-sidebar .rail-auth-btn .label,
+.sync-text-status {
   position: absolute;
-  left: 56px;
+  left: 64px;
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.1s ease;
   font-size: 13.5px;
   font-weight: 600;
 }
 
 .app-sidebar:hover .rail-nav-item .label,
 .app-sidebar:hover .rail-auth-btn .label,
+.app-sidebar:hover .sync-text-status,
+.app-sidebar:hover .sidebar-brand-label,
 .app-sidebar.expanded .rail-nav-item .label,
-.app-sidebar.expanded .rail-auth-btn .label {
+.app-sidebar.expanded .rail-auth-btn .label,
+.app-sidebar.expanded .sync-text-status,
+.app-sidebar.expanded .sidebar-brand-label {
   opacity: 1;
   visibility: visible;
   transition: opacity 0.2s ease 0.05s;
@@ -267,7 +269,8 @@ body.ro .auth-only {
   border-top: 1px solid var(--divider);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.1s ease;
+  overflow-y: auto;
 }
 
 .app-sidebar:hover .sidebar-tree-container,
@@ -285,7 +288,7 @@ body.ro .auth-only {
   margin-bottom: 8px;
 }
 
-/* Footer della sidebar (Sincronizzazione e Lucchetto) */
+/* Footer in basso */
 .sidebar-bottom {
   margin-top: auto;
   padding: 8px 0;
@@ -308,60 +311,7 @@ body.ro .auth-only {
 
 .rail-sync-wrap .sync-dot {
   position: absolute;
-  left: 27px; /* Centrato esattamente nell'area 64px (27px + 10px pallino = 37px centro) */
-}
-
-.sync-text-status {
-  position: absolute;
-  left: 56px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--mute);
-  white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.15s ease;
-}
-
-.app-sidebar:hover .sync-text-status,
-.app-sidebar.expanded .sync-text-status {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.2s ease 0.05s;
-}
-
-/* Pulsante Lucchetto / Auth */
-.app-sidebar .rail-auth-btn {
-  width: 100% !important;
-  height: 44px !important;
-  min-height: 44px !important;
-  border-radius: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  color: var(--ink) !important;
-  display: flex !important;
-  align-items: center !important;
-  position: relative !important;
-  padding: 0 !important;
-  cursor: pointer;
-  box-shadow: none !important;
-  margin: 0 !important;
-}
-
-.app-sidebar .rail-auth-btn .icon {
-  width: 64px !important;
-  min-width: 64px !important;
-  height: 44px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex-shrink: 0 !important;
-  margin: 0 !important;
-  font-size: 20px !important;
-}
-
-.app-sidebar .rail-auth-btn:hover {
-  background: var(--hl) !important;
+  left: 27px;
 }
 
 /* --- RESTO DELL'APP --- */
