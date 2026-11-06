@@ -135,7 +135,7 @@ input, select, textarea {
 
   .app-sidebar:hover {
     width: 270px;
-    transition-delay: 0.35s; /* Animazione ritardata a 0.35s come richiesto */
+    transition-delay: 0.35s; /* Ritardo esatto di 0.35s per l'apertura */
     overflow-y: auto;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -182,7 +182,7 @@ input, select, textarea {
 .app-sidebar.expanded .sidebar-brand-label {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.35s; /* Ritardo dissolvenza etichetta allineato */
+  transition: opacity 0.2s ease 0.35s;
 }
 
 .sidebar-nav {
@@ -299,7 +299,7 @@ input, select, textarea {
 .app-sidebar.expanded .sidebar-tree-container {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.35s; /* Ritardo dissolvenza etichette menu */
+  transition: opacity 0.2s ease 0.35s; /* Ritardo dissolvenza etichette allineato */
 }
 
 body.ro .rail-nav-item.auth-only,
@@ -365,29 +365,46 @@ body.ro .auth-only {
   white-space: nowrap;
 }
 
+/* Blocco Auth corretto per allinearsi perfettamente con il resto */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 38px !important;
   min-width: 44px !important;
+  max-width: 44px !important;
   border-radius: 8px !important;
   border: none !important;
   background: transparent !important;
   color: var(--ink) !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
+  justify-content: flex-start !important;
+  padding: 0 10px !important;
   cursor: pointer;
   box-shadow: none !important;
   margin: 0 auto !important;
+  position: relative !important;
+  overflow: hidden !important;
 }
 
 .app-sidebar:hover .rail-auth-btn,
 .app-sidebar.expanded .rail-auth-btn {
   width: 100% !important;
+  max-width: none !important;
   justify-content: flex-start !important;
   padding: 0 12px !important;
   gap: 12px !important;
+  margin: 0 !important;
+}
+
+.app-sidebar .rail-auth-btn .icon {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
   margin: 0 !important;
 }
 
