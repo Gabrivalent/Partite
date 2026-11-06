@@ -119,7 +119,7 @@ input, select, textarea {
   overflow: hidden;
   border-right: 1px solid var(--divider);
   flex-shrink: 0;
-  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1) 0s;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -135,7 +135,7 @@ input, select, textarea {
 
   .app-sidebar:hover {
     width: 270px;
-    transition-delay: 0.35s; /* Ritardo esatto di 0.35s per l'apertura */
+    transition-delay: 0.35s; /* Apertura ritardata a 0.35s */
     overflow-y: auto;
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
   }
@@ -175,7 +175,7 @@ input, select, textarea {
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease 0s;
+  transition: opacity 0.1s ease;
 }
 
 .app-sidebar:hover .sidebar-brand-label,
@@ -284,7 +284,7 @@ input, select, textarea {
 .app-sidebar .sidebar-tree-container {
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.1s ease 0s;
+  transition: opacity 0.1s ease;
   font-size: 13.5px;
   font-weight: 600;
 }
@@ -299,7 +299,7 @@ input, select, textarea {
 .app-sidebar.expanded .sidebar-tree-container {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease 0.35s; /* Ritardo dissolvenza etichette allineato */
+  transition: opacity 0.2s ease 0.35s;
 }
 
 body.ro .rail-nav-item.auth-only,
@@ -338,6 +338,7 @@ body.ro .auth-only {
   padding: 10px 8px;
 }
 
+/* Sync wrap: quando chiuso mostra sempre e solo il pallino verde centrato */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -365,13 +366,15 @@ body.ro .auth-only {
   white-space: nowrap;
 }
 
-/* Blocco Auth corretto per allinearsi perfettamente con il resto */
+/* Blocco Auth / Lucchetto leggermente più grande e perfettamente allineato */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
-  height: 38px !important;
+  height: 44px !important;
   min-width: 44px !important;
   max-width: 44px !important;
-  border-radius: 8px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  border-radius: 12px !important;
   border: none !important;
   background: transparent !important;
   color: var(--ink) !important;
@@ -391,8 +394,8 @@ body.ro .auth-only {
   width: 100% !important;
   max-width: none !important;
   justify-content: flex-start !important;
-  padding: 0 12px !important;
-  gap: 12px !important;
+  padding: 0 14px !important;
+  gap: 14px !important;
   margin: 0 !important;
 }
 
@@ -401,6 +404,7 @@ body.ro .auth-only {
   height: 24px !important;
   min-width: 24px !important;
   min-height: 24px !important;
+  font-size: 20px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
