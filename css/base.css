@@ -333,7 +333,7 @@ body.ro .auth-only {
   padding: 10px 8px;
 }
 
-/* Sync wrap: ora il pallino/indicatore di connessione è sempre visibile e centrato da chiuso */
+/* Sync wrap: indicatore di connessione visibile e centrato da chiuso */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -372,7 +372,7 @@ body.ro .auth-only {
   transition: opacity 0.2s ease;
 }
 
-/* Blocco Auth / Lucchetto */
+/* BLOCCO AUTH / LUCCHETTO RIPRISTINATO E ALLINEATO */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
@@ -395,14 +395,16 @@ body.ro .auth-only {
   overflow: hidden !important;
 }
 
-.app-sidebar:hover .rail-auth-btn,
-.app-sidebar.expanded .rail-auth-btn {
-  width: 100% !important;
-  max-width: none !important;
-  justify-content: flex-start !important;
-  padding: 0 14px !important;
-  gap: 14px !important;
-  margin: 0 !important;
+@media (min-width: 860px) {
+  .app-sidebar:hover .rail-auth-btn,
+  .app-sidebar.expanded .rail-auth-btn {
+    width: 100% !important;
+    max-width: none !important;
+    justify-content: flex-start !important;
+    padding: 0 14px !important;
+    gap: 14px !important;
+    margin: 0 !important;
+  }
 }
 
 .app-sidebar .rail-auth-btn .icon {
@@ -416,6 +418,22 @@ body.ro .auth-only {
   justify-content: center !important;
   flex-shrink: 0 !important;
   margin: 0 !important;
+}
+
+.app-sidebar .rail-auth-btn .label {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-sidebar:hover .rail-auth-btn .label,
+.app-sidebar.expanded .rail-auth-btn .label {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease;
 }
 
 /* --- RESTO DELL'APP --- */
