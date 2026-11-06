@@ -1,8 +1,8 @@
-import { state, registerStateCallbacks, save, saveD, saveNames, saveCategories, applyTheme, pushUndo, popUndoState, logEvent } from './state.js';
+import { state, registerStateCallbacks, save, saveD, saveNames, applyTheme, pushUndo, popUndoState, logEvent } from './state.js';
 import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback } from './api.js';
 import { uid, iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements, checkPersonRosterConflicts } from './rules.js';
 import { copyMonthRecapWhatsApp, generateWhatsAppText } from './export.js';
-import { $, esc, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree, renderHistoryView, renderCollaboratorProfile } from './render.js';
+import { $, esc, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree, renderHistoryView } from './render.js';
 import { openEditModal, openAddModal, openQuickCloseModal, openCompensiDetailModal, openViewFileModal, openMoltModal, openResocontoModal, openConflictsModal, openUrgentIncompleteModal, openPendingModal, openSettingsModal, promptLogin } from './modals.js';
 
 function isModalOpen() {
@@ -353,34 +353,12 @@ document.addEventListener('click', e => {
     closeQuickAssignPopover();
   }
 
-  // Chiusura vista profilo IG
-  if (e.target.id === 'closeProfileView' || e.target.id === 'collaboratorProfileView') {
-    const view = document.getElementById('collaboratorProfileView');
-    if (view) view.style.display = 'none';
-    return;
-  }
-
-  // Cambio Tab nel Profilo IG
-  const igTab = e.target.closest('[data-igtab]');
-  if (igTab) {
-    state.profileActiveTab = igTab.dataset.igtab;
-    if (state.activeCollabProfile) {
-      renderCollaboratorProfile(state.activeCollabProfile);
+  if (e.target.closest('[data-pickm]') || e.target.closest('[data-navw]')) {
+    if (window.innerWidth >= 860) {
+      document.activeElement?.blur();
+      const sidebar = $('#appSidebar');
+      if (sidebar) sidebar.blur();
     }
-    return;
-  }
-
-  const compItem = e.target.closest('[data-compname]');
-  if (compItem && !e.target.closest('button')) {
-    e.stopPropagation();
-    const collabName = compItem.dataset.compname;
-    const resOv = document.getElementById('resocontoOv');
-    if (resOv) resOv.remove();
-
-    state.profileActiveTab = 'posts';
-    state.profileMonthFilter = '';
-    renderCollaboratorProfile(collabName);
-    return;
   }
 
   const vfBtn = e.target.closest('[data-viewfile]');
@@ -426,6 +404,20 @@ document.addEventListener('click', e => {
       reader.readAsDataURL(file);
     };
     fileSelector.click();
+    return;
+  }
+
+  const compItem = e.target.closest('[data-compname]');
+  if (compItem && !e.target.closest('button')) {
+    e.stopPropagation();
+    openCompensiDetailModal(
+      compItem.dataset.compname,
+      { p: +compItem.dataset.p, a: +compItem.dataset.a, c: +compItem.dataset.c },
+      compItem.dataset.m || '',
+      triggerHaptic,
+      toast,
+      updateRecap
+    );
     return;
   }
 
@@ -549,14 +541,16 @@ document.addEventListener('click', e => {
     }
     return;
   }
-});
 
-document.addEventListener('change', e => {
-  if (e.target.id === 'profileMonthSelect') {
-    state.profileMonthFilter = e.target.value;
-    if (state.activeCollabProfile) {
-      renderCollaboratorProfile(state.activeCollabProfile);
+  const nb = e.target.closest('[data-name]');
+  if (nb) {
+    triggerHaptic('light');
+    if (state.READONLY) {
+      applyQuickPersonFilter(nb.dataset.name);
+    } else {
+      openMoltModal(nb.dataset.name, { p: +nb.dataset.p, a: +nb.dataset.a, c: +nb.dataset.c }, nb.dataset.m, toast, updateRecap);
     }
+    return;
   }
 });
 
@@ -854,11 +848,6 @@ window.addEventListener('keydown', e => {
       pop.remove();
       return;
     }
-    const profileView = document.getElementById('collaboratorProfileView');
-    if (profileView && profileView.style.display !== 'none') {
-      profileView.style.display = 'none';
-      return;
-    }
     const historyView = $('#historyView');
     if (historyView && historyView.style.display !== 'none') {
       historyView.style.display = 'none';
@@ -922,22 +911,18 @@ window.addEventListener('DOMContentLoaded', async () => {
   render();
 
   if (sb) {
-    if (!navigator.onLine) {
-      setSyncVisualState('orange', 'Modalità offline attiva');
-    } else {
-      setSyncVisualState('orange', 'Controllo aggiornamenti...');
-      try {
-        const res = await cloudFetchRaw();
-        if (res && res.data) {
-          applyCloudData(res.data);
-          render();
-          setSyncVisualState('green', 'Sincronizzato Cloud');
-        } else {
-          setSyncVisualState('green');
-        }
-      } catch(e) {
-        setSyncVisualState('red', 'Cloud non raggiungibile');
+    setSyncVisualState('orange', 'Controllo aggiornamenti...');
+    try {
+      const res = await cloudFetchRaw();
+      if (res && res.data) {
+        applyCloudData(res.data);
+        render();
+        setSyncVisualState('green', 'Sincronizzato Cloud');
+      } else {
+        setSyncVisualState('green');
       }
+    } catch(e) {
+      setSyncVisualState('red', 'Cloud non raggiungibile');
     }
 
     setupSupabaseRealtime({
