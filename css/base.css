@@ -103,7 +103,7 @@ input, select, textarea {
   width: 100%;
 }
 
-/* --- SIDEBAR ISOLATA E BLINDATA --- */
+/* --- SIDEBAR UNIFICATA E RESPONSIVE --- */
 .app-sidebar {
   width: 64px;
   background: var(--surface);
@@ -128,17 +128,13 @@ input, select, textarea {
   display: none;
 }
 
+/* Su desktop l'hover espande la sidebar */
 @media (min-width: 860px) {
   .app-layout {
     padding-left: 64px;
   }
 
-  .app-sidebar:hover {
-    width: 270px;
-    overflow-y: auto;
-    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
-  }
-
+  .app-sidebar:hover,
   .app-sidebar.expanded {
     width: 270px;
     overflow-y: auto;
@@ -146,25 +142,23 @@ input, select, textarea {
   }
 }
 
-.app-sidebar.expanded {
-  width: 270px;
-  overflow-y: auto;
+/* Su mobile (< 860px) la sidebar è fissa a 64px (o a tutto schermo se classe .expanded gestita da JS) */
+@media (max-width: 859px) {
+  .app-sidebar.expanded {
+    width: 270px !important;
+    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
+    overflow-y: auto;
+  }
 }
 
 .sidebar-top {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 12px 0;
-  min-height: 56px;
-  width: 100%;
-}
-
-.app-sidebar:hover .sidebar-top,
-.app-sidebar.expanded .sidebar-top {
   justify-content: flex-start;
-  padding: 12px 14px;
+  padding: 12px 10px;
+  min-height: 56px;
   gap: 12px;
+  width: 100%;
 }
 
 .sidebar-brand-label {
@@ -180,34 +174,43 @@ input, select, textarea {
 .app-sidebar.expanded .sidebar-brand-label {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease 0.1s;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 0;
+  padding: 8px;
   width: 100%;
   align-items: center;
 }
 
+@media (min-width: 860px) {
+  .app-sidebar:hover .sidebar-nav,
+  .app-sidebar.expanded .sidebar-nav {
+    align-items: stretch;
+  }
+}
+.app-sidebar.expanded .sidebar-nav {
+  align-items: stretch;
+}
+
+/* Elementi di navigazione (bottoni) */
 .app-sidebar .rail-icon-btn, 
 .app-sidebar .rail-nav-item {
   width: 44px !important;
   height: 44px !important;
   min-width: 44px !important;
   min-height: 44px !important;
-  max-width: 44px !important;
-  max-height: 44px !important;
   border-radius: 12px !important;
   border: none !important;
   background: transparent !important;
   color: var(--mute) !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: flex-start !important;
-  padding: 0 10px !important;
+  justify-content: center !important;
+  padding: 0 !important;
   cursor: pointer;
   box-shadow: none !important;
   margin: 0 auto !important;
@@ -215,46 +218,36 @@ input, select, textarea {
   overflow: hidden !important;
 }
 
-@media (max-width: 859px) {
-  .app-sidebar:not(.expanded) .rail-icon-btn, 
-  .app-sidebar:not(.expanded) .rail-nav-item {
-    justify-content: center !important;
-    padding: 0 !important;
-  }
-}
-
-.app-sidebar .rail-nav-item .icon {
-  width: 24px !important;
-  height: 24px !important;
-  min-width: 24px !important;
-  min-height: 24px !important;
-  font-size: 20px !important;
-  line-height: 1 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex-shrink: 0 !important;
-  margin: 0 !important;
-}
-
 @media (min-width: 860px) {
+  .app-sidebar:hover .rail-icon-btn, 
   .app-sidebar:hover .rail-nav-item,
+  .app-sidebar.expanded .rail-icon-btn, 
   .app-sidebar.expanded .rail-nav-item {
     width: 100% !important;
-    max-width: none !important;
     justify-content: flex-start !important;
     padding: 0 14px !important;
     gap: 14px !important;
     margin: 0 !important;
   }
 }
-
+.app-sidebar.expanded .rail-icon-btn, 
 .app-sidebar.expanded .rail-nav-item {
   width: 100% !important;
-  max-width: none !important;
   justify-content: flex-start !important;
   padding: 0 14px !important;
   gap: 14px !important;
+  margin: 0 !important;
+}
+
+.app-sidebar .rail-nav-item .icon,
+.app-sidebar .rail-icon-btn .icon {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
   margin: 0 !important;
 }
 
@@ -276,6 +269,7 @@ input, select, textarea {
   box-shadow: var(--shadow-sm) !important;
 }
 
+/* Etichette di testo nascoste da chiuso, visibili da aperto */
 .app-sidebar .rail-nav-item .label,
 .app-sidebar .rail-auth-btn .label,
 .sidebar-tree-container {
@@ -284,6 +278,7 @@ input, select, textarea {
   transition: opacity 0.1s ease;
   font-size: 13.5px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .app-sidebar:hover .rail-nav-item .label,
@@ -294,7 +289,7 @@ input, select, textarea {
 .app-sidebar.expanded .sidebar-tree-container {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease 0.1s;
 }
 
 body.ro .rail-nav-item.auth-only,
@@ -318,7 +313,7 @@ body.ro .auth-only {
 
 .sidebar-bottom {
   margin-top: auto;
-  padding: 10px 0;
+  padding: 10px 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -327,13 +322,17 @@ body.ro .auth-only {
   width: 100%;
 }
 
-.app-sidebar:hover .sidebar-bottom,
+@media (min-width: 860px) {
+  .app-sidebar:hover .sidebar-bottom,
+  .app-sidebar.expanded .sidebar-bottom {
+    align-items: stretch;
+  }
+}
 .app-sidebar.expanded .sidebar-bottom {
   align-items: stretch;
-  padding: 10px 8px;
 }
 
-/* BLOCCO SINCRONIZZAZIONE: Pallino sempre visibile e centrato da chiuso */
+/* BLOCCO SINCRONIZZAZIONE (Pallino sempre visibile e centrato da chiuso) */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -343,10 +342,18 @@ body.ro .auth-only {
   width: 44px;
   border-radius: 8px;
   margin: 0 auto;
-  overflow: visible !important;
 }
 
-.app-sidebar:hover .rail-sync-wrap,
+@media (min-width: 860px) {
+  .app-sidebar:hover .rail-sync-wrap,
+  .app-sidebar.expanded .rail-sync-wrap {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0 10px;
+    gap: 12px;
+    margin: 0;
+  }
+}
 .app-sidebar.expanded .rail-sync-wrap {
   width: 100%;
   justify-content: flex-start;
@@ -372,22 +379,20 @@ body.ro .auth-only {
   transition: opacity 0.2s ease;
 }
 
-/* BLOCCO AUTH / LUCCHETTO: Sempre visibile, dimensionato e centrato da chiuso */
+/* BLOCCO AUTH / LUCCHETTO (Sempre visibile, centrato e dimensionato correttamente) */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
   min-width: 44px !important;
-  max-width: 44px !important;
   min-height: 44px !important;
-  max-height: 44px !important;
   border-radius: 12px !important;
   border: none !important;
   background: transparent !important;
   color: var(--ink) !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: flex-start !important;
-  padding: 0 10px !important;
+  justify-content: center !important;
+  padding: 0 !important;
   cursor: pointer;
   box-shadow: none !important;
   margin: 0 auto !important;
@@ -395,52 +400,33 @@ body.ro .auth-only {
   overflow: hidden !important;
 }
 
-@media (max-width: 859px) {
-  .app-sidebar:not(.expanded) .rail-auth-btn {
-    justify-content: center !important;
-    padding: 0 !important;
-  }
-}
-
 @media (min-width: 860px) {
   .app-sidebar:hover .rail-auth-btn,
   .app-sidebar.expanded .rail-auth-btn {
     width: 100% !important;
-    max-width: none !important;
     justify-content: flex-start !important;
     padding: 0 14px !important;
     gap: 14px !important;
     margin: 0 !important;
   }
 }
+.app-sidebar.expanded .rail-auth-btn {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  padding: 0 14px !important;
+  gap: 14px !important;
+  margin: 0 !important;
+}
 
 .app-sidebar .rail-auth-btn .icon {
   width: 24px !important;
   height: 24px !important;
   min-width: 24px !important;
-  min-height: 24px !important;
-  font-size: 20px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
   margin: 0 !important;
-}
-
-.app-sidebar .rail-auth-btn .label {
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.1s ease;
-  font-size: 13.5px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.app-sidebar:hover .rail-auth-btn .label,
-.app-sidebar.expanded .rail-auth-btn .label {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.2s ease;
 }
 
 /* --- RESTO DELL'APP --- */
@@ -482,6 +468,10 @@ body.ro .auth-only {
   font-size: 18px;
   cursor: pointer;
 }
+@media (max-width: 859px) {
+  .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+}
+
 .page-title {
   font: 700 clamp(22px, 4vw, 28px)/1 var(--font-title);
   margin: 0;
