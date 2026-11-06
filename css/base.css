@@ -333,7 +333,7 @@ body.ro .auth-only {
   padding: 10px 8px;
 }
 
-/* PALINO DI CONNESSIONE: VISIBILE E CENTRATO ANCHE DA CHIUSO */
+/* BLOCCO SINCRONIZZAZIONE (PALLINO SEMPRE VISIBILE) */
 .rail-sync-wrap {
   display: flex;
   align-items: center;
@@ -372,7 +372,7 @@ body.ro .auth-only {
   transition: opacity 0.2s ease;
 }
 
-/* LUCCHETTO / AUTH BUTTON: VISIBILE E ALLINEATO ANCHE DA CHIUSO */
+/* BLOCCO LUCCHETTO / AUTH (SEMPRE VISIBILE E ALLINEATO) */
 .app-sidebar .rail-auth-btn {
   width: 44px !important;
   height: 44px !important;
