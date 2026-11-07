@@ -1,172 +1,681 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Partite</title>
-  
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='110' fill='%231d5fa8'/%3E%3Ccircle cx='256' cy='256' r='160' fill='none' stroke='white' stroke-width='28'/%3E%3C/svg%3E">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#161717">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Partite">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Basket - Dashboard & Profilo IG</title>
+    <style>
+        :root {
+            --bg-main: #f3f4f6;
+            --surface: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --primary: #3b82f6;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/modals.css">
-  <link rel="stylesheet" href="css/responsive.css">
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
 
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Barra Laterale (Sidebar) */
+        .sidebar {
+            width: 80px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            gap: 16px;
+            z-index: 10;
+        }
+
+        .sidebar-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: #f9fafb;
+            color: var(--text-muted);
+            font-size: 1.25rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            border: 1px solid transparent;
+        }
+
+        .sidebar-icon:hover {
+            background: #eff6ff;
+            color: var(--primary);
+            border-color: #bfdbfe;
+        }
+
+        .sidebar-icon.active {
+            background: #eff6ff;
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        /* Contenuto Principale */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 40px;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .content-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        /* Pulsanti e Trigger */
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Pannelli a Scorrimento (Slide-over) */
+        .side-panel {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 100%;
+            max-width: 650px;
+            height: 100vh;
+            background: var(--surface);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .side-panel.open {
+            right: 0;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .panel-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* KPI Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .kpi-card {
+            background: #f9fafb;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .kpi-title {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .kpi-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        /* Grafico Trend Mensili */
+        .trend-section {
+            margin-bottom: 32px;
+        }
+
+        .trend-section h3, .breakdown-section h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-main);
+        }
+
+        .css-bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            height: 180px;
+            padding: 10px 0;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .bar-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: flex-end;
+        }
+
+        .bar-val {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .bar-fill {
+            width: 100%;
+            background: var(--primary);
+            border-radius: 4px 4px 0 0;
+            transition: height 0.3s;
+        }
+
+        .bar-label {
+            font-size: 0.75rem;
+            color: var(--text-main);
+            margin-top: 6px;
+            font-weight: 500;
+        }
+
+        /* Tabella di Ripartizione */
+        .breakdown-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .breakdown-table th {
+            background: #f3f4f6;
+            color: var(--text-main);
+            padding: 10px;
+            border-bottom: 2px solid var(--border);
+            text-align: left;
+        }
+
+        .breakdown-table td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+        }
+
+        /* Profilo IG Specific Styles */
+        .ig-profile-header {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .ig-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .ig-info h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .ig-metrics {
+            display: flex;
+            gap: 24px;
+        }
+
+        .ig-metric-item {
+            text-align: left;
+        }
+
+        .ig-metric-num {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text-main);
+        }
+
+        .ig-metric-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* IG Tabs Nav */
+        .ig-tabs-nav {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .ig-tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 12px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            text-align: center;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .ig-tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .ig-tab-content {
+            display: none;
+        }
+
+        .ig-tab-content.active {
+            display: block;
+        }
+
+        /* IG Post Cards con Bordi Colorati Esito */
+        .ig-post-card {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ig-post-card.win {
+            border-color: var(--success);
+        }
+
+        .ig-post-card.loss {
+            border-color: var(--danger);
+        }
+
+        .tag-list-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
+        }
+    </style>
 </head>
-<body class="ro locked">
-<div class="app-layout">
+<body>
 
-  <!-- SIDEBAR CORRETTA -->
-  <aside class="app-sidebar" id="appSidebar">
-    <div class="sidebar-top">
-      <button id="sidebarToggleBtn" class="rail-icon-btn" title="Espandi / Comprimi Menu" type="button">
-        <span class="icon">☰</span>
-      </button>
-      <span class="sidebar-brand-label">Menu Partite</span>
-    </div>
-
-    <nav class="sidebar-nav">
-      <button type="button" class="rail-nav-item active" id="railNavHome" title="Partite">
-        <span class="icon">🏀</span>
-        <span class="label">Partite</span>
-      </button>
-      <button type="button" class="rail-nav-item auth-only" id="railNavResoconto" title="Resoconto Compensi">
-        <span class="icon">📊</span>
-        <span class="label">Compensi</span>
-      </button>
+    <!-- Barra Laterale (Sidebar) -->
+    <nav class="sidebar">
+        <!-- Icona Home / Gestione -->
+        <a href="#" class="sidebar-icon active" title="Dashboard">🏠</a>
+        <!-- Icona Compensi Attuali -->
+        <a href="#" class="sidebar-icon" onclick="openCompensiDashboard()" title="Compensi">💶</a>
+        <!-- Icona Profilo IG (Sotto i compensi attuali) -->
+        <a href="#" class="sidebar-icon" onclick="openIgProfile()" title="Profilo IG Collaboratore">📸</a>
     </nav>
 
-    <div class="sidebar-tree-container">
-      <div class="sidebar-section-title">Archivio Calendario</div>
-      <div id="navTree" class="nav-tree"></div>
-    </div>
-
-    <div class="sidebar-bottom">
-      <button type="button" class="rail-nav-item" id="railNavHistory" title="Cronologia Modifiche">
-        <span class="icon">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-            <path d="M3 3v5h5"/>
-            <path d="M12 7v5l4 2"/>
-          </svg>
-        </span>
-        <span class="label">Cronologia</span>
-      </button>
-
-      <button type="button" class="rail-nav-item" id="railNavSettings" title="Strumenti & Impostazioni">
-        <span class="icon">⚙️</span>
-        <span class="label">Impostazioni</span>
-      </button>
-
-      <div class="rail-sync-wrap" id="railSyncWrap">
-        <span id="syncDot" class="sync-dot sync-green" title="Pronto"></span>
-        <span class="sync-text-status" id="syncStatusText">Connesso</span>
-      </div>
-      <button id="authBtn" type="button" class="rail-auth-btn" title="Accesso Amministratore">
-        <span class="icon">🔒</span>
-        <span class="label">Accedi</span>
-      </button>
-    </div>
-  </aside>
-
-  <div id="navBackdrop" class="nav-backdrop"></div>
-
-  <div class="app-content-wrapper">
-    <header class="top-bar">
-      <div class="top-bar-left">
-        <button id="mobileMenuBtn" type="button" class="mobile-menu-btn" title="Apri Menu">☰</button>
-        <h1 class="page-title">Partite</h1>
-        <button id="conflictAlertBtn" type="button" class="alert-btn-standalone status-ok" title="Nessun conflitto">✓</button>
-      </div>
-
-      <div class="top-bar-actions">
-        <button id="todayBtn" type="button" class="pill-btn-action" title="Vai a Oggi">Oggi</button>
-        <button id="add" type="button" class="btn-primary-action auth-only">+ Partita</button>
-        <button id="undoBtn" type="button" class="pill-btn-sm auth-only" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
-        <button id="quickSaveBtn" class="pill-btn-sm auth-only" title="Salva modifiche (Ctrl+S)">💾</button>
-        <button id="quickPullBtn" class="pill-btn-sm" title="Aggiorna dati">↻</button>
-      </div>
-    </header>
-
-    <div class="filter-strip">
-      <div class="search-wrap">
-        <input type="search" id="searchFilter" placeholder="🔍 Cerca squadre, ruoli..." autocomplete="off">
-      </div>
-      <select id="filterCat"><option value="">Tutte le categorie</option></select>
-      <button id="filterIncomplete" type="button" class="filter-chip" aria-pressed="false">Incomplete <span id="incCount"></span></button>
-      <button class="waBtn" id="waTodayBtn" type="button" title="Copia turni dei prossimi 7 giorni">📲 WA 7gg</button>
-    </div>
-
-    <main class="content-scroll">
-      <div id="list"></div>
+    <!-- Contenuto Principale -->
+    <main class="main-content">
+        <h1 class="page-title">Gestione Compensi & Collaboratori</h1>
+        <div class="content-card">
+            <p style="margin-bottom: 16px; color: var(--text-muted);">Seleziona una voce dalla barra laterale per accedere alla Dashboard Contabile dei Compensi o al Profilo IG dei collaboratori.</p>
+            <button class="btn" onclick="openCompensiDashboard()">Apri Dashboard Compensi</button>
+            <button class="btn" style="margin-left: 10px; background: #8b5cf6;" onclick="openIgProfile()">Apri Profilo IG</button>
+        </div>
     </main>
-  </div>
-</div>
 
-<div id="historyView" class="history-fullscreen-view" style="display:none">
-  <div class="history-topbar">
-    <div class="history-topbar-left">
-      <button type="button" id="historyCloseBtn" class="pill-btn-action" title="Torna al calendario">← Calendario</button>
-      <h2>Cronologia Modifiche</h2>
+    <!-- 1. Pannello Dashboard dei Compensi (Vista Amministrativa e Contabile) -->
+    <div id="compensiDashboardPanel" class="side-panel">
+        <div class="panel-header">
+            <h2>Dashboard Compensi & Resoconti</h2>
+            <button class="close-btn" onclick="closeCompensiDashboard()">✕</button>
+        </div>
+        
+        <div class="panel-body">
+            <!-- KPI Principali -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <span class="kpi-title">Totale Stagionale</span>
+                    <span class="kpi-value" id="kpiTotaleStagione">€3.450,00</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">Gare Totali</span>
+                    <span class="kpi-value" id="kpiGareTotali">124</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">Servizi Palazzetto</span>
+                    <span class="kpi-value" id="kpiServiziPalazzetto">38</span>
+                </div>
+            </div>
+
+            <!-- Grafico Trend Mensili (HTML/CSS) -->
+            <div class="trend-section">
+                <h3>Trend Mensile Compensi</h3>
+                <div class="css-bar-chart" id="monthlyTrendChart">
+                    <!-- Generato via JS -->
+                </div>
+            </div>
+
+            <!-- Tabella di Ripartizione Categoria e Ruolo -->
+            <div class="breakdown-section">
+                <h3>Ripartizione per Categoria e Ruolo</h3>
+                <div style="overflow-x: auto;">
+                    <table class="breakdown-table">
+                        <thead>
+                            <tr>
+                                <th>Categoria</th>
+                                <th>Ruolo</th>
+                                <th style="text-align: center;">Gare</th>
+                                <th style="text-align: right;">Totale (€)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakdownTableBody">
+                            <!-- Popolato via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="history-topbar-right">
-      <input type="search" id="historySearchInput" placeholder="🔍 Cerca nella cronologia..." autocomplete="off" />
-      <button type="button" id="historyClearBtn" class="pill-btn-sm" style="background:rgba(239,68,68,0.18);color:#fca5a5">Cancella</button>
+
+    <!-- 2. Pannello Profilo IG del Collaboratore -->
+    <div id="igProfilePanel" class="side-panel">
+        <div class="panel-header">
+            <h2>Profilo Collaboratore (IG)</h2>
+            <button class="close-btn" onclick="closeIgProfile()">✕</button>
+        </div>
+        
+        <div class="panel-body">
+            <!-- Header del Profilo (Stile IG) -->
+            <div class="ig-profile-header">
+                <div class="ig-avatar" id="igAvatarInitials">GV</div>
+                <div class="ig-info">
+                    <h3 id="igCollaboratorName">Gabriele Valente</h3>
+                    <div class="ig-metrics">
+                        <div class="ig-metric-item">
+                            <div class="ig-metric-num" id="igTotalMoney">€3.450,00</div>
+                            <div class="ig-metric-label">Soldi Totali</div>
+                        </div>
+                        <div class="ig-metric-item">
+                            <div class="ig-metric-num" id="igTotalGames">124</div>
+                            <div class="ig-metric-label">Partite Totali</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigazione -->
+            <div class="ig-tabs-nav">
+                <button class="ig-tab-btn active" onclick="switchIgTab('posts', this)">🏀 Post</button>
+                <button class="ig-tab-btn" onclick="switchIgTab('stats', this)">📊 Statistiche</button>
+                <button class="ig-tab-btn" onclick="switchIgTab('tags', this)">🤝 Tag</button>
+            </div>
+
+            <!-- Tab 1: Post (Le Partite con bordi verde/rosso) -->
+            <div id="tab-posts" class="ig-tab-content active">
+                <div id="igPostsContainer">
+                    <!-- Popolato via JS -->
+                </div>
+            </div>
+
+            <!-- Tab 2: Statistiche (I Reel / Grafici con selettore) -->
+            <div id="tab-stats" class="ig-tab-content">
+                <div style="margin-bottom: 16px; display: flex; justify-content: flex-end;">
+                    <select id="statsPeriodSelect" onchange="updateIgStats()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);">
+                        <option value="season">Intera Stagione</option>
+                        <option value="month">Ultimo Mese</option>
+                    </select>
+                </div>
+                <div class="content-card" style="margin-bottom: 16px;">
+                    <h4 style="font-size: 0.9rem; margin-bottom: 10px; color: var(--text-muted);">Ripartizione Ruoli Coperti</h4>
+                    <div id="roleStatsChart" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Grafico visivo ruoli -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Tag (Collaborazioni frequenti) -->
+            <div id="tab-tags" class="ig-tab-content">
+                <div id="igTagsContainer">
+                    <!-- Popolato via JS -->
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-  <div class="history-container" id="historyListWrap"></div>
-</div>
 
-<nav class="bottom-nav-bar" id="bottomNavBar">
-  <button type="button" class="b-nav-item active" id="bNavHome">
-    <span class="b-nav-icon">🏀</span>
-    <span class="b-nav-label">Gare</span>
-  </button>
-  <button type="button" class="b-nav-item" id="bNavToday">
-    <span class="b-nav-icon">📅</span>
-    <span class="b-nav-label">Oggi</span>
-  </button>
-  <button type="button" class="b-nav-item b-nav-add auth-only" id="bNavAdd" title="Nuova Partita">
-    <span class="b-nav-add-icon">+</span>
-  </button>
-  <button type="button" class="b-nav-item auth-only" id="bNavResoconto">
-    <span class="b-nav-icon">📊</span>
-    <span class="b-nav-label">Compensi</span>
-  </button>
-  <button type="button" class="b-nav-item" id="bNavAlerts">
-    <span class="b-nav-icon" id="bNavAlertIcon">✓</span>
-    <span class="b-nav-label">Alert</span>
-  </button>
-</nav>
+    <!-- Script JavaScript Completo -->
+    <script>
+        // Gestione Apertura/Chiusura Dashboard Compensi
+        function openCompensiDashboard() {
+            document.getElementById('compensiDashboardPanel').classList.add('open');
+            renderCompensiData();
+        }
+        function closeCompensiDashboard() {
+            document.getElementById('compensiDashboardPanel').classList.remove('open');
+        }
 
-<input type="file" id="importFile" accept="application/json,.json" hidden>
-<datalist id="namesList"></datalist>
-<datalist id="categoriesList"></datalist>
-<div id="msg" role="status"></div>
+        // Gestione Apertura/Chiusura Profilo IG
+        function openIgProfile() {
+            document.getElementById('igProfilePanel').classList.add('open');
+            renderIgProfileData();
+        }
+        function closeIgProfile() {
+            document.getElementById('igProfilePanel').classList.remove('open');
+        }
 
-<div class="robanner" id="roBanner">
-  <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
-  <h3 style="margin: 0 0 8px; color: var(--ink);">Accesso Riservato</h3>
-  <p style="color: var(--mute); margin: 0 0 16px; font-size: 13px;">
-    Il calendario e le designazioni dei turni sono private. Effettua l'accesso come amministratore per gestire o sbloccare le modifiche.
-  </p>
-  <button type="button" class="btn-primary-action" onclick="window.handleAuthClick()" style="width: 100%;">
-    Accedi con Account
-  </button>
-</div>
+        // Popolamento Dati Dashboard Compensi
+        function renderCompensiData() {
+            // Trend Mensile
+            const chartContainer = document.getElementById('monthlyTrendChart');
+            const mesiData = [
+                { mese: 'Set', importo: 320 },
+                { mese: 'Ott', importo: 450 },
+                { mese: 'Nov', importo: 510 },
+                { mese: 'Dic', importo: 480 },
+                { mese: 'Gen', importo: 410 },
+                { mese: 'Feb', importo: 490 },
+                { mese: 'Mar', importo: 530 },
+                { mese: 'Apr', importo: 260 }
+            ];
+            const maxImporto = Math.max(...mesiData.map(d => d.importo));
+            chartContainer.innerHTML = '';
+            
+            mesiData.forEach(d => {
+                const heightPercent = (d.importo / maxImporto) * 100;
+                chartContainer.innerHTML += `
+                    <div class="bar-col">
+                        <span class="bar-val">€${d.importo}</span>
+                        <div class="bar-fill" style="height: ${heightPercent}%;"></div>
+                        <span class="bar-label">${d.mese}</span>
+                    </div>
+                `;
+            });
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="js/main.js"></script>
+            // Tabella Ripartizione
+            const tbody = document.getElementById('breakdownTableBody');
+            const rowsData = [
+                { cat: 'U17 Eccellenza', ruolo: 'Arbitro', gare: 18, tot: '€630,00' },
+                { cat: 'U17 Eccellenza', ruolo: 'Tavolo 1', gare: 12, tot: '€300,00' },
+                { cat: 'U14 Elite', ruolo: 'Arbitro', gare: 22, tot: '€660,00' },
+                { cat: 'Esordienti', ruolo: 'Tavolo 1', gare: 32, tot: '€576,00' }
+            ];
+            
+            tbody.innerHTML = '';
+            rowsData.forEach(r => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${r.cat}</td>
+                        <td style="color: var(--text-muted);">${r.ruolo}</td>
+                        <td style="text-align: center; color: var(--text-muted);">${r.gare}</td>
+                        <td style="text-align: right; font-weight: 600;">${r.tot}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Popolamento Profilo IG
+        function renderIgProfileData() {
+            // Post / Partite con bordo verde (vinta) o rosso (persa)
+            const postsContainer = document.getElementById('igPostsContainer');
+            const mockPosts = [
+                { id: 1, data: '05 Nov 2026', categoria: 'U17 Eccellenza', ruolo: 'Arbitro', esito: 'win', compenso: '€35,00' },
+                { id: 2, data: '02 Nov 2026', categoria: 'U14 Elite', ruolo: 'Tavolo 1', esito: 'loss', compenso: '€25,00' },
+                { id: 3, data: '28 Ott 2026', categoria: 'Esordienti', ruolo: 'Arbitro', esito: 'win', compenso: '€30,00' },
+                { id: 4, data: '24 Ott 2026', categoria: 'U17 Eccellenza', ruolo: 'Tavolo 2', esito: 'win', compenso: '€20,00' }
+            ];
+
+            postsContainer.innerHTML = '';
+            mockPosts.forEach(p => {
+                postsContainer.innerHTML += `
+                    <div class="ig-post-card ${p.esito}">
+                        <div>
+                            <strong style="display: block; font-size: 0.95rem; margin-bottom: 2px;">${p.categoria}</strong>
+                            <span style="font-size: 0.8rem; color: var(--text-muted);">${p.data} • Ruolo: ${p.ruolo}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="font-weight: 700; font-size: 0.95rem; display: block;">${p.compenso}</span>
+                            <span style="font-size: 0.75rem; font-weight: 600; color: ${p.esito === 'win' ? 'var(--success)' : 'var(--danger)'};">
+                                ${p.esito === 'win' ? '✓ Vinta' : '✕ Persa'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Tag / Collaboratori Frequenti
+            const tagsContainer = document.getElementById('igTagsContainer');
+            const mockTags = [
+                { nome: 'Marco Rossi', condivise: 18 },
+                { nome: 'Luca Bianchi', condivise: 14 },
+                { nome: 'Giovanni Verdi', condivise: 10 }
+            ];
+
+            tagsContainer.innerHTML = '';
+            mockTags.forEach(t => {
+                tagsContainer.innerHTML += `
+                    <div class="tag-list-item">
+                        <span>🤝 @${t.nome.toLowerCase().replace(' ', '_')} (${t.nome})</span>
+                        <strong style="color: var(--primary);">${t.condivise} gare insieme</strong>
+                    </div>
+                `;
+            });
+
+            updateIgStats();
+        }
+
+        // Gestione Tab IG
+        function switchIgTab(tabName, btnElement) {
+            document.querySelectorAll('.ig-tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.ig-tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            btnElement.classList.add('active');
+        }
+
+        // Aggiornamento Statistiche Grafiche IG con selettore periodo
+        function updateIgStats() {
+            const period = document.getElementById('statsPeriodSelect').value;
+            const chartBox = document.getElementById('roleStatsChart');
+            
+            // Dati dinamici fittizi basati sul periodo selezionato
+            const statsData = period === 'season' ? [
+                { ruolo: 'Arbitro', percentuale: 55, gare: '68 gare' },
+                { ruolo: 'Tavolo 1', percentuale: 30, gare: '37 gare' },
+                { ruolo: 'Tavolo 2', percentuale: 15, gare: '19 gare' }
+            ] : [
+                { ruolo: 'Arbitro', percentuale: 60, gare: '12 gare' },
+                { ruolo: 'Tavolo 1', percentuale: 25, gare: '5 gare' },
+                { ruolo: 'Tavolo 2', percentuale: 15, gare: '3 gare' }
+            ];
+
+            chartBox.innerHTML = '';
+            statsData.forEach(s => {
+                chartBox.innerHTML += `
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
+                            <span>${s.ruolo}</span>
+                            <span style="font-weight: 600; color: var(--text-muted);">${s.gare}</span>
+                        </div>
+                        <div style="width: 100%; background: var(--border); border-radius: 4px; height: 8px; overflow: hidden;">
+                            <div style="width: ${s.percentuale}%; background: var(--primary); height: 100%; border-radius: 4px;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    </script>
 </body>
 </html>
