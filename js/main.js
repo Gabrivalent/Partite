@@ -6,7 +6,7 @@ import { $, esc, params, setParam, renderNamesList, renderCategoriesList, update
 import { openEditModal, openAddModal, openQuickCloseModal, openCompensiDetailModal, openViewFileModal, openMoltModal, openResocontoModal, openConflictsModal, openUrgentIncompleteModal, openPendingModal, openSettingsModal, promptLogin } from './modals.js';
 
 function isModalOpen() {
-  return !!document.querySelector('.ov') || !!document.querySelector('.side-panel.open');
+  return !!document.querySelector('.ov');
 }
 
 function triggerHaptic(type = 'light') {
@@ -622,256 +622,6 @@ function fromExportFormat(arr) {
   return { newItems, wi };
 }
 
-// ---------------------------------------------------------
-// FUNZIONI PER LA DASHBOARD COMPENSI & PROFILO IG
-// ---------------------------------------------------------
-
-function openCompensiDashboard() {
-    const panel = document.getElementById('compensiDashboardPanel');
-    if (panel) {
-        panel.style.display = 'block';
-        setTimeout(() => panel.classList.add('open'), 10);
-        renderCompensiDashboardData();
-    }
-}
-
-function closeCompensiDashboard() {
-    const panel = document.getElementById('compensiDashboardPanel');
-    if (panel) {
-        panel.classList.remove('open');
-        setTimeout(() => { panel.style.display = 'none'; }, 350);
-    }
-}
-
-function openIgProfile() {
-    const panel = document.getElementById('igProfilePanel');
-    if (panel) {
-        panel.style.display = 'block';
-        setTimeout(() => panel.classList.add('open'), 10);
-        renderIgProfileData();
-    }
-}
-
-function closeIgProfile() {
-    const panel = document.getElementById('igProfilePanel');
-    if (panel) {
-        panel.classList.remove('open');
-        setTimeout(() => { panel.style.display = 'none'; }, 350);
-    }
-}
-
-function renderCompensiDashboardData() {
-    let totalSeasonMoney = 0;
-    let totalGamesCount = 0;
-    let totalPalazzettoServices = 0;
-
-    const months = monthsWithData();
-    const monthlyMap = {};
-
-    months.forEach(m => {
-        monthlyMap[m] = 0;
-        const rows = computeRecapRows(m);
-        rows.forEach(r => {
-            const k = r.n.toLowerCase();
-            const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[k]);
-            const tot = (r.p * v.p) + (r.a * v.a) + (r.c * v.c);
-            totalSeasonMoney += tot;
-            totalGamesCount += r.p;
-            totalPalazzettoServices += (r.a + r.c);
-            monthlyMap[m] += tot;
-        });
-    });
-
-    document.getElementById('kpiTotaleStagione').innerText = `€${totalSeasonMoney.toFixed(2)}`;
-    document.getElementById('kpiGareTotali').innerText = totalGamesCount;
-    document.getElementById('kpiServiziPalazzetto').innerText = totalPalazzettoServices;
-
-    // Trend Mensile Chart CSS
-    const chartContainer = document.getElementById('monthlyTrendChart');
-    if (chartContainer) {
-        const sortedMonths = Object.keys(monthlyMap).sort();
-        const maxVal = Math.max(...Object.values(monthlyMap), 10);
-        chartContainer.innerHTML = '';
-        sortedMonths.forEach(m => {
-            const val = monthlyMap[m];
-            const heightPercent = (val / maxVal) * 100;
-            const labelMese = new Date(m + '-15T12:00').toLocaleDateString('it-IT', { month: 'short' });
-            chartContainer.innerHTML += `
-                <div class="bar-col">
-                    <span class="bar-val">€${val}</span>
-                    <div class="bar-fill" style="height: ${heightPercent}%;"></div>
-                    <span class="bar-label">${labelMese}</span>
-                </div>
-            `;
-        });
-    }
-
-    // Tabella Ripartizione
-    const tbody = document.getElementById('breakdownTableBody');
-    if (tbody) {
-        const breakdownMap = {};
-        state.items.forEach(i => {
-            if (i.status === 'annullata' || !i.ghost) return;
-            const cat = i.cat || 'Generale';
-            [
-                { ruolo: 'Arbitro', nome: i.arb },
-                { ruolo: 'Tavolo 1', nome: i.t1 },
-                { ruolo: 'Tavolo 2', nome: i.t2 }
-            ].forEach(r => {
-                if (r.nome && r.nome.trim()) {
-                    const key = `${cat}___${r.ruolo}`;
-                    breakdownMap[key] = (breakdownMap[key] || 0) + 1;
-                }
-            });
-        });
-
-        tbody.innerHTML = '';
-        const keys = Object.keys(breakdownMap);
-        if (keys.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--mute)">Nessun dato di ripartizione disponibile</td></tr>`;
-        } else {
-            keys.forEach(k => {
-                const [cat, ruolo] = k.split('___');
-                const gare = breakdownMap[k];
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${esc(cat)}</td>
-                        <td style="color: var(--mute);">${esc(ruolo)}</td>
-                        <td style="text-align: center; color: var(--mute);">${gare}</td>
-                        <td style="text-align: right; font-weight: 600;">€${gare * 25}</td>
-                    </tr>
-                `;
-            });
-        }
-    }
-}
-
-function renderIgProfileData() {
-    const postsContainer = document.getElementById('igPostsContainer');
-    if (!postsContainer) return;
-
-    const completedMatches = state.items.filter(i => i.ghost && i.status !== 'annullata');
-    postsContainer.innerHTML = '';
-
-    if (completedMatches.length === 0) {
-        postsContainer.innerHTML = `<div style="text-align:center;color:var(--mute);padding:24px">Nessuna partita completata registrata.</div>`;
-    } else {
-        completedMatches.slice(0, 15).forEach(p => {
-            const isWin = p.status === 'vinta';
-            const esitoClass = isWin ? 'win' : 'loss';
-            postsContainer.innerHTML += `
-                <div class="ig-post-card ${esitoClass}">
-                    <div>
-                        <strong style="display: block; font-size: 0.95rem; margin-bottom: 2px;">${esc(p.title || 'Partita')}</strong>
-                        <span style="font-size: 0.8rem; color: var(--mute);">📅 ${esc(p.date)} • Cat: ${esc(p.cat || 'n.d.')}</span>
-                    </div>
-                    <div style="text-align: right;">
-                        <span style="font-weight: 700; font-size: 0.95rem; display: block; color: #4ade80;">${esc(p.score || 'Completata')}</span>
-                        <span style="font-size: 0.75rem; font-weight: 600; color: ${isWin ? '#10b981' : '#ef4444'};">
-                            ${isWin ? '✓ Vinta' : '✕ Esito'}
-                        </span>
-                    </div>
-                </div>
-            `;
-        });
-    }
-
-    const tagsContainer = document.getElementById('igTagsContainer');
-    if (tagsContainer) {
-        const counts = {};
-        state.items.forEach(i => {
-            [i.t1, i.t2, i.arb].forEach(n => {
-                if (n && n.trim()) {
-                    const clean = n.trim();
-                    counts[clean] = (counts[clean] || 0) + 1;
-                }
-            });
-        });
-
-        const sortedTags = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-        tagsContainer.innerHTML = '';
-        if (sortedTags.length === 0) {
-            tagsContainer.innerHTML = `<div style="text-align:center;color:var(--mute);padding:24px">Nessuna collaborazione registrata.</div>`;
-        } else {
-            sortedTags.forEach(([name, count]) => {
-                tagsContainer.innerHTML += `
-                    <div class="tag-list-item">
-                        <span>🤝 @${name.toLowerCase().replace(/\s+/g, '_')} (${esc(name)})</span>
-                        <strong style="color: var(--acc);">${count} gare insieme</strong>
-                    </div>
-                `;
-            });
-        }
-    }
-
-    updateIgStats();
-}
-
-function switchIgTab(tabName, btnElement) {
-    document.querySelectorAll('.ig-tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.ig-tab-btn').forEach(el => el.classList.remove('active'));
-    
-    const targetTab = document.getElementById(`tab-${tabName}`);
-    if (targetTab) targetTab.classList.add('active');
-    if (btnElement) btnElement.classList.add('active');
-}
-
-function updateIgStats() {
-    const periodSelect = document.getElementById('statsPeriodSelect');
-    const chartBox = document.getElementById('roleStatsChart');
-    if (!chartBox) return;
-
-    let arbCount = 0, t1Count = 0, t2Count = 0;
-    state.items.forEach(i => {
-        if (i.arb && i.arb.trim()) arbCount++;
-        if (i.t1 && i.t1.trim()) t1Count++;
-        if (i.t2 && i.t2.trim()) t2Count++;
-    });
-
-    const totalRoles = arbCount + t1Count + t2Count || 1;
-    const arbPct = Math.round((arbCount / totalRoles) * 100);
-    const t1Pct = Math.round((t1Count / totalRoles) * 100);
-    const t2Pct = Math.max(0, 100 - arbPct - t1Pct);
-
-    chartBox.innerHTML = `
-        <div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
-                <span>Arbitro</span>
-                <span style="font-weight: 600; color: var(--mute);">${arbCount} incarichi</span>
-            </div>
-            <div style="width: 100%; background: var(--divider); border-radius: 4px; height: 8px; overflow: hidden;">
-                <div style="width: ${arbPct}%; background: var(--acc); height: 100%; border-radius: 4px;"></div>
-            </div>
-        </div>
-        <div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
-                <span>Tavolo 1</span>
-                <span style="font-weight: 600; color: var(--mute);">${t1Count} incarichi</span>
-            </div>
-            <div style="width: 100%; background: var(--divider); border-radius: 4px; height: 8px; overflow: hidden;">
-                <div style="width: ${t1Pct}%; background: var(--acc); height: 100%; border-radius: 4px;"></div>
-            </div>
-        </div>
-        <div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
-                <span>Tavolo 2</span>
-                <span style="font-weight: 600; color: var(--mute);">${t2Count} incarichi</span>
-            </div>
-            <div style="width: 100%; background: var(--divider); border-radius: 4px; height: 8px; overflow: hidden;">
-                <div style="width: ${t2Pct}%; background: var(--acc); height: 100%; border-radius: 4px;"></div>
-            </div>
-        </div>
-    `;
-}
-
-// Rendiamo globali le funzioni dei pannelli per i click inline dell'HTML
-window.openCompensiDashboard = openCompensiDashboard;
-window.closeCompensiDashboard = closeCompensiDashboard;
-window.openIgProfile = openIgProfile;
-window.closeIgProfile = closeIgProfile;
-window.switchIgTab = switchIgTab;
-window.updateIgStats = updateIgStats;
-
 function bindEvents() {
   const authBtn = $('#authBtn');
   if (authBtn) authBtn.onclick = () => window.handleAuthClick();
@@ -920,16 +670,8 @@ function bindEvents() {
   const railRes = $('#railNavResoconto');
   if (railRes) railRes.onclick = () => {
     if (window.innerWidth < 860) closeMobileDrawer();
-    openCompensiDashboard();
+    openResocontoModal(triggerHaptic, toast, updateRecap);
   };
-
-  const railIgProfile = $('#railNavIgProfile');
-  if (railIgProfile) {
-    railIgProfile.onclick = () => {
-      if (window.innerWidth < 860) closeMobileDrawer();
-      openIgProfile();
-    };
-  }
 
   const railSettings = $('#railNavSettings');
   if (railSettings) railSettings.onclick = () => openSettingsModal(toast, render);
@@ -1008,7 +750,7 @@ function bindEvents() {
   if (bNavAdd) bNavAdd.onclick = () => openAddModal(triggerHaptic, toast, render);
 
   const bNavRes = $('#bNavResoconto');
-  if (bNavRes) bNavRes.onclick = () => openCompensiDashboard();
+  if (bNavRes) bNavRes.onclick = () => openResocontoModal(triggerHaptic, toast, updateRecap);
 
   const bNavAlerts = $('#bNavAlerts');
   if (bNavAlerts) bNavAlerts.onclick = () => {
@@ -1113,13 +855,6 @@ window.addEventListener('keydown', e => {
     }
     const modals = document.querySelectorAll('.ov');
     if (modals.length) modals.forEach(m => m.remove());
-
-    const panels = document.querySelectorAll('.side-panel.open');
-    if (panels.length) {
-      panels.forEach(p => p.classList.remove('open'));
-      setTimeout(() => panels.forEach(p => p.style.display = 'none'), 350);
-      return;
-    }
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
     if (e.shiftKey) return;

@@ -44,11 +44,6 @@
         <span class="icon">📊</span>
         <span class="label">Compensi</span>
       </button>
-      <!-- Icona Profilo IG (Sotto i compensi) -->
-      <button type="button" class="rail-nav-item auth-only" id="railNavIgProfile" title="Profilo IG Collaboratore">
-        <span class="icon">📸</span>
-        <span class="label">Profilo IG</span>
-      </button>
     </nav>
 
     <div class="sidebar-tree-container">
@@ -130,107 +125,6 @@
     </div>
   </div>
   <div class="history-container" id="historyListWrap"></div>
-</div>
-
-<!-- 1. Dashboard dei Compensi (Pannello a scorrimento) -->
-<div id="compensiDashboardPanel" class="side-panel" style="display: none;">
-    <div class="panel-header">
-        <h2>Dashboard Compensi & Resoconti</h2>
-        <button class="close-btn" onclick="closeCompensiDashboard()">✕</button>
-    </div>
-    
-    <div class="panel-body">
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <span class="kpi-title">Totale Stagionale</span>
-                <span class="kpi-value" id="kpiTotaleStagione">€0,00</span>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-title">Gare Totali</span>
-                <span class="kpi-value" id="kpiGareTotali">0</span>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-title">Servizi Palazzetto</span>
-                <span class="kpi-value" id="kpiServiziPalazzetto">0</span>
-            </div>
-        </div>
-
-        <div class="trend-section">
-            <h3>Trend Mensile Compensi</h3>
-            <div class="css-bar-chart" id="monthlyTrendChart"></div>
-        </div>
-
-        <div class="breakdown-section">
-            <h3>Ripartizione per Categoria e Ruolo</h3>
-            <div style="overflow-x: auto;">
-                <table class="breakdown-table">
-                    <thead>
-                        <tr>
-                            <th>Categoria</th>
-                            <th>Ruolo</th>
-                            <th style="text-align: center;">Gare</th>
-                            <th style="text-align: right;">Totale (€)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="breakdownTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 2. Profilo IG del Collaboratore (Pannello a scorrimento) -->
-<div id="igProfilePanel" class="side-panel" style="display: none;">
-    <div class="panel-header">
-        <h2>Profilo Collaboratore (IG)</h2>
-        <button class="close-btn" onclick="closeIgProfile()">✕</button>
-    </div>
-    
-    <div class="panel-body">
-        <div class="ig-profile-header">
-            <div class="ig-avatar" id="igAvatarInitials">GV</div>
-            <div class="ig-info">
-                <h3 id="igCollaboratorName">Gabriele Valente</h3>
-                <div class="ig-metrics">
-                    <div class="ig-metric-item">
-                        <div class="ig-metric-num" id="igTotalMoney">€3.450,00</div>
-                        <div class="ig-metric-label">Soldi Totali</div>
-                    </div>
-                    <div class="ig-metric-item">
-                        <div class="ig-metric-num" id="igTotalGames">124</div>
-                        <div class="ig-metric-label">Partite Totali</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="ig-tabs-nav">
-            <button class="ig-tab-btn active" onclick="switchIgTab('posts', this)">🏀 Post</button>
-            <button class="ig-tab-btn" onclick="switchIgTab('stats', this)">📊 Statistiche</button>
-            <button class="ig-tab-btn" onclick="switchIgTab('tags', this)">🤝 Tag</button>
-        </div>
-
-        <div id="tab-posts" class="ig-tab-content active">
-            <div id="igPostsContainer"></div>
-        </div>
-
-        <div id="tab-stats" class="ig-tab-content">
-            <div style="margin-bottom: 16px; display: flex; justify-content: flex-end;">
-                <select id="statsPeriodSelect" onchange="updateIgStats()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--divider);">
-                    <option value="season">Intera Stagione</option>
-                    <option value="month">Ultimo Mese</option>
-                </select>
-            </div>
-            <div class="content-card" style="margin-bottom: 16px; background: var(--card); padding: 16px; border-radius: 12px;">
-                <h4 style="font-size: 0.9rem; margin-bottom: 10px; color: var(--mute);">Ripartizione Ruoli Coperti</h4>
-                <div id="roleStatsChart" style="display: flex; flex-direction: column; gap: 8px;"></div>
-            </div>
-        </div>
-
-        <div id="tab-tags" class="ig-tab-content">
-            <div id="igTagsContainer"></div>
-        </div>
-    </div>
 </div>
 
 <nav class="bottom-nav-bar" id="bottomNavBar">
