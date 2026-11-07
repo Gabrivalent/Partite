@@ -1,132 +1,278 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestione Compensi & Collaboratori</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Partite</title>
+  
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='110' fill='%231d5fa8'/%3E%3Ccircle cx='256' cy='256' r='160' fill='none' stroke='white' stroke-width='28'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#161717">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Partite">
 
-    <!-- Barra Laterale (Sidebar) -->
-    <nav class="sidebar">
-        <!-- Icona Home / Dashboard -->
-        <a href="#" class="sidebar-icon active" title="Dashboard">🏠</a>
-        <!-- Icona Compensi Attuali -->
-        <a href="#" class="sidebar-icon" onclick="openCompensiDashboard()" title="Compensi">💶</a>
-        <!-- Icona Profilo IG (Sotto i compensi attuali) -->
-        <a href="#" class="sidebar-icon" onclick="openIgProfile()" title="Profilo IG Collaboratore">📸</a>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/modals.css">
+  <link rel="stylesheet" href="css/responsive.css">
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="ro locked">
+<div class="app-layout">
+
+  <!-- SIDEBAR CORRETTA -->
+  <aside class="app-sidebar" id="appSidebar">
+    <div class="sidebar-top">
+      <button id="sidebarToggleBtn" class="rail-icon-btn" title="Espandi / Comprimi Menu" type="button">
+        <span class="icon">☰</span>
+      </button>
+      <span class="sidebar-brand-label">Menu Partite</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button type="button" class="rail-nav-item active" id="railNavHome" title="Partite">
+        <span class="icon">🏀</span>
+        <span class="label">Partite</span>
+      </button>
+      <button type="button" class="rail-nav-item auth-only" id="railNavResoconto" title="Resoconto Compensi">
+        <span class="icon">📊</span>
+        <span class="label">Compensi</span>
+      </button>
+      <!-- Icona Profilo IG (Sotto i compensi) -->
+      <button type="button" class="rail-nav-item auth-only" id="railNavIgProfile" title="Profilo IG Collaboratore">
+        <span class="icon">📸</span>
+        <span class="label">Profilo IG</span>
+      </button>
     </nav>
 
-    <!-- Contenuto Principale -->
-    <main class="main-content">
-        <h1 class="page-title">Gestione Compensi & Collaboratori</h1>
-        <div class="content-card">
-            <p>Usa la barra laterale a sinistra per aprire la Dashboard dei Compensi o il Profilo IG.</p>
-        </div>
+    <div class="sidebar-tree-container">
+      <div class="sidebar-section-title">Archivio Calendario</div>
+      <div id="navTree" class="nav-tree"></div>
+    </div>
+
+    <div class="sidebar-bottom">
+      <button type="button" class="rail-nav-item" id="railNavHistory" title="Cronologia Modifiche">
+        <span class="icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M12 7v5l4 2"/>
+          </svg>
+        </span>
+        <span class="label">Cronologia</span>
+      </button>
+
+      <button type="button" class="rail-nav-item" id="railNavSettings" title="Strumenti & Impostazioni">
+        <span class="icon">⚙️</span>
+        <span class="label">Impostazioni</span>
+      </button>
+
+      <div class="rail-sync-wrap" id="railSyncWrap">
+        <span id="syncDot" class="sync-dot sync-green" title="Pronto"></span>
+        <span class="sync-text-status" id="syncStatusText">Connesso</span>
+      </div>
+      <button id="authBtn" type="button" class="rail-auth-btn" title="Accesso Amministratore">
+        <span class="icon">🔒</span>
+        <span class="label">Accedi</span>
+      </button>
+    </div>
+  </aside>
+
+  <div id="navBackdrop" class="nav-backdrop"></div>
+
+  <div class="app-content-wrapper">
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button id="mobileMenuBtn" type="button" class="mobile-menu-btn" title="Apri Menu">☰</button>
+        <h1 class="page-title">Partite</h1>
+        <button id="conflictAlertBtn" type="button" class="alert-btn-standalone status-ok" title="Nessun conflitto">✓</button>
+      </div>
+
+      <div class="top-bar-actions">
+        <button id="todayBtn" type="button" class="pill-btn-action" title="Vai a Oggi">Oggi</button>
+        <button id="add" type="button" class="btn-primary-action auth-only">+ Partita</button>
+        <button id="undoBtn" type="button" class="pill-btn-sm auth-only" title="Annulla ultima modifica (Ctrl+Z)">↺</button>
+        <button id="quickSaveBtn" class="pill-btn-sm auth-only" title="Salva modifiche (Ctrl+S)">💾</button>
+        <button id="quickPullBtn" class="pill-btn-sm" title="Aggiorna dati">↻</button>
+      </div>
+    </header>
+
+    <div class="filter-strip">
+      <div class="search-wrap">
+        <input type="search" id="searchFilter" placeholder="🔍 Cerca squadre, ruoli..." autocomplete="off">
+      </div>
+      <select id="filterCat"><option value="">Tutte le categorie</option></select>
+      <button id="filterIncomplete" type="button" class="filter-chip" aria-pressed="false">Incomplete <span id="incCount"></span></button>
+      <button class="waBtn" id="waTodayBtn" type="button" title="Copia turni dei prossimi 7 giorni">📲 WA 7gg</button>
+    </div>
+
+    <main class="content-scroll">
+      <div id="list"></div>
     </main>
+  </div>
+</div>
 
-    <!-- Pannello Dashboard dei Compensi (Stile Cronologia) -->
-    <div id="compensiDashboardPanel" class="side-panel">
-        <div class="panel-header">
-            <h2>Dashboard Compensi & Resoconti</h2>
-            <button class="close-btn" onclick="closeCompensiDashboard()">✕</button>
+<div id="historyView" class="history-fullscreen-view" style="display:none">
+  <div class="history-topbar">
+    <div class="history-topbar-left">
+      <button type="button" id="historyCloseBtn" class="pill-btn-action" title="Torna al calendario">← Calendario</button>
+      <h2>Cronologia Modifiche</h2>
+    </div>
+    <div class="history-topbar-right">
+      <input type="search" id="historySearchInput" placeholder="🔍 Cerca nella cronologia..." autocomplete="off" />
+      <button type="button" id="historyClearBtn" class="pill-btn-sm" style="background:rgba(239,68,68,0.18);color:#fca5a5">Cancella</button>
+    </div>
+  </div>
+  <div class="history-container" id="historyListWrap"></div>
+</div>
+
+<!-- 1. Dashboard dei Compensi (Pannello a scorrimento) -->
+<div id="compensiDashboardPanel" class="side-panel" style="display: none;">
+    <div class="panel-header">
+        <h2>Dashboard Compensi & Resoconti</h2>
+        <button class="close-btn" onclick="closeCompensiDashboard()">✕</button>
+    </div>
+    
+    <div class="panel-body">
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <span class="kpi-title">Totale Stagionale</span>
+                <span class="kpi-value" id="kpiTotaleStagione">€0,00</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-title">Gare Totali</span>
+                <span class="kpi-value" id="kpiGareTotali">0</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-title">Servizi Palazzetto</span>
+                <span class="kpi-value" id="kpiServiziPalazzetto">0</span>
+            </div>
         </div>
-        
-        <div class="panel-body">
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <span class="kpi-title">Totale Stagionale</span>
-                    <span class="kpi-value" id="kpiTotaleStagione">€0,00</span>
-                </div>
-                <div class="kpi-card">
-                    <span class="kpi-title">Gare Totali</span>
-                    <span class="kpi-value" id="kpiGareTotali">0</span>
-                </div>
-                <div class="kpi-card">
-                    <span class="kpi-title">Servizi Palazzetto</span>
-                    <span class="kpi-value" id="kpiServiziPalazzetto">0</span>
-                </div>
-            </div>
 
-            <div class="trend-section">
-                <h3>Trend Mensile Compensi</h3>
-                <div class="css-bar-chart" id="monthlyTrendChart"></div>
-            </div>
+        <div class="trend-section">
+            <h3>Trend Mensile Compensi</h3>
+            <div class="css-bar-chart" id="monthlyTrendChart"></div>
+        </div>
 
-            <div class="breakdown-section">
-                <h3>Ripartizione per Categoria e Ruolo</h3>
-                <div style="overflow-x: auto;">
-                    <table class="breakdown-table">
-                        <thead>
-                            <tr>
-                                <th>Categoria</th>
-                                <th>Ruolo</th>
-                                <th style="text-align: center;">Gare</th>
-                                <th style="text-align: right;">Totale (€)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="breakdownTableBody"></tbody>
-                    </table>
-                </div>
+        <div class="breakdown-section">
+            <h3>Ripartizione per Categoria e Ruolo</h3>
+            <div style="overflow-x: auto;">
+                <table class="breakdown-table">
+                    <thead>
+                        <tr>
+                            <th>Categoria</th>
+                            <th>Ruolo</th>
+                            <th style="text-align: center;">Gare</th>
+                            <th style="text-align: right;">Totale (€)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="breakdownTableBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Pannello Profilo IG del Collaboratore -->
-    <div id="igProfilePanel" class="side-panel">
-        <div class="panel-header">
-            <h2>Profilo Collaboratore (IG)</h2>
-            <button class="close-btn" onclick="closeIgProfile()">✕</button>
-        </div>
-        
-        <div class="panel-body">
-            <div class="ig-profile-header">
-                <div class="ig-avatar" id="igAvatarInitials">GV</div>
-                <div class="ig-info">
-                    <h3 id="igCollaboratorName">Gabriele Valente</h3>
-                    <div class="ig-metrics">
-                        <div class="ig-metric-item">
-                            <div class="ig-metric-num" id="igTotalMoney">€3.450,00</div>
-                            <div class="ig-metric-label">Soldi Totali</div>
-                        </div>
-                        <div class="ig-metric-item">
-                            <div class="ig-metric-num" id="igTotalGames">124</div>
-                            <div class="ig-metric-label">Partite Totali</div>
-                        </div>
+<!-- 2. Profilo IG del Collaboratore (Pannello a scorrimento) -->
+<div id="igProfilePanel" class="side-panel" style="display: none;">
+    <div class="panel-header">
+        <h2>Profilo Collaboratore (IG)</h2>
+        <button class="close-btn" onclick="closeIgProfile()">✕</button>
+    </div>
+    
+    <div class="panel-body">
+        <div class="ig-profile-header">
+            <div class="ig-avatar" id="igAvatarInitials">GV</div>
+            <div class="ig-info">
+                <h3 id="igCollaboratorName">Gabriele Valente</h3>
+                <div class="ig-metrics">
+                    <div class="ig-metric-item">
+                        <div class="ig-metric-num" id="igTotalMoney">€3.450,00</div>
+                        <div class="ig-metric-label">Soldi Totali</div>
+                    </div>
+                    <div class="ig-metric-item">
+                        <div class="ig-metric-num" id="igTotalGames">124</div>
+                        <div class="ig-metric-label">Partite Totali</div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="ig-tabs-nav">
-                <button class="ig-tab-btn active" onclick="switchIgTab('posts', this)">🏀 Post</button>
-                <button class="ig-tab-btn" onclick="switchIgTab('stats', this)">📊 Statistiche</button>
-                <button class="ig-tab-btn" onclick="switchIgTab('tags', this)">🤝 Tag</button>
+        <div class="ig-tabs-nav">
+            <button class="ig-tab-btn active" onclick="switchIgTab('posts', this)">🏀 Post</button>
+            <button class="ig-tab-btn" onclick="switchIgTab('stats', this)">📊 Statistiche</button>
+            <button class="ig-tab-btn" onclick="switchIgTab('tags', this)">🤝 Tag</button>
+        </div>
+
+        <div id="tab-posts" class="ig-tab-content active">
+            <div id="igPostsContainer"></div>
+        </div>
+
+        <div id="tab-stats" class="ig-tab-content">
+            <div style="margin-bottom: 16px; display: flex; justify-content: flex-end;">
+                <select id="statsPeriodSelect" onchange="updateIgStats()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--divider);">
+                    <option value="season">Intera Stagione</option>
+                    <option value="month">Ultimo Mese</option>
+                </select>
             </div>
-
-            <div id="tab-posts" class="ig-tab-content active">
-                <div id="igPostsContainer"></div>
-            </div>
-
-            <div id="tab-stats" class="ig-tab-content">
-                <div style="margin-bottom: 16px; display: flex; justify-content: flex-end;">
-                    <select id="statsPeriodSelect" onchange="updateIgStats()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);">
-                        <option value="season">Intera Stagione</option>
-                        <option value="month">Ultimo Mese</option>
-                    </select>
-                </div>
-                <div class="content-card" style="margin-bottom: 16px;">
-                    <h4 style="font-size: 0.9rem; margin-bottom: 10px; color: var(--text-muted);">Ripartizione Ruoli Coperti</h4>
-                    <div id="roleStatsChart" style="display: flex; flex-direction: column; gap: 8px;"></div>
-                </div>
-            </div>
-
-            <div id="tab-tags" class="ig-tab-content">
-                <div id="igTagsContainer"></div>
+            <div class="content-card" style="margin-bottom: 16px; background: var(--card); padding: 16px; border-radius: 12px;">
+                <h4 style="font-size: 0.9rem; margin-bottom: 10px; color: var(--mute);">Ripartizione Ruoli Coperti</h4>
+                <div id="roleStatsChart" style="display: flex; flex-direction: column; gap: 8px;"></div>
             </div>
         </div>
-    </div>
 
-    <script src="script.js"></script>
+        <div id="tab-tags" class="ig-tab-content">
+            <div id="igTagsContainer"></div>
+        </div>
+    </div>
+</div>
+
+<nav class="bottom-nav-bar" id="bottomNavBar">
+  <button type="button" class="b-nav-item active" id="bNavHome">
+    <span class="b-nav-icon">🏀</span>
+    <span class="b-nav-label">Gare</span>
+  </button>
+  <button type="button" class="b-nav-item" id="bNavToday">
+    <span class="b-nav-icon">📅</span>
+    <span class="b-nav-label">Oggi</span>
+  </button>
+  <button type="button" class="b-nav-item b-nav-add auth-only" id="bNavAdd" title="Nuova Partita">
+    <span class="b-nav-add-icon">+</span>
+  </button>
+  <button type="button" class="b-nav-item auth-only" id="bNavResoconto">
+    <span class="b-nav-icon">📊</span>
+    <span class="b-nav-label">Compensi</span>
+  </button>
+  <button type="button" class="b-nav-item" id="bNavAlerts">
+    <span class="b-nav-icon" id="bNavAlertIcon">✓</span>
+    <span class="b-nav-label">Alert</span>
+  </button>
+</nav>
+
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<datalist id="namesList"></datalist>
+<datalist id="categoriesList"></datalist>
+<div id="msg" role="status"></div>
+
+<div class="robanner" id="roBanner">
+  <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
+  <h3 style="margin: 0 0 8px; color: var(--ink);">Accesso Riservato</h3>
+  <p style="color: var(--mute); margin: 0 0 16px; font-size: 13px;">
+    Il calendario e le designazioni dei turni sono private. Effettua l'accesso come amministratore per gestire o sbloccare le modifiche.
+  </p>
+  <button type="button" class="btn-primary-action" onclick="window.handleAuthClick()" style="width: 100%;">
+    Accedi con Account
+  </button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
