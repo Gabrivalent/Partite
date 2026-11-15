@@ -6,7 +6,7 @@ import { $, esc, params, setParam, renderNamesList, renderCategoriesList, update
 import { openEditModal, openAddModal, openQuickCloseModal, openCompensiDetailModal, openViewFileModal, openMoltModal, openResocontoModal, openConflictsModal, openUrgentIncompleteModal, openPendingModal, openSettingsModal, promptLogin } from './modals.js';
 
 function isModalOpen() {
-  return !!document.querySelector('.ov');
+  return !!document.querySelector('.ov') || !!document.querySelector('.side-panel.open');
 }
 
 function triggerHaptic(type = 'light') {
@@ -366,7 +366,8 @@ document.addEventListener('click', e => {
     e.stopPropagation();
     const it = state.items.find(x => x.id === vfBtn.dataset.viewfile);
     if (it && it.fileData) {
-      openViewFileModal(it.fileData, it.fileName, it.title, triggerHaptic);
+      // Apre istantaneamente il file dal cloud di Supabase in un nuovo tab
+      window.open(it.fileData, '_blank');
     }
     return;
   }
@@ -384,24 +385,45 @@ document.addEventListener('click', e => {
     const fileSelector = document.createElement('input');
     fileSelector.type = 'file';
     fileSelector.accept = 'application/pdf,image/*';
-    fileSelector.onchange = ev => {
+    fileSelector.onchange = async ev => {
       const file = ev.target.files[0];
       if (!file) return;
-      if (file.size > 8 * 1024 * 1024) {
-        toast('File troppo grande (max 8MB)', 'warning');
+      if (file.size > 15 * 1024 * 1024) {
+        toast('File troppo grande (max 15MB)', 'warning');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = uploadEv => {
-        pushUndo();
-        it.fileData = uploadEv.target.result;
-        it.fileName = file.name;
-        save();
-        render();
-        triggerHaptic('success');
-        toast('Referto caricato con successo!', 'success');
-      };
-      reader.readAsDataURL(file);
+
+      toast('Caricamento in corso nel cloud...', 'light');
+
+      // Nome pulito e univoco basato sull'ID della partita e timestamp
+      const fileExt = file.name.split('.').pop();
+      const fileNameClean = `${it.id}_${Date.now()}.${fileExt}`;
+
+      // Upload diretto sul bucket Supabase Storage (match-reports)
+      const { data, error } = await sb.storage
+        .from('match-reports')
+        .upload(fileNameClean, file);
+
+      if (error) {
+        console.error('Errore upload:', error);
+        toast('Errore durante il caricamento del file', 'warning');
+        return;
+      }
+
+      // Recupero dell'URL pubblico del file caricato
+      const { data: publicUrlData } = sb.storage
+        .from('match-reports')
+        .getPublicUrl(fileNameClean);
+
+      pushUndo();
+      // Salviamo solo l'URL e il nome nel record della partita (zero peso nel localStorage!)
+      it.fileData = publicUrlData.publicUrl;
+      it.fileName = file.name;
+      
+      save();
+      render();
+      triggerHaptic('success');
+      toast('Referto salvato nel cloud con successo!', 'success');
     };
     fileSelector.click();
     return;
