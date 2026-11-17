@@ -82,6 +82,12 @@ function openQuickAssignPopover(chipEl, matchId, roleKey) {
     return;
   }
 
+  // Se la categoria è FEM, Tavolo 2 e Arbitro sono gestiti dalla federazione
+  if (it.cat === 'FEM' && (roleKey === 't2' || roleKey === 'arb')) {
+    toast('Ruolo designato direttamente dalla Federazione', 'light');
+    return;
+  }
+
   const roleLabels = { t1: 'Tavolo 1', t2: 'Tavolo 2', arb: 'Arbitro' };
   const currentVal = (it[roleKey] || '').trim();
 
@@ -366,7 +372,6 @@ document.addEventListener('click', e => {
     e.stopPropagation();
     const it = state.items.find(x => x.id === vfBtn.dataset.viewfile);
     if (it && it.fileData) {
-      // Apre istantaneamente il file dal cloud di Supabase in un nuovo tab
       window.open(it.fileData, '_blank');
     }
     return;
@@ -395,11 +400,9 @@ document.addEventListener('click', e => {
 
       toast('Caricamento in corso nel cloud...', 'light');
 
-      // Nome pulito e univoco basato sull'ID della partita e timestamp
       const fileExt = file.name.split('.').pop();
       const fileNameClean = `${it.id}_${Date.now()}.${fileExt}`;
 
-      // Upload diretto sul bucket Supabase Storage (match-reports)
       const { data, error } = await sb.storage
         .from('match-reports')
         .upload(fileNameClean, file);
@@ -410,13 +413,11 @@ document.addEventListener('click', e => {
         return;
       }
 
-      // Recupero dell'URL pubblico del file caricato
       const { data: publicUrlData } = sb.storage
         .from('match-reports')
         .getPublicUrl(fileNameClean);
 
       pushUndo();
-      // Salviamo solo l'URL e il nome nel record della partita (zero peso nel localStorage!)
       it.fileData = publicUrlData.publicUrl;
       it.fileName = file.name;
       
@@ -623,14 +624,15 @@ function fromExportFormat(arr) {
       chNome: (day.chiusura && day.chiusura.si) ? (day.chiusura.nome || '') : ''
     };
     (day.partite || []).forEach(p => {
+      const isFem = (p.cat || '').trim() === 'FEM';
       newItems.push({
         id: uid(),
         date: d,
         title: p.partita || '',
         cat: p.cat || '',
         t1: p.tavolo1 || '',
-        t2: p.tavolo2 || '',
-        arb: p.arbitro || '',
+        t2: isFem ? '' : (p.tavolo2 || ''),
+        arb: isFem ? '' : (p.arbitro || ''),
         time: p.orario || '',
         friendly: !!p.amichevole,
         score: p.score || '',
