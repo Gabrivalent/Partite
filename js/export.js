@@ -60,24 +60,42 @@ export function generateWhatsAppText(startDate, endDate, customTitle, toast) {
     arr.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
     out += `🏀 *${fmtDayHeader(dayStr)}*\n`;
     arr.forEach(it => {
+      const isFem = (it.cat || '').trim().toUpperCase() === 'FEM';
       const timeStr = it.time ? `Ore ${it.time} - ` : '';
       const catStr = it.cat ? `[${it.cat}${it.friendly ? ' (AMICHEVOLE)' : ''}] ` : (it.friendly ? '[AMICHEVOLE] ' : '');
       const title = it.title || 'Partita';
       const t1 = it.t1 && it.t1.trim() ? it.t1.trim() : '...';
-      const t2 = it.t2 && it.t2.trim() ? it.t2.trim() : '...';
 
       out += `• ${timeStr}${catStr}${title}\n`;
       out += `  - Tavolo 1: ${t1}\n`;
-      if (!it.friendly) {
-        out += `  - Tavolo 2: ${t2}\n`;
-      }
-      if (isRefereeNeeded(it.cat, it.friendly)) {
-        const arb = it.arb && it.arb.trim() ? it.arb.trim() : '...';
-        out += `  - Arbitro: ${arb}\n`;
+
+      // Se la categoria è FEM, Tavolo 2 e Arbitro non vengono inseriti nel messaggio
+      if (!isFem) {
+        if (!it.friendly) {
+          const t2 = it.t2 && it.t2.trim() ? it.t2.trim() : '...';
+          out += `  - Tavolo 2: ${t2}\n`;
+        }
+        if (isRefereeNeeded(it.cat, it.friendly)) {
+          const arb = it.arb && it.arb.trim() ? it.arb.trim() : '...';
+          out += `  - Arbitro: ${arb}\n`;
+        }
       }
       out += '\n';
     });
   });
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(out.trim()).then(() => {
+      toast('Testo copiato negli appunti!', 'success');
+    }).catch(() => {
+      toast('Errore durante la copia', 'warning');
+    });
+  } else {
+    toast('Copia non supportata dal browser', 'warning');
+  }
+
+  return out;
+}
 
   try {
     navigator.clipboard.writeText(out.trim());
