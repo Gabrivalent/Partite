@@ -329,19 +329,6 @@ export function openQuickCloseModal(matchId, triggerHaptic, toast, onRender) {
 }
 
 export function openEditModal(matchId, triggerHaptic, toast, onRender) {
-  // Quando carichi i campi nel modale
-const isFem = it.cat === 'FEM';
-const t2Row = document.getElementById('editTavolo2Group');
-const arbRow = document.getElementById('editArbitroGroup');
-
-if (t2Row) t2Row.style.display = isFem ? 'none' : 'block';
-if (arbRow) arbRow.style.display = isFem ? 'none' : 'block';
-
-// Nel salvataggio della modale:
-if (it.cat === 'FEM') {
-  it.t2 = '';
-  it.arb = '';
-}
   if (state.READONLY) return;
   const it = state.items.find(x => x.id === matchId);
   if (!it) return;
@@ -353,6 +340,7 @@ if (it.cat === 'FEM') {
   }
 
   const isFriendly = !!it.friendly;
+  let isFem = (it.cat || '').trim() === 'FEM';
   let currentFileData = it.fileData || null;
   let currentFileName = it.fileName || null;
 
@@ -393,9 +381,12 @@ if (it.cat === 'FEM') {
     </div>
 
     <div style="border-top:1px solid var(--divider);margin:12px 0 10px;padding-top:10px">
-      <div class="frow"><label for="edT1">Tavolo 1 *</label><input id="edT1" type="text" list="namesList" value="${esc(it.t1)}" placeholder="Nome obbligatorio"></div>
-      <div class="frow"><label for="edT2">Tavolo 2</label><input id="edT2" type="text" list="namesList" value="${esc(it.t2)}" placeholder="Nome"></div>
-      <div class="frow"><label for="edArb">Arbitro</label><input id="edArb" type="text" list="namesList" value="${esc(it.arb)}" placeholder="Nome"></div>
+      <div class="frow" id="editTavolo1Group"><label for="edT1">Tavolo 1 *</label><input id="edT1" type="text" list="namesList" value="${esc(it.t1)}" placeholder="Nome obbligatorio"></div>
+      <div class="frow" id="editTavolo2Group" style="display:${isFem ? 'none' : 'block'}"><label for="edT2">Tavolo 2</label><input id="edT2" type="text" list="namesList" value="${esc(it.t2)}" placeholder="Nome"></div>
+      <div class="frow" id="editArbitroGroup" style="display:${isFem ? 'none' : 'block'}"><label for="edArb">Arbitro</label><input id="edArb" type="text" list="namesList" value="${esc(it.arb)}" placeholder="Nome"></div>
+      <div id="femInfoNotice" style="display:${isFem ? 'block' : 'none'};padding:8px 10px;border-radius:8px;background:rgba(59,130,246,0.12);color:var(--text);font-size:12.5px;margin-top:6px">
+        ℹ️ <i>Categoria FEM: Tavolo 2 e Arbitro sono designati dalla Federazione.</i>
+      </div>
     </div>
 
     <div style="border-top:1px solid var(--divider);margin:12px 0 10px;padding-top:10px">
@@ -424,6 +415,19 @@ if (it.cat === 'FEM') {
 
   document.body.appendChild(ov);
   bindTimePickerEvents(ov, triggerHaptic);
+
+  const edCatInput = ov.querySelector('#edCat');
+  const t2Group = ov.querySelector('#editTavolo2Group');
+  const arbGroup = ov.querySelector('#editArbitroGroup');
+  const femNotice = ov.querySelector('#femInfoNotice');
+
+  // Aggiorna dinamicamente la visibilità se l'utente cambia categoria a mano nel modale
+  edCatInput.addEventListener('input', () => {
+    isFem = edCatInput.value.trim().toUpperCase() === 'FEM';
+    t2Group.style.display = isFem ? 'none' : 'block';
+    arbGroup.style.display = isFem ? 'none' : 'block';
+    femNotice.style.display = isFem ? 'block' : 'none';
+  });
 
   const fileInput = ov.querySelector('#matchFileInput');
   const fileLoadedWrap = ov.querySelector('#fileLoadedWrap');
@@ -501,11 +505,12 @@ if (it.cat === 'FEM') {
     const newDate = document.getElementById('edDate').value;
     if (!newDate) { toast('La data è obbligatoria', 'warning'); return; }
     const time = document.getElementById('finalTimeVal').value;
-    const t1 = document.getElementById('edT1').value.trim();
-    const t2 = document.getElementById('edT2').value.trim();
-    const arb = document.getElementById('edArb').value.trim();
-    const newStatus = document.getElementById('edStatus').value;
     const cat = document.getElementById('edCat').value.trim();
+    const isCatFem = cat.toUpperCase() === 'FEM';
+    const t1 = document.getElementById('edT1').value.trim();
+    const t2 = isCatFem ? '' : document.getElementById('edT2').value.trim();
+    const arb = isCatFem ? '' : document.getElementById('edArb').value.trim();
+    const newStatus = document.getElementById('edStatus').value;
 
     if (newStatus !== 'annullata' && newStatus !== 'rinviata') {
       const conflicts = checkPersonRosterConflicts(matchId, newDate, time, t1, t2, arb, cat);
@@ -580,15 +585,31 @@ export function openAddModal(triggerHaptic, toast, onRender) {
       </div>
     </div>
 
-    <div class="frow"><label for="nT1">Tavolo 1</label><input id="nT1" type="text" list="namesList" placeholder="Nome"></div>
-    <div class="frow"><label for="nT2">Tavolo 2</label><input id="nT2" type="text" list="namesList" placeholder="Nome"></div>
-    <div class="frow"><label for="nArb">Arbitro</label><input id="nArb" type="text" list="namesList" placeholder="Nome"></div>
+    <div class="frow" id="addTavolo1Group"><label for="nT1">Tavolo 1</label><input id="nT1" type="text" list="namesList" placeholder="Nome"></div>
+    <div class="frow" id="addTavolo2Group"><label for="nT2">Tavolo 2</label><input id="nT2" type="text" list="namesList" placeholder="Nome"></div>
+    <div class="frow" id="addArbitroGroup"><label for="nArb">Arbitro</label><input id="nArb" type="text" list="namesList" placeholder="Nome"></div>
+    <div id="addFemInfoNotice" style="display:none;padding:8px 10px;border-radius:8px;background:rgba(59,130,246,0.12);color:var(--text);font-size:12.5px;margin-top:6px">
+      ℹ️ <i>Categoria FEM: Tavolo 2 e Arbitro sono designati dalla Federazione.</i>
+    </div>
+
     <div id="nConflictBox" style="display:none"></div>
     <p class="err" id="nErr">Inserisci almeno la data.</p>
     <div class="mbtns"><button id="nCancel">Annulla</button><button class="btn-primary-action" id="nSave">Aggiungi</button></div>
   </div>`;
   document.body.appendChild(ov);
   bindTimePickerEvents(ov, triggerHaptic);
+
+  const nCatInput = ov.querySelector('#nCat');
+  const addT2Group = ov.querySelector('#addTavolo2Group');
+  const addArbGroup = ov.querySelector('#addArbitroGroup');
+  const addFemNotice = ov.querySelector('#addFemInfoNotice');
+
+  nCatInput.addEventListener('input', () => {
+    const isFem = nCatInput.value.trim().toUpperCase() === 'FEM';
+    addT2Group.style.display = isFem ? 'none' : 'block';
+    addArbGroup.style.display = isFem ? 'none' : 'block';
+    addFemNotice.style.display = isFem ? 'block' : 'none';
+  });
 
   let currentFriendlyVal = false;
   const ynBtns = ov.querySelectorAll('#nFriendlyYN button');
@@ -611,11 +632,12 @@ export function openAddModal(triggerHaptic, toast, onRender) {
       return;
     }
     const time = document.getElementById('finalTimeVal').value;
-    const t1 = document.getElementById('nT1').value.trim();
-    const t2 = document.getElementById('nT2').value.trim();
-    const arb = document.getElementById('nArb').value.trim();
-    const statusVal = document.getElementById('nStatus').value;
     const cat = document.getElementById('nCat').value.trim();
+    const isCatFem = cat.toUpperCase() === 'FEM';
+    const t1 = document.getElementById('nT1').value.trim();
+    const t2 = isCatFem ? '' : document.getElementById('nT2').value.trim();
+    const arb = isCatFem ? '' : document.getElementById('nArb').value.trim();
+    const statusVal = document.getElementById('nStatus').value;
 
     if (statusVal !== 'annullata' && statusVal !== 'rinviata') {
       const conflicts = checkPersonRosterConflicts(null, date, time, t1, t2, arb, cat);
@@ -639,7 +661,9 @@ export function openAddModal(triggerHaptic, toast, onRender) {
       friendly: currentFriendlyVal,
       score: document.getElementById('nScore').value.trim(),
       status: statusVal,
-      t1, t2, arb,
+      t1, 
+      t2, 
+      arb,
       fileData: null,
       fileName: null,
       ghost: statusVal === 'rinviata' || statusVal === 'annullata',
