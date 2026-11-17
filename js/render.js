@@ -214,7 +214,17 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const fileBtnHtml = hasFile
     ? `<button class="reportBtn has-file" data-viewfile="${i.id}" type="button" title="Visualizza Referto Gara">📄</button>`
     : `<button class="reportBtn no-file" data-uploadfile="${i.id}" type="button" title="Carica Referto Gara">📄</button>`;
+const isFem = it.cat === 'FEM';
 
+// Mostra Tavolo 2 o etichetta Federazione
+const t2Html = isFem 
+  ? `<span class="chip-val" style="color:var(--mute);font-style:italic">Federazione</span>` 
+  : (it.t2 ? esc(it.t2) : '<span class="chip-empty">Da assegnare</span>');
+
+// Mostra Arbitro o etichetta Federazione
+const arbHtml = isFem 
+  ? `<span class="chip-val" style="color:var(--mute);font-style:italic">Federazione</span>` 
+  : (it.arb ? esc(it.arb) : '<span class="chip-empty">Da assegnare</span>');
   let badgeHtml = '';
   if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
   else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da def.)'}</div>`;
