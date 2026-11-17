@@ -8,19 +8,24 @@ export function isRefereeNeeded(cat, isFriendly) {
   if (isFriendly) return true;
   if (!cat) return true;
   const c = cat.toUpperCase().replace(/\s+/g, '');
+  if (c === 'FEM') return false;
   return !(c === 'U15' || c === 'U17' || c === 'U19');
 }
 
 export function isMissingRequirements(item) {
+  if (!item) return false;
   if (item.status === 'rinviata' || item.status === 'annullata') return false;
+
   const hasT1 = !!(item.t1 && item.t1.trim());
   const hasT2 = !!(item.t2 && item.t2.trim());
   const hasArb = !!(item.arb && item.arb.trim());
+  const catClean = (item.cat || '').trim().toUpperCase();
 
+  // Yoo T1 hin guuttamne yeroo hunda incomplete dha
   if (!hasT1) return true;
 
-  // Se è categoria FEM serve solo Tavolo 1 (T2 e Arb sono della federazione)
-  if (item.cat === 'FEM') return false;
+  // Garee FEM yoo ta'e T1 qofatu barbaachisa (T2 fi Arb federeeshiniidhan ergamu)
+  if (catClean === 'FEM') return false;
 
   if (item.friendly) return !hasArb;
   if (!hasT2) return true;
