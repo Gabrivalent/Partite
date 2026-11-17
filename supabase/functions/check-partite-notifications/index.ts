@@ -22,25 +22,38 @@ async function sendTelegram(text: string) {
   return res.json();
 }
 
-// Stessa regola arbitro di app.js
+// Regola per l'arbitro societario
 function isRefereeNeeded(cat: string, isFriendly: boolean): boolean {
   if (isFriendly) return true;
   if (!cat) return true;
   const c = cat.toUpperCase().replace(/\s+/g, "");
+  if (c === "FEM") return false;
   if (c === "U15" || c === "U17" || c === "U19") {
     return false;
   }
   return true;
 }
 
-// Stessa verifica completezza di app.js
+// Verifica completezza allineata al frontend
 function checkRequirements(item: any): { incompleta: boolean; mancanti: string[] } {
+  // Partite annullate, rinviate o con check confermato non sono incomplete
+  if (item.status === "annullata" || item.status === "rinviata" || item.ghost) {
+    return { incompleta: false, mancanti: [] };
+  }
+
   const mancanti: string[] = [];
   const hasT1 = !!(item.t1 && item.t1.trim());
   const hasT2 = !!(item.t2 && item.t2.trim());
   const hasArb = !!(item.arb && item.arb.trim());
+  const catClean = (item.cat || "").trim().toUpperCase();
 
+  // Tavolo 1 è sempre obbligatorio
   if (!hasT1) mancanti.push("Tavolo 1");
+
+  // Se è categoria FEM, Tavolo 2 e Arbitro sono federali: basta Tavolo 1
+  if (catClean === "FEM") {
+    return { incompleta: mancanti.length > 0, mancanti };
+  }
 
   if (item.friendly) {
     if (!hasArb) mancanti.push("Arbitro");
@@ -69,7 +82,7 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const mode = url.searchParams.get("mode") || "urgent"; // 'urgent' oppure 'weekly'
 
-  // Recupera i dati da 'partite_board' come fa app.js
+  // Recupera i dati da 'partite_board'
   const { data: row, error } = await supabase
     .from("partite_board")
     .select("data")
@@ -90,7 +103,7 @@ Deno.serve(async (req) => {
   const tomorrowIso = toIsoDate(tomorrow);
 
   if (mode === "urgent") {
-    // Gare di OGGI e di DOMANI ancora incomplete
+    // Gare di OGGI e di DOMANI ancora incomplete (esclude annullate, rinviate e FEM con T1)
     const urgentMatches = items.filter((it) => {
       const isUrgentDate = it.date === todayIso || it.date === tomorrowIso;
       return isUrgentDate && checkRequirements(it).incompleta;
@@ -102,7 +115,7 @@ Deno.serve(async (req) => {
         const { mancanti } = checkRequirements(m);
         const amich = m.friendly ? " [AMICHEVOLE]" : "";
         msg += `🏀 <b>${m.title || "Partita"}</b>${amich}\n`;
-        msg += `📅 Data: <b>${m.date}</b> | Ore: <b>${m.time || "n.d."}</b> | Cat: ${m.cat || "n.d."}\n`;
+        msg += `📅 Data: <b>${m.date}</b> | Ore: <b>${m.time || "n.d."}</b> | Cat: <b>${m.cat || "n.d."}</b>\n`;
         msg += `❌ Mancano: <b>${mancanti.join(", ")}</b>\n\n`;
       });
 
@@ -119,8 +132,9 @@ Deno.serve(async (req) => {
     nextWeek.setDate(nextWeek.getDate() + 7);
     const nextWeekIso = toIsoDate(nextWeek);
 
+    // Esclude gare annullate o rinviate dal riepilogo settimanale
     const upcoming = items
-      .filter((it) => it.date >= todayIso && it.date <= nextWeekIso)
+      .filter((it) => it.date >= todayIso && it.date <= nextWeekIso && it.status !== "annullata" && it.status !== "rinviata")
       .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
 
     let msg = `📋 <b>PROMEMORIA TURNI DELLA SETTIMANA</b>\n`;
