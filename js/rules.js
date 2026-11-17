@@ -18,6 +18,10 @@ export function isMissingRequirements(item) {
   const hasArb = !!(item.arb && item.arb.trim());
 
   if (!hasT1) return true;
+
+  // Se è categoria FEM serve solo Tavolo 1 (T2 e Arb sono della federazione)
+  if (item.cat === 'FEM') return false;
+
   if (item.friendly) return !hasArb;
   if (!hasT2) return true;
   if (isRefereeNeeded(item.cat, false) && !hasArb) return true;
