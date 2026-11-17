@@ -82,7 +82,7 @@ export function renderNamesList() {
 
 export function renderCategoriesList() {
   const dl = document.getElementById('categoriesList');
-  if (dl) dl.innerHTML = state.categories.map(c => `<option value="${esc(c)}">`).join('');
+  if (dl) dl.innerHTML = state.categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   const sel = document.getElementById('filterCat');
   if (sel) {
     const cur = sel.value;
@@ -186,20 +186,31 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const isPostponed = i.status === 'rinviata';
   const ghostOn = !state.READONLY && (!!i.ghost || isCancelled || isPostponed);
   const missingReq = isMissingRequirements(i);
+  const isFem = i.cat === 'FEM';
 
   const t1Val = (i.t1 && i.t1.trim()) 
     ? `<span class="clickable-person" data-quickperson="${esc(i.t1.trim())}">${esc(i.t1.trim())}</span>`
     : '<span class="empty-req">Manca</span>';
 
   const t2Required = !i.friendly;
-  const t2Val = (i.t2 && i.t2.trim())
-    ? `<span class="clickable-person" data-quickperson="${esc(i.t2.trim())}">${esc(i.t2.trim())}</span>`
-    : (t2Required ? '<span class="empty-req">Manca</span>' : '<span class="empty-opt">—</span>');
+  let t2Val;
+  if (isFem) {
+    t2Val = '<span class="empty-opt" style="font-style:italic">Federazione</span>';
+  } else if (i.t2 && i.t2.trim()) {
+    t2Val = `<span class="clickable-person" data-quickperson="${esc(i.t2.trim())}">${esc(i.t2.trim())}</span>`;
+  } else {
+    t2Val = t2Required ? '<span class="empty-req">Manca</span>' : '<span class="empty-opt">—</span>';
+  }
 
   const arbNeeded = isRefereeNeeded(i.cat, i.friendly);
-  const arbVal = (i.arb && i.arb.trim())
-    ? `<span class="clickable-person" data-quickperson="${esc(i.arb.trim())}">${esc(i.arb.trim())}</span>`
-    : (arbNeeded ? '<span class="empty-req">Manca</span>' : '<span class="empty-opt">FIP</span>');
+  let arbVal;
+  if (isFem) {
+    arbVal = '<span class="empty-opt" style="font-style:italic">Federazione</span>';
+  } else if (i.arb && i.arb.trim()) {
+    arbVal = `<span class="clickable-person" data-quickperson="${esc(i.arb.trim())}">${esc(i.arb.trim())}</span>`;
+  } else {
+    arbVal = arbNeeded ? '<span class="empty-req">Manca</span>' : '<span class="empty-opt">FIP</span>';
+  }
 
   const catHtml = i.cat ? `<span class="cat-pill" style="${getCatBadgeStyle(i.cat)}">${esc(i.cat)}</span>` : '';
   const friendlyHtml = i.friendly ? `<span class="friendly-badge" title="Amichevole">A</span>` : '';
@@ -214,17 +225,7 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const fileBtnHtml = hasFile
     ? `<button class="reportBtn has-file" data-viewfile="${i.id}" type="button" title="Visualizza Referto Gara">📄</button>`
     : `<button class="reportBtn no-file" data-uploadfile="${i.id}" type="button" title="Carica Referto Gara">📄</button>`;
-const isFem = it.cat === 'FEM';
 
-// Mostra Tavolo 2 o etichetta Federazione
-const t2Html = isFem 
-  ? `<span class="chip-val" style="color:var(--mute);font-style:italic">Federazione</span>` 
-  : (it.t2 ? esc(it.t2) : '<span class="chip-empty">Da assegnare</span>');
-
-// Mostra Arbitro o etichetta Federazione
-const arbHtml = isFem 
-  ? `<span class="chip-val" style="color:var(--mute);font-style:italic">Federazione</span>` 
-  : (it.arb ? esc(it.arb) : '<span class="chip-empty">Da assegnare</span>');
   let badgeHtml = '';
   if (isCancelled) badgeHtml = `<div class="cancelled-badge">❌ CANCELLATA</div>`;
   else if (isPostponed) badgeHtml = `<div class="postponed-badge">🔄 RINVIATA ${i.postponedDate ? '➔ ' + i.postponedDate : '(Da def.)'}</div>`;
@@ -255,11 +256,11 @@ const arbHtml = isFem
         <span class="chip-lbl">Tavolo 1</span>
         <span class="chip-val">${t1Val}</span>
       </div>
-      <div class="m-roster-chip" data-quickassign="t2" title="Clicca per assegnare Tavolo 2">
+      <div class="m-roster-chip"${isFem ? '' : ' data-quickassign="t2" title="Clicca per assegnare Tavolo 2"'}>
         <span class="chip-lbl">Tavolo 2</span>
         <span class="chip-val">${t2Val}</span>
       </div>
-      <div class="m-roster-chip" data-quickassign="arb" title="Clicca per assegnare Arbitro">
+      <div class="m-roster-chip"${isFem ? '' : ' data-quickassign="arb" title="Clicca per assegnare Arbitro"'}>
         <span class="chip-lbl">Arbitro</span>
         <span class="chip-val">${arbVal}</span>
       </div>
