@@ -69,7 +69,7 @@ export function generateWhatsAppText(startDate, endDate, customTitle, toast) {
       out += `• ${timeStr}${catStr}${title}\n`;
       out += `  - Tavolo 1: ${t1}\n`;
 
-      // Se la categoria è FEM, Tavolo 2 e Arbitro non vengono inseriti nel messaggio
+      // Se la categoria è FEM, Tavolo 2 e Arbitro sono omessi
       if (!isFem) {
         if (!it.friendly) {
           const t2 = it.t2 && it.t2.trim() ? it.t2.trim() : '...';
@@ -88,21 +88,14 @@ export function generateWhatsAppText(startDate, endDate, customTitle, toast) {
     navigator.clipboard.writeText(out.trim()).then(() => {
       toast('Testo copiato negli appunti!', 'success');
     }).catch(() => {
-      toast('Errore durante la copia', 'warning');
+      prompt('Copia il testo:', out);
     });
   } else {
-    toast('Copia non supportata dal browser', 'warning');
+    prompt('Copia il testo:', out);
   }
 
   return out;
 }
-
-  try {
-    navigator.clipboard.writeText(out.trim());
-    toast('Turni copiati per WhatsApp!', 'success');
-  } catch(e) { 
-    prompt('Copia il testo:', out); 
-  }
 
 export function copyMonthRecapWhatsApp(m, toast) {
   const rows = computeRecapRows(m);
@@ -118,11 +111,14 @@ export function copyMonthRecapWhatsApp(m, toast) {
     out += `• *${r.n}*: ${tot}€ (Partite: ${r.p}, Ap/Ch: ${r.a + r.c})\n`;
   });
 
-  try {
-    navigator.clipboard.writeText(out.trim());
-    toast('Riepilogo copiato per WhatsApp!', 'success');
-  } catch(e) { 
-    prompt('Copia il testo:', out); 
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(out.trim()).then(() => {
+      toast('Riepilogo copiato per WhatsApp!', 'success');
+    }).catch(() => { 
+      prompt('Copia il testo:', out); 
+    });
+  } else {
+    prompt('Copia il testo:', out);
   }
 }
 
@@ -131,7 +127,7 @@ export function copyReadOnlyLink(toast) {
   url.searchParams.set('readonly', 'true');
   const fullUrl = url.toString();
   
-  if (navigator.clipboard && navigator.clipboard.writeText) {
+  if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(fullUrl).then(() => {
       toast('Link sola lettura copiato!', 'success');
     }).catch(() => {
@@ -274,11 +270,15 @@ export function generateMonthPDF(m, toast) {
       nl(16);
     }
     list.forEach(it => {
+      const isFem = (it.cat || '').trim().toUpperCase() === 'FEM';
       doc.setFont('helvetica', 'bold'); 
       doc.text(`• ${it.time ? it.time + ' - ' : ''}${it.title || '(senza titolo)'}${it.friendly ? ' [AMICHEVOLE]' : ''}`, ml + 6, y); 
       nl(13);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Tavolo 1: ${it.t1 || '—'}    Tavolo 2: ${it.t2 || '—'}    Arbitro: ${it.arb || '—'}`, ml + 16, y);
+      const rosterText = isFem
+        ? `Tavolo 1: ${it.t1 || '—'}    (Tavolo 2 e Arbitro: Federazione)`
+        : `Tavolo 1: ${it.t1 || '—'}    Tavolo 2: ${it.t2 || '—'}    Arbitro: ${it.arb || '—'}`;
+      doc.text(rosterText, ml + 16, y);
       nl(16);
     });
     nl(4);
