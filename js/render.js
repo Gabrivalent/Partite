@@ -195,7 +195,7 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const t2Required = !i.friendly;
   let t2Val;
   if (isFem) {
-    t2Val = '<span class="empty-opt" style="font-style:italic">Federazione</span>';
+    t2Val = '<span class="empty-opt" style="font-style:italic">CSI</span>';
   } else if (i.t2 && i.t2.trim()) {
     t2Val = `<span class="clickable-person" data-quickperson="${esc(i.t2.trim())}">${esc(i.t2.trim())}</span>`;
   } else {
@@ -205,7 +205,7 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const arbNeeded = isRefereeNeeded(i.cat, i.friendly);
   let arbVal;
   if (isFem) {
-    arbVal = '<span class="empty-opt" style="font-style:italic">Federazione</span>';
+    arbVal = '<span class="empty-opt" style="font-style:italic">CSI</span>';
   } else if (i.arb && i.arb.trim()) {
     arbVal = `<span class="clickable-person" data-quickperson="${esc(i.arb.trim())}">${esc(i.arb.trim())}</span>`;
   } else {
