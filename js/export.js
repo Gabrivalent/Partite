@@ -103,7 +103,6 @@ export function generateWhatsAppText(startDate, endDate, customTitle, toast) {
   } catch(e) { 
     prompt('Copia il testo:', out); 
   }
-}
 
 export function copyMonthRecapWhatsApp(m, toast) {
   const rows = computeRecapRows(m);
