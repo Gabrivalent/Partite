@@ -329,6 +329,19 @@ export function openQuickCloseModal(matchId, triggerHaptic, toast, onRender) {
 }
 
 export function openEditModal(matchId, triggerHaptic, toast, onRender) {
+  // Quando carichi i campi nel modale
+const isFem = it.cat === 'FEM';
+const t2Row = document.getElementById('editTavolo2Group');
+const arbRow = document.getElementById('editArbitroGroup');
+
+if (t2Row) t2Row.style.display = isFem ? 'none' : 'block';
+if (arbRow) arbRow.style.display = isFem ? 'none' : 'block';
+
+// Nel salvataggio della modale:
+if (it.cat === 'FEM') {
+  it.t2 = '';
+  it.arb = '';
+}
   if (state.READONLY) return;
   const it = state.items.find(x => x.id === matchId);
   if (!it) return;
