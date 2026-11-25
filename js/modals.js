@@ -1,6 +1,6 @@
 import { COMMON_TIMES } from './config.js';
 import { state, save, saveMolt, saveNames, saveCategories, saveFipLinks, applyTheme, pushUndo, logEvent } from './state.js';
-import { sb } from './api.js';
+import { sb, uploadMatchReportFile } from './api.js';
 import { uid, iso, monday, checkPersonRosterConflicts, getConflictClusters, getUrgentIncompleteMatches, getPendingPostponedMatches, isRefereeNeeded } from './rules.js';
 import { monthsWithData, monthLabel, computeRecapRows, exportSelectedMonthsJSON, generateMonthPDF, copyReadOnlyLink } from './export.js';
 import { esc, setParam, renderNamesList, renderCategoriesList } from './render.js';
@@ -147,7 +147,7 @@ export function openViewFileModal(fileData, fileName, matchTitle, triggerHaptic)
   triggerHaptic('light');
   const ov = document.createElement('div');
   ov.className = 'ov';
-  const isPdf = fileData.startsWith('data:application/pdf') || (fileName && fileName.toLowerCase().endsWith('.pdf'));
+  const isPdf = fileData.startsWith('data:application/pdf') || (fileName && fileName.toLowerCase().endsWith('.pdf')) || fileData.toLowerCase().includes('.pdf');
 
   ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" style="max-width:680px;height:85vh;display:flex;flex-direction:column">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -164,7 +164,7 @@ export function openViewFileModal(fileData, fileName, matchTitle, triggerHaptic)
       }
     </div>
     <div class="mbtns" style="display:flex;gap:8px">
-      <a href="${fileData}" download="${esc(fileName || 'referto.pdf')}" class="btn-primary-action" style="flex:1;text-decoration:none;display:inline-flex;align-items:center;justify-content:center">⬇ Scarica File</a>
+      <a href="${fileData}" target="_blank" rel="noopener noreferrer" download="${esc(fileName || 'referto.pdf')}" class="btn-primary-action" style="flex:1;text-decoration:none;display:inline-flex;align-items:center;justify-content:center">⬇ Scarica File</a>
       <button type="button" id="viewFileClose" style="flex:1">Chiudi</button>
     </div>
   </div>`;
@@ -398,7 +398,7 @@ export function openEditModal(matchId, triggerHaptic, toast, onRender) {
         </div>
         <div id="fileInputWrap" style="display:${currentFileData ? 'none' : 'block'}">
           <input type="file" id="matchFileInput" accept="application/pdf,image/*" style="font-size:13px !important">
-          <span style="font-size:11px;color:var(--mute);margin-top:2px;display:block">Carica il referto ufficiale o la foto del referto.</span>
+          <span style="font-size:11px;color:var(--mute);margin-top:2px;display:block">Carica il referto ufficiale o la foto del referto (max 15MB).</span>
         </div>
       </div>
     </div>
@@ -421,7 +421,6 @@ export function openEditModal(matchId, triggerHaptic, toast, onRender) {
   const arbGroup = ov.querySelector('#editArbitroGroup');
   const femNotice = ov.querySelector('#femInfoNotice');
 
-  // Aggiorna dinamicamente la visibilità se l'utente cambia categoria a mano nel modale
   edCatInput.addEventListener('input', () => {
     isFem = edCatInput.value.trim().toUpperCase() === 'FEM';
     t2Group.style.display = isFem ? 'none' : 'block';
@@ -435,24 +434,28 @@ export function openEditModal(matchId, triggerHaptic, toast, onRender) {
   const fileLoadedName = ov.querySelector('#fileLoadedName');
   const btnRemoveFile = ov.querySelector('#btnRemoveFile');
 
-  fileInput.onchange = e => {
+  fileInput.onchange = async e => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast('File troppo grande (max 8MB)', 'warning');
+    if (file.size > 15 * 1024 * 1024) {
+      toast('File troppo grande (max 15MB)', 'warning');
       fileInput.value = '';
       return;
     }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      currentFileData = ev.target.result;
-      currentFileName = file.name;
-      fileLoadedName.textContent = `✓ ${file.name}`;
+    toast('Caricamento referto in corso...', 'light');
+    try {
+      const res = await uploadMatchReportFile(it.id, file);
+      currentFileData = res.publicUrl;
+      currentFileName = res.originalName;
+      fileLoadedName.textContent = `✓ ${res.originalName}`;
       fileLoadedWrap.style.display = 'flex';
       fileInputWrap.style.display = 'none';
-      toast('Referto caricato con successo!', 'success');
-    };
-    reader.readAsDataURL(file);
+      toast('Referto salvato nel cloud!', 'success');
+    } catch (err) {
+      console.error('Errore upload:', err);
+      toast('Errore nel caricamento del file su Supabase', 'warning');
+      fileInput.value = '';
+    }
   };
 
   btnRemoveFile.onclick = () => {
@@ -1148,7 +1151,7 @@ export function openFipLinksModal(toast, onRender) {
       saveFipLinks();
       ov.remove();
       onRender();
-      toast('Link FIP salvati!', 'success');
+      toast('Link FIP salvati nel cloud!', 'success');
     };
   }
 }
