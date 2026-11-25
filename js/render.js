@@ -151,7 +151,10 @@ export function slotHTML(d, k) {
 }
 
 export function recapHTML(m) {
-  if (state.READONLY) return '';
+  // Sicurezza frontend: se non autenticato, non genera alcuna riga né calcolo economico
+  if (state.READONLY) {
+    return '';
+  }
 
   const rows = computeRecapRows(m);
   if (!rows.length) {
