@@ -8,7 +8,7 @@ export const state = {
   molt: {},
   names: [],
   categories: [],
-  fipLinks: JSON.parse(localStorage.getItem('partite-fip-v1') || JSON.stringify(DEFAULT_FIP_LINKS)),
+  fipLinks: JSON.parse(localStorage.getItem(STORAGE_KEYS.FIP_LINKS) || JSON.stringify(DEFAULT_FIP_LINKS)),
   history: JSON.parse(localStorage.getItem('partite-history-v1') || '[]'),
   isDirty: false,
   filterCat: '',
@@ -89,7 +89,7 @@ export const saveCategoriesLocal = () => {
 
 export const saveFipLinksLocal = () => {
   try {
-    localStorage.setItem('partite-fip-v1', JSON.stringify(state.fipLinks));
+    localStorage.setItem(STORAGE_KEYS.FIP_LINKS, JSON.stringify(state.fipLinks));
   } catch(e) { console.error('Errore salvataggio fipLinks locale', e); }
   state.isDirty = true;
 };
