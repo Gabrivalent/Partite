@@ -10,11 +10,16 @@ export const STORAGE_KEYS = {
   MOLT: 'partite-molt-v1',
   NAMES: 'partite-nomi-v1',
   CATEGORIES: 'partite-categorie-v1',
+  FIP_LINKS: 'partite-fip-v1',
   THEME: 'partite-theme'
 };
 
 export const COMMON_TIMES = [
   '09:00', '11:00', '11:15', '11:30', '15:00', '15:30', '17:00', '17:30', '18:00', '20:30', '21:00'
+];
+
+export const EXCLUDED_CONFLICT_CATEGORIES = [
+  '2019', '2018', '2017', '2016', 'U6', 'U7', 'U8', 'U9', 'U10'
 ];
 
 export const APP_ICONS = {
