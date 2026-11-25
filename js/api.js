@@ -20,9 +20,9 @@ try {
 
 export function setSyncVisualState(syncState, tooltip) {
   const dot = document.getElementById('syncDot');
-  const wrap = document.getElementById('syncIndicatorWrap');
+  const wrap = document.getElementById('railSyncWrap');
   if (!wrap || !dot) return;
-  wrap.style.display = 'inline-flex';
+  wrap.style.display = 'flex';
   if (syncState === 'orange') {
     dot.className = 'sync-dot sync-orange';
     dot.title = tooltip || 'Sincronizzazione in corso…';
@@ -33,6 +33,27 @@ export function setSyncVisualState(syncState, tooltip) {
     dot.className = 'sync-dot sync-red';
     dot.title = tooltip || 'Cloud non raggiungibile';
   }
+}
+
+export async function uploadMatchReportFile(matchId, file) {
+  if (!sb) throw new Error('Cloud Supabase non disponibile');
+  const fileExt = file.name.split('.').pop();
+  const fileNameClean = `${matchId}_${Date.now()}.${fileExt}`;
+
+  const { error } = await sb.storage
+    .from('match-reports')
+    .upload(fileNameClean, file);
+
+  if (error) throw error;
+
+  const { data } = sb.storage
+    .from('match-reports')
+    .getPublicUrl(fileNameClean);
+
+  return {
+    publicUrl: data.publicUrl,
+    originalName: file.name
+  };
 }
 
 export async function cloudFetchRaw() {
