@@ -18,6 +18,10 @@ try {
   sb = null;
 }
 
+let lastSyncedUpdatedAt = null;
+let isPushing = false;
+let pushQueued = false;
+
 export function setSyncVisualState(syncState, tooltip) {
   const dot = document.getElementById('syncDot');
   const wrap = document.getElementById('railSyncWrap');
@@ -64,12 +68,20 @@ export async function cloudFetchRaw() {
       .select('data, updated_at')
       .eq('id', SUPABASE_CONFIG.board)
       .maybeSingle();
-    if (error || !data) return null;
+
+    if (error) {
+      console.error('Errore lettura da Supabase:', error);
+      return null;
+    }
+    if (!data) return null;
+
+    lastSyncedUpdatedAt = data.updated_at || null;
     return {
       data: data.data || null,
       updated_at: data.updated_at || null
     };
   } catch(e) {
+    console.error('Errore di connessione Supabase:', e);
     return null;
   }
 }
@@ -79,7 +91,7 @@ export function registerCloudCallback(cb) {
   onCloudDataAppliedCallback = cb;
 }
 
-export function applyCloudData(payload) {
+export function applyCloudData(payload, updatedAt = null) {
   if (!payload) return;
   const raw = payload.data ? payload.data : payload;
 
@@ -97,6 +109,10 @@ export function applyCloudData(payload) {
     state.fipLinks = Object.assign({}, state.fipLinks, raw.fipLinks);
   }
 
+  if (updatedAt) {
+    lastSyncedUpdatedAt = updatedAt;
+  }
+
   saveLocalOnly();
   saveDLocalOnly();
   saveMoltLocal();
@@ -110,8 +126,45 @@ export function applyCloudData(payload) {
 
 export async function cloudPushNow() {
   if (!sb || state.READONLY) return false;
+
+  if (!navigator.onLine) {
+    setSyncVisualState('orange', 'In attesa di connessione per salvare…');
+    return false;
+  }
+
+  if (isPushing) {
+    pushQueued = true;
+    return true;
+  }
+
+  isPushing = true;
   setSyncVisualState('orange');
+
   try {
+    // 1. Controllo di concorrenza ottimistica: verifichiamo che nessuno abbia salvato dopo la nostra ultima lettura
+    if (lastSyncedUpdatedAt) {
+      const { data: checkData, error: checkError } = await sb
+        .from('partite_board')
+        .select('updated_at')
+        .eq('id', SUPABASE_CONFIG.board)
+        .maybeSingle();
+
+      if (!checkError && checkData && checkData.updated_at) {
+        const remoteTime = new Date(checkData.updated_at).getTime();
+        const localTime = new Date(lastSyncedUpdatedAt).getTime();
+        // Conflitto rilevato: se la versione remota è più recente di oltre 2 secondi
+        if (remoteTime > localTime + 2000) {
+          console.warn('Conflitto rilevato: la versione sul Cloud è più recente.');
+          setSyncVisualState('red', 'Conflitto: dati modificati altrove');
+          isPushing = false;
+          // Eseguiamo un pull sicuro per allineare i dati
+          await cloudPullSafe(false);
+          return false;
+        }
+      }
+    }
+
+    const newTimestamp = new Date().toISOString();
     const { error } = await sb.from('partite_board').upsert({
       id: SUPABASE_CONFIG.board,
       data: {
@@ -122,14 +175,31 @@ export async function cloudPushNow() {
         categories: state.categories,
         fipLinks: state.fipLinks
       },
-      updated_at: new Date().toISOString()
+      updated_at: newTimestamp
     });
-    if (error) throw error;
+
+    if (error) {
+      if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+        console.error('Sessione scaduta o non autorizzata:', error);
+        window.handleAuthClick && window.handleAuthClick();
+      }
+      throw error;
+    }
+
+    lastSyncedUpdatedAt = newTimestamp;
     state.isDirty = false;
-    setSyncVisualState('green');
+    setSyncVisualState('green', 'Sincronizzato Cloud');
+    isPushing = false;
+
+    if (pushQueued) {
+      pushQueued = false;
+      setTimeout(cloudPushNow, 300);
+    }
     return true;
   } catch (err) {
-    setSyncVisualState('red');
+    console.error('Errore durante il salvataggio Cloud:', err);
+    setSyncVisualState('red', 'Errore durante il salvataggio');
+    isPushing = false;
     return false;
   }
 }
@@ -142,22 +212,31 @@ export function scheduleCloudPush() {
 
 export async function cloudPullSafe(silent) {
   if (!sb) return false;
-  if (state.isDirty && !state.READONLY) await cloudPushNow();
   if (!silent) setSyncVisualState('orange');
   try {
     const res = await cloudFetchRaw();
     if (res && res.data) {
-      applyCloudData(res.data);
-      setSyncVisualState('green');
+      applyCloudData(res.data, res.updated_at);
+      setSyncVisualState('green', 'Sincronizzato Cloud');
       return true;
     }
     setSyncVisualState('green');
     return false;
   } catch(e) {
-    setSyncVisualState('red');
+    console.error('Errore durante il caricamento Cloud:', e);
+    setSyncVisualState('red', 'Cloud non raggiungibile');
     return false;
   }
 }
+
+// Auto-retry quando torna la connessione Internet
+window.addEventListener('online', () => {
+  if (state.isDirty && !state.READONLY) {
+    cloudPushNow();
+  } else {
+    cloudPullSafe(true);
+  }
+});
 
 export function setupSupabaseRealtime({ isModalOpen, onRealtimeUpdate }) {
   if (!sb) return;
@@ -169,7 +248,7 @@ export function setupSupabaseRealtime({ isModalOpen, onRealtimeUpdate }) {
         payload => {
           if (payload.new && payload.new.data) {
             if (!state.isDirty && !isModalOpen()) {
-              applyCloudData(payload.new.data);
+              applyCloudData(payload.new.data, payload.new.updated_at);
               if (onRealtimeUpdate) onRealtimeUpdate();
               setSyncVisualState('green', 'Aggiornato in tempo reale');
             }
