@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { EXCLUDED_CONFLICT_CATEGORIES } from './config.js';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 export const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -21,10 +22,7 @@ export function isMissingRequirements(item) {
   const hasArb = !!(item.arb && item.arb.trim());
   const catClean = (item.cat || '').trim().toUpperCase();
 
-  // Yoo T1 hin guuttamne yeroo hunda incomplete dha
   if (!hasT1) return true;
-
-  // Garee FEM yoo ta'e T1 qofatu barbaachisa (T2 fi Arb federeeshiniidhan ergamu)
   if (catClean === 'FEM') return false;
 
   if (item.friendly) return !hasArb;
@@ -84,8 +82,7 @@ export function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2,
   if (!date || !timeStr) return [];
 
   const catUpper = (targetCategory || '').toUpperCase().replace(/\s+/g, '');
-  const excludedYears = ['2019', '2018', '2017', '2016', 'U6', 'U7', 'U8', 'U9', 'U10'];
-  if (excludedYears.some(y => catUpper.includes(y))) {
+  if (EXCLUDED_CONFLICT_CATEGORIES.some(y => catUpper.includes(y))) {
     return [];
   }
 
@@ -98,7 +95,7 @@ export function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2,
 
   state.items.filter(it => it.id !== targetMatchId && it.date === date && it.time && it.status !== 'annullata' && it.status !== 'rinviata').forEach(it => {
     const otherCatUpper = (it.cat || '').toUpperCase().replace(/\s+/g, '');
-    if (excludedYears.some(y => otherCatUpper.includes(y))) return;
+    if (EXCLUDED_CONFLICT_CATEGORIES.some(y => otherCatUpper.includes(y))) return;
 
     const [oh, om] = it.time.split(':').map(Number);
     const otherMinutes = oh * 60 + om;
@@ -119,12 +116,11 @@ export function checkPersonRosterConflicts(targetMatchId, date, timeStr, t1, t2,
 
 export function findConflictingMatches() {
   const conflicts = new Map();
-  const excludedYears = ['2019', '2018', '2017', '2016', 'U6', 'U7', 'U8', 'U9', 'U10'];
 
   const validItems = state.items.filter(it => {
     if (it.status === 'annullata' || it.status === 'rinviata' || !it.date || !it.time) return false;
     const catUpper = (it.cat || '').toUpperCase().replace(/\s+/g, '');
-    return !excludedYears.some(y => catUpper.includes(y));
+    return !EXCLUDED_CONFLICT_CATEGORIES.some(y => catUpper.includes(y));
   });
 
   validItems.forEach((m) => {
