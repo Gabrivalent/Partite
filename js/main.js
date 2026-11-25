@@ -1,5 +1,5 @@
 import { state, registerStateCallbacks, save, saveD, saveNames, applyTheme, pushUndo, popUndoState, logEvent } from './state.js';
-import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback } from './api.js';
+import { sb, setSyncVisualState, cloudFetchRaw, applyCloudData, cloudPushNow, scheduleCloudPush, cloudPullSafe, setupSupabaseRealtime, registerCloudCallback, uploadMatchReportFile } from './api.js';
 import { uid, iso, monday, findConflictingMatches, isWithinOneDayOrLess, isMissingRequirements, checkPersonRosterConflicts } from './rules.js';
 import { copyMonthRecapWhatsApp, generateWhatsAppText } from './export.js';
 import { $, esc, params, setParam, renderNamesList, renderCategoriesList, updateIncompleteBadge, updateAlertStatusBadge, slotHTML, recapHTML, card, renderNavTree, renderHistoryView } from './render.js';
@@ -82,7 +82,6 @@ function openQuickAssignPopover(chipEl, matchId, roleKey) {
     return;
   }
 
-  // Se la categoria è FEM, Tavolo 2 e Arbitro sono gestiti dalla federazione
   if (it.cat === 'FEM' && (roleKey === 't2' || roleKey === 'arb')) {
     toast('Ruolo designato direttamente dalla Federazione', 'light');
     return;
@@ -398,33 +397,20 @@ document.addEventListener('click', e => {
         return;
       }
 
-      toast('Caricamento in corso nel cloud...', 'light');
-
-      const fileExt = file.name.split('.').pop();
-      const fileNameClean = `${it.id}_${Date.now()}.${fileExt}`;
-
-      const { data, error } = await sb.storage
-        .from('match-reports')
-        .upload(fileNameClean, file);
-
-      if (error) {
-        console.error('Errore upload:', error);
+      toast('Caricamento referto in corso...', 'light');
+      try {
+        const res = await uploadMatchReportFile(it.id, file);
+        pushUndo();
+        it.fileData = res.publicUrl;
+        it.fileName = res.originalName;
+        save();
+        render();
+        triggerHaptic('success');
+        toast('Referto salvato nel cloud con successo!', 'success');
+      } catch (err) {
+        console.error('Errore upload:', err);
         toast('Errore durante il caricamento del file', 'warning');
-        return;
       }
-
-      const { data: publicUrlData } = sb.storage
-        .from('match-reports')
-        .getPublicUrl(fileNameClean);
-
-      pushUndo();
-      it.fileData = publicUrlData.publicUrl;
-      it.fileName = file.name;
-      
-      save();
-      render();
-      triggerHaptic('success');
-      toast('Referto salvato nel cloud con successo!', 'success');
     };
     fileSelector.click();
     return;
