@@ -75,6 +75,18 @@ export function updateRecap(m) {
   aside.outerHTML = recapHTML(m);
 }
 
+function hideAccessGate() {
+  const gateIds = ['authGateModal', 'accessGateModal', 'loginGate', 'authGate', 'gateModal', 'authOverlay'];
+  gateIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.setProperty('display', 'none', 'important');
+  });
+  document.querySelectorAll('.auth-gate-overlay, .gate-overlay, .login-gate-overlay, .access-gate').forEach(el => {
+    el.style.setProperty('display', 'none', 'important');
+    el.classList.remove('active', 'show');
+  });
+}
+
 export function render() {
   const p = params();
   const todayIso = iso(new Date());
@@ -82,7 +94,6 @@ export function render() {
   const activeWeek = p.get('s') || iso(monday(todayIso));
   const filterPerson = (p.get('person') || '').trim().toLowerCase();
 
-  // Vista Cronologia vs Calendario
   const isHistoryView = p.get('view') === 'history';
   const histViewEl = document.getElementById('historyView');
   const calViewEl = document.getElementById('calendarView');
@@ -103,7 +114,6 @@ export function render() {
     if (bNavHist) bNavHist.classList.remove('active');
   }
 
-  // Albero laterale navigazione
   const groupedTree = {};
   state.items.forEach(it => {
     if (!it.date) return;
@@ -113,11 +123,9 @@ export function render() {
   });
   renderNavTree(groupedTree, activeMonth, activeWeek);
 
-  // Filtri attivi
   const catFilter = state.filterCat ? state.filterCat.toLowerCase() : '';
   const searchFilter = (p.get('q') || '').toLowerCase().trim();
 
-  // Titoli mese e settimana
   const mTitleEl = document.getElementById('currentMonthTitle');
   if (mTitleEl) {
     mTitleEl.textContent = new Date(activeMonth + '-15T12:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
@@ -131,7 +139,6 @@ export function render() {
     wTitleEl.textContent = `${wMon.getDate()} ${wMon.toLocaleDateString('it-IT', { month: 'short' })} – ${wSun.getDate()} ${wSun.toLocaleDateString('it-IT', { month: 'short' })}`;
   }
 
-  // Banner filtro persona
   const personBanner = document.getElementById('personFilterBanner');
   if (personBanner) {
     if (filterPerson) {
@@ -143,7 +150,6 @@ export function render() {
     }
   }
 
-  // Rendering 7 giorni
   const daysWrapper = document.getElementById('daysWrapper');
   if (!daysWrapper) return;
 
@@ -197,7 +203,6 @@ export function render() {
 
   daysWrapper.innerHTML = daysHtml;
 
-  // Sidebar Desktop
   const sideWrap = document.getElementById('sideRecapWrapper');
   if (sideWrap) {
     sideWrap.innerHTML = recapHTML(activeMonth);
@@ -215,6 +220,11 @@ export function render() {
 export function setAuthMode(isAdmin) {
   state.READONLY = !isAdmin;
   document.body.classList.toggle('readonly-mode', !isAdmin);
+
+  if (isAdmin) {
+    hideAccessGate();
+  }
+
   const btn = document.getElementById('authModeBtn');
   if (btn) {
     btn.textContent = isAdmin ? '🔓 Admin' : '🔒 Lettura';
@@ -333,7 +343,15 @@ function openQuickAssignMenu(chipEl, role, matchId) {
 }
 
 document.addEventListener('click', e => {
-  // Toggle compatto compensi
+  // Gestione click del pulsante Accedi sul gate
+  const gateLoginBtn = e.target.closest('.auth-gate-box button, #btnGateLogin, .gate-login-btn');
+  if (gateLoginBtn || (e.target.tagName === 'BUTTON' && e.target.textContent.includes('Accedi con Account'))) {
+    e.preventDefault();
+    promptLogin(triggerHaptic, toast, setAuthMode);
+    return;
+  }
+
+  // Toggle compatto per la colonna compensi
   const recapTog = e.target.closest('#recapToggleBtn');
   if (recapTog) {
     e.preventDefault();
@@ -344,7 +362,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Modale dettaglio compenso
   const recapItem = e.target.closest('[data-compname]');
   if (recapItem) {
     const name = recapItem.dataset.compname;
@@ -356,7 +373,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Modale modifica partita
   const editBtn = e.target.closest('[data-edit]');
   if (editBtn) {
     const matchEl = editBtn.closest('[data-id]');
@@ -367,7 +383,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Check / Esito rapido
   const ghostBtn = e.target.closest('[data-ghost]');
   if (ghostBtn) {
     const id = ghostBtn.dataset.ghost || ghostBtn.closest('[data-id]')?.dataset.id;
@@ -377,7 +392,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Assegnazione rapida collaboratore da card
   const qaChip = e.target.closest('[data-quickassign]');
   if (qaChip && !state.READONLY) {
     const matchEl = qaChip.closest('[data-id]');
@@ -388,7 +402,6 @@ document.addEventListener('click', e => {
     }
   }
 
-  // Visualizzazione referto
   const viewFileBtn = e.target.closest('[data-viewfile]');
   if (viewFileBtn) {
     const mId = viewFileBtn.dataset.viewfile;
@@ -399,7 +412,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Caricamento referto da card vuota
   const upFileBtn = e.target.closest('[data-uploadfile]');
   if (upFileBtn) {
     const mId = upFileBtn.dataset.uploadfile;
@@ -407,7 +419,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Apertura / Chiusura palestra
   const ynBtn = e.target.closest('.slot [data-yn]');
   if (ynBtn && !state.READONLY) {
     triggerHaptic('light');
@@ -423,7 +434,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Navigazione mese
   const pickM = e.target.closest('[data-pickm]');
   if (pickM) {
     const m = pickM.dataset.pickm;
@@ -431,7 +441,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Navigazione settimana
   const navW = e.target.closest('[data-navw]');
   if (navW) {
     const m = navW.dataset.navm;
@@ -444,7 +453,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Filtro rapido per persona
   const qp = e.target.closest('[data-quickperson]');
   if (qp) {
     const name = qp.dataset.quickperson;
@@ -453,14 +461,12 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Reset filtro persona
   if (e.target.closest('#clearPersonFilterBtn')) {
     setParam('person', '', render);
     toast('Filtro persona rimosso');
     return;
   }
 
-  // Recap mensile WhatsApp
   const waRecapBtn = e.target.closest('[data-warecap]');
   if (waRecapBtn) {
     const m = waRecapBtn.dataset.warecap;
@@ -469,7 +475,6 @@ document.addEventListener('click', e => {
   }
 });
 
-// Listener modifiche nomi apertura/chiusura
 document.addEventListener('change', e => {
   const wn = e.target.closest('[data-wn]');
   if (wn && !state.READONLY) {
@@ -484,7 +489,6 @@ document.addEventListener('change', e => {
   }
 });
 
-// Swipe touch mobile
 let touchStartX = 0;
 let touchStartY = 0;
 document.addEventListener('touchstart', e => {
@@ -504,41 +508,42 @@ document.addEventListener('touchend', e => {
   }
 }, { passive: true });
 
-// Boot dell'applicazione
 window.addEventListener('DOMContentLoaded', async () => {
   renderNamesList();
   renderCategoriesList();
 
   if (sb) {
     const { data } = await sb.auth.getSession();
-    setAuthMode(!!data.session);
+    const hasSession = !!data?.session;
+    setAuthMode(hasSession);
+    if (hasSession) hideAccessGate();
+
     sb.auth.onAuthStateChange((_event, session) => {
-      setAuthMode(!!session);
+      const isAuth = !!session;
+      setAuthMode(isAuth);
+      if (isAuth) hideAccessGate();
     });
   } else {
     const urlRo = new URLSearchParams(window.location.search).get('readonly') === 'true';
     setAuthMode(!urlRo);
+    if (!urlRo) hideAccessGate();
   }
 
-  // Push automatico via callback registrabile di state.js
   registerStateCallbacks({
     onSave: () => scheduleCloudPush(),
     onBadgeUpdate: () => updateIncompleteBadge()
   });
 
-  // Re-render quando arrivano nuovi dati dal Cloud
   registerCloudCallback(() => {
     render();
   });
 
-  // Tasti navigazione temporale
   document.getElementById('btnPrevWeek')?.addEventListener('click', () => shiftWeek(-1));
   document.getElementById('btnNextWeek')?.addEventListener('click', () => shiftWeek(1));
   document.getElementById('btnPrevMonth')?.addEventListener('click', () => shiftMonth(-1));
   document.getElementById('btnNextMonth')?.addEventListener('click', () => shiftMonth(1));
   document.getElementById('btnToday')?.addEventListener('click', resetToCurrent);
 
-  // Tasti header
   document.getElementById('btnAddMatch')?.addEventListener('click', () => {
     triggerHaptic('light');
     openAddModal(triggerHaptic, toast, render);
@@ -574,7 +579,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     setParam('hq', e.target.value.trim(), render);
   });
 
-  // Bottom Nav Mobile
   document.getElementById('bNavCal')?.addEventListener('click', () => {
     setParam('view', '', render);
   });
@@ -588,7 +592,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     setParam('view', 'history', render);
   });
 
-  // Import JSON backup
   const impFile = document.getElementById('importFile');
   if (impFile) {
     impFile.addEventListener('change', e => {
@@ -639,7 +642,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Ctrl+Z Undo
   window.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       if (popUndoState()) {
@@ -649,12 +651,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Caricamento dati da Supabase
   cloudPullSafe(false).then(() => {
     render();
   });
 
-  // Connessione realtime
   setupSupabaseRealtime({
     isModalOpen: () => !!document.querySelector('.modal-overlay'),
     onRealtimeUpdate: () => render()
