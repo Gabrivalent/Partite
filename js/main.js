@@ -3,14 +3,16 @@ import {
   pushUndo, 
   popUndoState, 
   save, 
-  saveDayMeta, 
+  saveD, 
   applyTheme, 
-  logEvent 
+  logEvent,
+  registerStateCallbacks 
 } from './state.js';
 import { 
   sb, 
   cloudPullSafe, 
   setupSupabaseRealtime, 
+  scheduleCloudPush,
   registerCloudCallback 
 } from './api.js';
 import { iso, monday, isRefereeNeeded } from './rules.js';
@@ -101,7 +103,7 @@ export function render() {
     if (bNavHist) bNavHist.classList.remove('active');
   }
 
-  // Costruzione albero laterale di navigazione
+  // Albero laterale navigazione
   const groupedTree = {};
   state.items.forEach(it => {
     if (!it.date) return;
@@ -141,7 +143,7 @@ export function render() {
     }
   }
 
-  // Rendering 7 giorni della settimana
+  // Rendering 7 giorni
   const daysWrapper = document.getElementById('daysWrapper');
   if (!daysWrapper) return;
 
@@ -331,7 +333,7 @@ function openQuickAssignMenu(chipEl, role, matchId) {
 }
 
 document.addEventListener('click', e => {
-  // Toggle compatto per i primi 4 compensi
+  // Toggle compatto compensi
   const recapTog = e.target.closest('#recapToggleBtn');
   if (recapTog) {
     e.preventDefault();
@@ -375,7 +377,7 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Assegnazione rapida tavolo/arbitro
+  // Assegnazione rapida collaboratore da card
   const qaChip = e.target.closest('[data-quickassign]');
   if (qaChip && !state.READONLY) {
     const matchEl = qaChip.closest('[data-id]');
@@ -416,7 +418,7 @@ document.addEventListener('click', e => {
 
     state.dayMeta[d] ??= {};
     state.dayMeta[d][k] = val;
-    saveDayMeta();
+    saveD();
     render();
     return;
   }
@@ -476,7 +478,7 @@ document.addEventListener('change', e => {
     const k = slot.dataset.k;
     state.dayMeta[d] ??= {};
     state.dayMeta[d][k + 'Nome'] = wn.value.trim();
-    saveDayMeta();
+    saveD();
     const p = params();
     updateRecap(p.get('m') || iso(new Date()).slice(0, 7));
   }
@@ -517,6 +519,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     const urlRo = new URLSearchParams(window.location.search).get('readonly') === 'true';
     setAuthMode(!urlRo);
   }
+
+  // Push automatico via callback registrabile di state.js
+  registerStateCallbacks({
+    onSave: () => scheduleCloudPush(),
+    onBadgeUpdate: () => updateIncompleteBadge()
+  });
 
   // Re-render quando arrivano nuovi dati dal Cloud
   registerCloudCallback(() => {
