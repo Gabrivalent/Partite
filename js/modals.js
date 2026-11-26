@@ -321,11 +321,13 @@ export function openQuickCloseModal(matchId, triggerHaptic, toast, onRender) {
       const h = ov.querySelector('#qcHome')?.value.trim() || '';
       const a = ov.querySelector('#qcAway')?.value.trim() || '';
       if (h !== '' && a !== '') {
-        it.score = `${h}-${a}`;
+        const hn = parseInt(h, 10);
+        const an = parseInt(a, 10);
+        it.score = `${hn}-${an}`;
         if (!selectedStatus) {
-          const hn = Number(h), an = Number(a);
           if (hn > an) selectedStatus = 'vinta';
           else if (hn < an) selectedStatus = 'persa';
+          else selectedStatus = 'sospesa';
         }
       }
       it.status = selectedStatus;
