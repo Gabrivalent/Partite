@@ -5,48 +5,6 @@ export const uid = () => Math.random().toString(36).slice(2, 10);
 export const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 export const monday = s => { const d = new Date(s + 'T12:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; };
 
-export const monthsWithData = () => {
-  const s = new Set();
-  state.items.forEach(i => {
-    if (i.date) s.add(i.date.slice(0, 7));
-  });
-  Object.keys(state.dayMeta).forEach(d => s.add(d.slice(0, 7)));
-  return [...s].sort();
-};
-
-export const monthLabel = m => new Date(m + '-15T12:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
-
-export function computeRecapRows(m) {
-  const rec = {};
-  const add = (n, f) => { 
-    n = (n || '').trim(); 
-    if (!n) return; 
-    const k = n.toLowerCase(); 
-    (rec[k] ??= { n, p: 0, a: 0, c: 0 })[f]++; 
-  };
-  
-  state.items
-    .filter(i => i.date && i.date.startsWith(m) && (!state.filterCat || i.cat === state.filterCat) && !!i.ghost && i.status !== 'annullata' && i.status !== 'rinviata')
-    .forEach(i => {
-      const seen = new Set();
-      [i.t1, i.t2, i.arb].forEach(n => { 
-        n = (n || '').trim(); 
-        const k = n.toLowerCase(); 
-        if (!n || seen.has(k)) return; 
-        seen.add(k); 
-        add(n, 'p'); 
-      });
-    });
-
-  Object.keys(state.dayMeta).filter(dt => dt.startsWith(m)).forEach(dt => {
-    const x = state.dayMeta[dt] || {};
-    if (x.ap === 'si') add(x.apNome, 'a');
-    if (x.ch === 'si') add(x.chNome, 'c');
-  });
-
-  return Object.values(rec).sort((a, b) => b.p - a.p || (b.a + b.c) - (a.a + a.c) || a.n.localeCompare(b.n));
-}
-
 export function isRefereeNeeded(cat, isFriendly) {
   if (isFriendly) return true;
   if (!cat) return true;
@@ -97,20 +55,14 @@ export function getMatchOutcome(item) {
   if (item.status === 'vinta') return { type: 'win', label: item.score ? `${item.score} (V)` : 'Vinta' };
   if (item.status === 'persa') return { type: 'loss', label: item.score ? `${item.score} (P)` : 'Persa' };
 
-  if (item.score) {
-    const cleanScore = String(item.score).replace(/[–—:]/g, '-');
-    const m = cleanScore.match(/(\d+)\s*-\s*(\d+)/);
-    if (m) {
-      const h = parseInt(m[1], 10);
-      const a = parseInt(m[2], 10);
-      const scoreLabel = `${h}-${a}`;
-
-      if (h > a) return { type: 'win', label: scoreLabel };
-      if (h < a) return { type: 'loss', label: scoreLabel };
-      return { type: 'suspended', label: `${scoreLabel} (Pari)` };
+  if (item.score && String(item.score).includes('-')) {
+    const [h, a] = item.score.split('-').map(x => parseInt(x.trim(), 10));
+    if (!isNaN(h) && !isNaN(a)) {
+      if (h > a) return { type: 'win', label: `${h}-${a}` };
+      if (h < a) return { type: 'loss', label: `${h}-${a}` };
+      return { type: 'suspended', label: `${h}-${a}` };
     }
   }
-
   return null;
 }
 

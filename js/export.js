@@ -1,5 +1,44 @@
 import { state } from './state.js';
-import { iso, monday, isRefereeNeeded, monthsWithData, monthLabel, computeRecapRows } from './rules.js';
+import { iso, monday, isRefereeNeeded } from './rules.js';
+
+export const monthsWithData = () => {
+  const s = new Set();
+  state.items.forEach(i => s.add(i.date.slice(0, 7)));
+  Object.keys(state.dayMeta).forEach(d => s.add(d.slice(0, 7)));
+  return [...s].sort();
+};
+
+export const monthLabel = m => new Date(m + '-15T12:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+
+export function computeRecapRows(m) {
+  const rec = {}, add = (n, f) => { 
+    n = (n || '').trim(); 
+    if (!n) return; 
+    const k = n.toLowerCase(); 
+    (rec[k] ??= { n, p: 0, a: 0, c: 0 })[f]++; 
+  };
+  
+  const dates = new Set();
+  state.items.filter(i => i.date.startsWith(m) && (!state.filterCat || i.cat === state.filterCat) && !!i.ghost && i.status !== 'annullata' && i.status !== 'rinviata').forEach(i => {
+    dates.add(i.date); 
+    const seen = new Set();
+    [i.t1, i.t2, i.arb].forEach(n => { 
+      n = (n || '').trim(); 
+      const k = n.toLowerCase(); 
+      if (!n || seen.has(k)) return; 
+      seen.add(k); 
+      add(n, 'p'); 
+    });
+  });
+
+  Object.keys(state.dayMeta).filter(dt => dt.startsWith(m)).forEach(dt => {
+    const x = state.dayMeta[dt] || {};
+    if (x.ap === 'si') add(x.apNome, 'a');
+    if (x.ch === 'si') add(x.chNome, 'c');
+  });
+
+  return Object.values(rec).sort((a, b) => b.p - a.p || (b.a + b.c) - (a.a + a.c) || a.n.localeCompare(b.n));
+}
 
 export function generateWhatsAppText(startDate, endDate, customTitle, toast) {
   const startStr = iso(startDate), endStr = iso(endDate);
@@ -30,6 +69,7 @@ export function generateWhatsAppText(startDate, endDate, customTitle, toast) {
       out += `• ${timeStr}${catStr}${title}\n`;
       out += `  - Tavolo 1: ${t1}\n`;
 
+      // Se la categoria è FEM, Tavolo 2 e Arbitro sono omessi
       if (!isFem) {
         if (!it.friendly) {
           const t2 = it.t2 && it.t2.trim() ? it.t2.trim() : '...';
@@ -207,7 +247,7 @@ export function generateMonthPDF(m, toast) {
   }
 
   const days = {};
-  state.items.filter(i => i.date && i.date.startsWith(m) && i.status !== 'annullata').forEach(i => (days[i.date] ??= []).push(i));
+  state.items.filter(i => i.date.startsWith(m) && i.status !== 'annullata').forEach(i => (days[i.date] ??= []).push(i));
   Object.keys(state.dayMeta).filter(d => d.startsWith(m)).forEach(d => { if (!days[d]) days[d] = []; });
   const dateKeys = Object.keys(days).sort();
   dateKeys.forEach(dt => {
