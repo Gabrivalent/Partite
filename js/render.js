@@ -3,43 +3,31 @@ import {
   monday, 
   iso, 
   isMissingRequirements, 
-  isWithinOneDayOrLess, 
   isRefereeNeeded, 
   getMatchOutcome, 
   getCategoryFipUrl, 
-  findConflictingMatches, 
-  getConflictClusters, 
-  getUrgentIncompleteMatches, 
-  getPendingPostponedMatches 
+  computeRecapRows
 } from './rules.js';
-import { computeRecapRows } from './export.js';
 
 export const $ = s => document.querySelector(s);
 export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const CAT_PALETTE = [
-  { bg: 'rgba(37, 99, 235, 0.2)', text: '#93c5fd', border: 'rgba(59, 130, 246, 0.38)' },   // Blu
-  { bg: 'rgba(16, 185, 129, 0.2)', text: '#6ee7b7', border: 'rgba(16, 185, 129, 0.38)' },  // Smeraldo
-  { bg: 'rgba(245, 158, 11, 0.2)', text: '#fcd34d', border: 'rgba(245, 158, 11, 0.38)' },  // Ambra
-  { bg: 'rgba(168, 85, 247, 0.2)', text: '#d8b4fe', border: 'rgba(168, 85, 247, 0.38)' },  // Viola
-  { bg: 'rgba(236, 72, 153, 0.2)', text: '#f9a8d4', border: 'rgba(236, 72, 153, 0.38)' },  // Rosa
-  { bg: 'rgba(6, 182, 212, 0.2)', text: '#67e8f9', border: 'rgba(6, 182, 212, 0.38)' },   // Ciano
-  { bg: 'rgba(249, 115, 22, 0.2)', text: '#fdba74', border: 'rgba(249, 115, 22, 0.38)' },  // Arancio
-  { bg: 'rgba(132, 204, 22, 0.2)', text: '#bef264', border: 'rgba(132, 204, 22, 0.38)' }   // Lime
+  { bg: 'rgba(37, 99, 235, 0.2)', text: '#93c5fd', border: 'rgba(59, 130, 246, 0.38)' },
+  { bg: 'rgba(16, 185, 129, 0.2)', text: '#6ee7b7', border: 'rgba(16, 185, 129, 0.38)' },
+  { bg: 'rgba(245, 158, 11, 0.2)', text: '#fcd34d', border: 'rgba(245, 158, 11, 0.38)' },
+  { bg: 'rgba(168, 85, 247, 0.2)', text: '#d8b4fe', border: 'rgba(168, 85, 247, 0.38)' },
+  { bg: 'rgba(236, 72, 153, 0.2)', text: '#f9a8d4', border: 'rgba(236, 72, 153, 0.38)' },
+  { bg: 'rgba(6, 182, 212, 0.2)', text: '#67e8f9', border: 'rgba(6, 182, 212, 0.38)' },
+  { bg: 'rgba(249, 115, 22, 0.2)', text: '#fdba74', border: 'rgba(249, 115, 22, 0.38)' },
+  { bg: 'rgba(132, 204, 22, 0.2)', text: '#bef264', border: 'rgba(132, 204, 22, 0.38)' }
 ];
 
 export function getCatBadgeStyle(cat) {
   if (!cat) return '';
   const clean = cat.trim().toUpperCase();
   const known = {
-    'U19': 0,
-    'U17': 1,
-    'U15': 2,
-    'U14': 3,
-    'U13': 4,
-    'ESO': 5,
-    '2016': 6,
-    '2017': 7
+    'U19': 0, 'U17': 1, 'U15': 2, 'U14': 3, 'U13': 4, 'ESO': 5, '2016': 6, '2017': 7
   };
   let idx = known[clean];
   if (idx === undefined) {
@@ -103,43 +91,45 @@ export function updateAlertStatusBadge(openConflicts, openUrgent, openPending, t
   const bNavIcon = document.getElementById('bNavAlertIcon');
   if (!btn) return;
 
-  const clusters = getConflictClusters();
-  const clusterCount = clusters.length;
-  const urgentIncomplete = getUrgentIncompleteMatches();
-  const pendingPostponed = getPendingPostponedMatches();
+  import('./rules.js').then(({ getConflictClusters, getUrgentIncompleteMatches, getPendingPostponedMatches }) => {
+    const clusters = getConflictClusters();
+    const clusterCount = clusters.length;
+    const urgentIncomplete = getUrgentIncompleteMatches();
+    const pendingPostponed = getPendingPostponedMatches();
 
-  if (clusterCount > 0) {
-    btn.className = 'alert-btn-standalone status-conflict';
-    btn.textContent = `❗ ${clusterCount}`;
-    btn.title = `${clusterCount} gruppo/i di partite in conflitto di orario! Clicca per risolvere.`;
-    btn.onclick = openConflicts;
-    if (bNavIcon) bNavIcon.textContent = `❗ ${clusterCount}`;
-    return;
-  }
+    if (clusterCount > 0) {
+      btn.className = 'alert-btn-standalone status-conflict';
+      btn.textContent = `❗ ${clusterCount}`;
+      btn.title = `${clusterCount} gruppo/i di partite in conflitto di orario! Clicca per risolvere.`;
+      btn.onclick = openConflicts;
+      if (bNavIcon) bNavIcon.textContent = `❗ ${clusterCount}`;
+      return;
+    }
 
-  if (urgentIncomplete.length > 0) {
-    btn.className = 'alert-btn-standalone status-urgent-incomplete';
-    btn.textContent = `⚠️ ${urgentIncomplete.length}`;
-    btn.title = `${urgentIncomplete.length} gara/e a meno di un giorno ancora con turni incompleti!`;
-    btn.onclick = openUrgent;
-    if (bNavIcon) bNavIcon.textContent = `⚠️ ${urgentIncomplete.length}`;
-    return;
-  }
+    if (urgentIncomplete.length > 0) {
+      btn.className = 'alert-btn-standalone status-urgent-incomplete';
+      btn.textContent = `⚠️ ${urgentIncomplete.length}`;
+      btn.title = `${urgentIncomplete.length} gara/e a meno di un giorno ancora con turni incompleti!`;
+      btn.onclick = openUrgent;
+      if (bNavIcon) bNavIcon.textContent = `⚠️ ${urgentIncomplete.length}`;
+      return;
+    }
 
-  if (pendingPostponed.length > 0) {
-    btn.className = 'alert-btn-standalone status-pending';
-    btn.textContent = `⏳ ${pendingPostponed.length}`;
-    btn.title = `${pendingPostponed.length} partita/e rinviata/e senza data di recupero. Clicca per gestire.`;
-    btn.onclick = openPending;
-    if (bNavIcon) bNavIcon.textContent = `⏳ ${pendingPostponed.length}`;
-    return;
-  }
+    if (pendingPostponed.length > 0) {
+      btn.className = 'alert-btn-standalone status-pending';
+      btn.textContent = `⏳ ${pendingPostponed.length}`;
+      btn.title = `${pendingPostponed.length} partita/e rinviata/e senza data di recupero. Clicca per gestire.`;
+      btn.onclick = openPending;
+      if (bNavIcon) bNavIcon.textContent = `⏳ ${pendingPostponed.length}`;
+      return;
+    }
 
-  btn.className = 'alert-btn-standalone status-ok';
-  btn.textContent = `✓`;
-  btn.title = `Nessun conflitto o urgenza rilevata. Calendario regolare.`;
-  btn.onclick = () => toast('Calendario regolare: nessun conflitto.');
-  if (bNavIcon) bNavIcon.textContent = '✓';
+    btn.className = 'alert-btn-standalone status-ok';
+    btn.textContent = `✓`;
+    btn.title = `Nessun conflitto o urgenza rilevata. Calendario regolare.`;
+    btn.onclick = () => toast('Calendario regolare: nessun conflitto.');
+    if (bNavIcon) bNavIcon.textContent = '✓';
+  });
 }
 
 export function slotHTML(d, k) {
@@ -151,10 +141,7 @@ export function slotHTML(d, k) {
 }
 
 export function recapHTML(m) {
-  // Sicurezza frontend: se non autenticato, non genera alcuna riga né calcolo economico
-  if (state.READONLY) {
-    return '';
-  }
+  if (state.READONLY) return '';
 
   const rows = computeRecapRows(m);
   if (!rows.length) {
@@ -198,7 +185,7 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const t2Required = !i.friendly;
   let t2Val;
   if (isFem) {
-    t2Val = '<span class="empty-opt" >CSI</span>';
+    t2Val = '<span class="empty-opt">CSI</span>';
   } else if (i.t2 && i.t2.trim()) {
     t2Val = `<span class="clickable-person" data-quickperson="${esc(i.t2.trim())}">${esc(i.t2.trim())}</span>`;
   } else {
@@ -208,7 +195,7 @@ export function card(i, hasConflict, isUrgentIncomplete) {
   const arbNeeded = isRefereeNeeded(i.cat, i.friendly);
   let arbVal;
   if (isFem) {
-    arbVal = '<span class="empty-opt" >CSI</span>';
+    arbVal = '<span class="empty-opt">CSI</span>';
   } else if (i.arb && i.arb.trim()) {
     arbVal = `<span class="clickable-person" data-quickperson="${esc(i.arb.trim())}">${esc(i.arb.trim())}</span>`;
   } else {

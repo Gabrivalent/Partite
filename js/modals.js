@@ -1,8 +1,20 @@
 import { COMMON_TIMES } from './config.js';
 import { state, save, saveMolt, saveNames, saveCategories, saveFipLinks, applyTheme, pushUndo, logEvent } from './state.js';
 import { sb, uploadMatchReportFile } from './api.js';
-import { uid, iso, monday, checkPersonRosterConflicts, getConflictClusters, getUrgentIncompleteMatches, getPendingPostponedMatches, isRefereeNeeded } from './rules.js';
-import { monthsWithData, monthLabel, computeRecapRows, exportSelectedMonthsJSON, generateMonthPDF, copyReadOnlyLink } from './export.js';
+import { 
+  uid, 
+  iso, 
+  monday, 
+  checkPersonRosterConflicts, 
+  getConflictClusters, 
+  getUrgentIncompleteMatches, 
+  getPendingPostponedMatches, 
+  isRefereeNeeded,
+  monthsWithData, 
+  monthLabel, 
+  computeRecapRows 
+} from './rules.js';
+import { exportSelectedMonthsJSON, generateMonthPDF, copyReadOnlyLink } from './export.js';
 import { esc, setParam, renderNamesList, renderCategoriesList } from './render.js';
 
 export function buildCustomTimePicker(initialVal) {
@@ -309,11 +321,13 @@ export function openQuickCloseModal(matchId, triggerHaptic, toast, onRender) {
       const h = ov.querySelector('#qcHome')?.value.trim() || '';
       const a = ov.querySelector('#qcAway')?.value.trim() || '';
       if (h !== '' && a !== '') {
-        it.score = `${h}-${a}`;
+        const hn = parseInt(h, 10);
+        const an = parseInt(a, 10);
+        it.score = `${hn}-${an}`;
         if (!selectedStatus) {
-          const hn = Number(h), an = Number(a);
           if (hn > an) selectedStatus = 'vinta';
           else if (hn < an) selectedStatus = 'persa';
+          else selectedStatus = 'sospesa';
         }
       }
       it.status = selectedStatus;
