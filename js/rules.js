@@ -1,4 +1,4 @@
-import { state } from './state.js';
+Aimport { state } from './state.js';
 import { EXCLUDED_CONFLICT_CATEGORIES } from './config.js';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -97,14 +97,23 @@ export function getMatchOutcome(item) {
   if (item.status === 'vinta') return { type: 'win', label: item.score ? `${item.score} (V)` : 'Vinta' };
   if (item.status === 'persa') return { type: 'loss', label: item.score ? `${item.score} (P)` : 'Persa' };
 
-  if (item.score && String(item.score).includes('-')) {
-    const [h, a] = item.score.split('-').map(x => parseInt(x.trim(), 10));
-    if (!isNaN(h) && !isNaN(a)) {
-      if (h > a) return { type: 'win', label: `${h}-${a}` };
-      if (h < a) return { type: 'loss', label: `${h}-${a}` };
-      return { type: 'suspended', label: `${h}-${a}` };
+  if (item.score) {
+    // Normalizza trattini lunghi (en-dash, em-dash) in meno standard
+    const cleanScore = String(item.score).replace(/[–—:]/g, '-');
+    // Estrae i due gruppi numerici anche in presenza di testo come '72-68 dts'
+    const m = cleanScore.match(/(\d+)\s*-\s*(\d+)/);
+    if (m) {
+      const h = parseInt(m[1], 10);
+      const a = parseInt(m[2], 10);
+      const scoreLabel = `${h}-${a}`;
+
+      if (h > a) return { type: 'win', label: scoreLabel };
+      if (h < a) return { type: 'loss', label: scoreLabel };
+      // Nel basket non c'è pareggio: se h === a viene segnalato come anomalo / sospeso
+      return { type: 'suspended', label: `${scoreLabel} (Pari)` };
     }
   }
+
   return null;
 }
 
