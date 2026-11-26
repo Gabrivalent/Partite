@@ -8,7 +8,13 @@ import {
   applyTheme, 
   logEvent 
 } from './state.js';
-import { initSync, listenRealtime, sb } from './api.js';
+import { 
+  sb, 
+  cloudPullSafe, 
+  setupSupabaseRealtime, 
+  scheduleCloudPush, 
+  registerCloudCallback 
+} from './api.js';
 import { iso, monday, isRefereeNeeded } from './rules.js';
 import { 
   params, 
@@ -498,8 +504,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     setAuthMode(!urlRo);
   }
 
+  // Push automatico al salvataggio
   registerOnSave(() => {
-    // Sync trigger
+    scheduleCloudPush();
+  });
+
+  // Re-render quando arrivano nuovi dati dal Cloud
+  registerCloudCallback(() => {
+    render();
   });
 
   document.getElementById('btnPrevWeek')?.addEventListener('click', () => shiftWeek(-1));
@@ -615,7 +627,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  initSync(render, toast);
-  listenRealtime(render);
+  // Pull iniziale dal cloud
+  cloudPullSafe(false).then(() => {
+    render();
+  });
+
+  // Listener realtime Supabase
+  setupSupabaseRealtime({
+    isModalOpen: () => !!document.querySelector('.modal-overlay'),
+    onRealtimeUpdate: () => render()
+  });
+
   render();
 });
