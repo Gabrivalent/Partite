@@ -1,6 +1,5 @@
 import { 
   state, 
-  initFromStorage, 
   registerOnSave, 
   pushUndo, 
   popUndoState, 
@@ -77,7 +76,7 @@ export function render() {
   const activeWeek = p.get('s') || iso(monday(todayIso));
   const filterPerson = (p.get('person') || '').trim().toLowerCase();
 
-  // Controllo visualizzazione Cronologia vs Vista Calendario
+  // Vista Cronologia vs Vista Calendario
   const isHistoryView = p.get('view') === 'history';
   const histViewEl = document.getElementById('historyView');
   const calViewEl = document.getElementById('calendarView');
@@ -112,7 +111,7 @@ export function render() {
   const catFilter = state.filterCat ? state.filterCat.toLowerCase() : '';
   const searchFilter = (p.get('q') || '').toLowerCase().trim();
 
-  // Header mese e settimana corrente a video
+  // Titoli mese e settimana
   const mTitleEl = document.getElementById('currentMonthTitle');
   if (mTitleEl) {
     mTitleEl.textContent = new Date(activeMonth + '-15T12:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
@@ -126,7 +125,7 @@ export function render() {
     wTitleEl.textContent = `${wMon.getDate()} ${wMon.toLocaleDateString('it-IT', { month: 'short' })} – ${wSun.getDate()} ${wSun.toLocaleDateString('it-IT', { month: 'short' })}`;
   }
 
-  // Box filtro persona attivo
+  // Banner filtro persona
   const personBanner = document.getElementById('personFilterBanner');
   if (personBanner) {
     if (filterPerson) {
@@ -138,7 +137,7 @@ export function render() {
     }
   }
 
-  // Rendering 7 giorni della settimana
+  // Rendering giorni
   const daysWrapper = document.getElementById('daysWrapper');
   if (!daysWrapper) return;
 
@@ -230,7 +229,6 @@ window.handleAuthClick = () => {
   }
 };
 
-// Navigazione temporale rapida
 function shiftWeek(offset) {
   const p = params();
   const cur = p.get('s') || iso(monday(iso(new Date())));
@@ -264,7 +262,6 @@ function resetToCurrent() {
   render();
 }
 
-// Menu contestuale di assegnazione rapida collaboratore da card
 function openQuickAssignMenu(chipEl, role, matchId) {
   if (state.READONLY) return;
   const match = state.items.find(x => x.id === matchId);
@@ -295,7 +292,6 @@ function openQuickAssignMenu(chipEl, role, matchId) {
 
   document.body.appendChild(menu);
 
-  // Posizionamento menu vicino al chip premuto
   const rect = chipEl.getBoundingClientRect();
   const top = rect.bottom + window.scrollY + 6;
   const left = Math.min(Math.max(10, rect.left + window.scrollX), window.innerWidth - 220);
@@ -330,9 +326,7 @@ function openQuickAssignMenu(chipEl, role, matchId) {
   setTimeout(() => document.addEventListener('click', outsideClick), 50);
 }
 
-// Listener globale click
 document.addEventListener('click', e => {
-  // Toggle per i primi 4 compensi
   const recapTog = e.target.closest('#recapToggleBtn');
   if (recapTog) {
     e.preventDefault();
@@ -343,7 +337,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Dettaglio compenso persona da sidebar o resoconto
   const recapItem = e.target.closest('[data-compname]');
   if (recapItem) {
     const name = recapItem.dataset.compname;
@@ -355,7 +348,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Modale modifica partita
   const editBtn = e.target.closest('[data-edit]');
   if (editBtn) {
     const matchEl = editBtn.closest('[data-id]');
@@ -366,7 +358,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Check / Esito rapido
   const ghostBtn = e.target.closest('[data-ghost]');
   if (ghostBtn) {
     const id = ghostBtn.dataset.ghost || ghostBtn.closest('[data-id]')?.dataset.id;
@@ -376,7 +367,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Assegnazione rapida collaboratore da card (chip)
   const qaChip = e.target.closest('[data-quickassign]');
   if (qaChip && !state.READONLY) {
     const matchEl = qaChip.closest('[data-id]');
@@ -387,7 +377,6 @@ document.addEventListener('click', e => {
     }
   }
 
-  // Visualizzazione file referto
   const viewFileBtn = e.target.closest('[data-viewfile]');
   if (viewFileBtn) {
     const mId = viewFileBtn.dataset.viewfile;
@@ -398,7 +387,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Upload file referto da card vuota
   const upFileBtn = e.target.closest('[data-uploadfile]');
   if (upFileBtn) {
     const mId = upFileBtn.dataset.uploadfile;
@@ -406,7 +394,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Slot apertura / chiusura palestra
   const ynBtn = e.target.closest('.slot [data-yn]');
   if (ynBtn && !state.READONLY) {
     triggerHaptic('light');
@@ -422,7 +409,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Navigazione da nav tree (Mese)
   const pickM = e.target.closest('[data-pickm]');
   if (pickM) {
     const m = pickM.dataset.pickm;
@@ -430,7 +416,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Navigazione da nav tree (Settimana)
   const navW = e.target.closest('[data-navw]');
   if (navW) {
     const m = navW.dataset.navm;
@@ -443,7 +428,6 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Filtro rapido persona (click sul nome)
   const qp = e.target.closest('[data-quickperson]');
   if (qp) {
     const name = qp.dataset.quickperson;
@@ -452,14 +436,12 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Rimozione banner filtro persona
   if (e.target.closest('#clearPersonFilterBtn')) {
     setParam('person', '', render);
     toast('Filtro persona rimosso');
     return;
   }
 
-  // WhatsApp mese da modale resoconto
   const waRecapBtn = e.target.closest('[data-warecap]');
   if (waRecapBtn) {
     const m = waRecapBtn.dataset.warecap;
@@ -468,7 +450,6 @@ document.addEventListener('click', e => {
   }
 });
 
-// Listener modifiche nomi apertura/chiusura
 document.addEventListener('change', e => {
   const wn = e.target.closest('[data-wn]');
   if (wn && !state.READONLY) {
@@ -483,7 +464,6 @@ document.addEventListener('change', e => {
   }
 });
 
-// Supporto swipe touch su mobile per navigare tra le settimane
 let touchStartX = 0;
 let touchStartY = 0;
 document.addEventListener('touchstart', e => {
@@ -494,23 +474,19 @@ document.addEventListener('touchstart', e => {
 document.addEventListener('touchend', e => {
   const diffX = e.changedTouches[0].screenX - touchStartX;
   const diffY = e.changedTouches[0].screenY - touchStartY;
-  // Solo se lo swipe orizzontale è netto e non è uno scroll verticale
   if (Math.abs(diffX) > 75 && Math.abs(diffY) < 45) {
     if (diffX > 0) {
-      shiftWeek(-1); // Swipe verso destra = settimana precedente
+      shiftWeek(-1);
     } else {
-      shiftWeek(1);  // Swipe verso sinistra = settimana successiva
+      shiftWeek(1);
     }
   }
 }, { passive: true });
 
-// Avvio dell'app al caricamento DOM
 window.addEventListener('DOMContentLoaded', async () => {
-  initFromStorage();
   renderNamesList();
   renderCategoriesList();
 
-  // Controllo sessione Supabase o fallback readonly
   if (sb) {
     const { data } = await sb.auth.getSession();
     setAuthMode(!!data.session);
@@ -523,17 +499,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   registerOnSave(() => {
-    // Sincronizzazione automatica su modifiche locali
+    // Sync trigger
   });
 
-  // Tasti navigazione temporale
   document.getElementById('btnPrevWeek')?.addEventListener('click', () => shiftWeek(-1));
   document.getElementById('btnNextWeek')?.addEventListener('click', () => shiftWeek(1));
   document.getElementById('btnPrevMonth')?.addEventListener('click', () => shiftMonth(-1));
   document.getElementById('btnNextMonth')?.addEventListener('click', () => shiftMonth(1));
   document.getElementById('btnToday')?.addEventListener('click', resetToCurrent);
 
-  // Tasti barra superiore
   document.getElementById('btnAddMatch')?.addEventListener('click', () => {
     triggerHaptic('light');
     openAddModal(triggerHaptic, toast, render);
@@ -565,12 +539,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     setParam('q', e.target.value.trim(), render);
   });
 
-  // Ricerca cronologia
   document.getElementById('historySearchInput')?.addEventListener('input', e => {
     setParam('hq', e.target.value.trim(), render);
   });
 
-  // Tasti Bottom Nav Mobile
   document.getElementById('bNavCal')?.addEventListener('click', () => {
     setParam('view', '', render);
   });
@@ -584,7 +556,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     setParam('view', 'history', render);
   });
 
-  // Gestione caricamento file JSON di backup
   const impFile = document.getElementById('importFile');
   if (impFile) {
     impFile.addEventListener('change', e => {
@@ -635,7 +606,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Scorciatoia Undo (Ctrl+Z o Cmd+Z)
   window.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       if (popUndoState()) {
@@ -645,7 +615,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Avvio sincronizzazione e rendering iniziale
   initSync(render, toast);
   listenRealtime(render);
   render();
