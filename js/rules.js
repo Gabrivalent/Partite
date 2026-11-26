@@ -1,4 +1,4 @@
-Aimport { state } from './state.js';
+import { state } from './state.js';
 import { EXCLUDED_CONFLICT_CATEGORIES } from './config.js';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -98,9 +98,7 @@ export function getMatchOutcome(item) {
   if (item.status === 'persa') return { type: 'loss', label: item.score ? `${item.score} (P)` : 'Persa' };
 
   if (item.score) {
-    // Normalizza trattini lunghi (en-dash, em-dash) in meno standard
     const cleanScore = String(item.score).replace(/[–—:]/g, '-');
-    // Estrae i due gruppi numerici anche in presenza di testo come '72-68 dts'
     const m = cleanScore.match(/(\d+)\s*-\s*(\d+)/);
     if (m) {
       const h = parseInt(m[1], 10);
@@ -109,7 +107,6 @@ export function getMatchOutcome(item) {
 
       if (h > a) return { type: 'win', label: scoreLabel };
       if (h < a) return { type: 'loss', label: scoreLabel };
-      // Nel basket non c'è pareggio: se h === a viene segnalato come anomalo / sospeso
       return { type: 'suspended', label: `${scoreLabel} (Pari)` };
     }
   }
