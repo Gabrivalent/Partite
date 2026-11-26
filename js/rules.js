@@ -1,4 +1,4 @@
-Aimport { state } from './state.js';
+import { state } from './state.js';
 import { EXCLUDED_CONFLICT_CATEGORIES } from './config.js';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
