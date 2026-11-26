@@ -14,7 +14,7 @@ export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;',
 
 const CAT_PALETTE = [
   { bg: 'rgba(37, 99, 235, 0.2)', text: '#93c5fd', border: 'rgba(59, 130, 246, 0.38)' },
-  { bg: 'rgba(16, 185, 129, 0.2)', text: '#6ee7b7', border: 'rgba(16, 185, 129, 0.38)' },
+  { bg: 'rgba(160, 185, 129, 0.2)', text: '#6ee7b7', border: 'rgba(16, 185, 129, 0.38)' },
   { bg: 'rgba(245, 158, 11, 0.2)', text: '#fcd34d', border: 'rgba(245, 158, 11, 0.38)' },
   { bg: 'rgba(168, 85, 247, 0.2)', text: '#d8b4fe', border: 'rgba(168, 85, 247, 0.38)' },
   { bg: 'rgba(236, 72, 153, 0.2)', text: '#f9a8d4', border: 'rgba(236, 72, 153, 0.38)' },
@@ -140,15 +140,129 @@ export function slotHTML(d, k) {
     ${v === 'si' ? (state.READONLY ? `<span class="val clickable-person" data-quickperson="${esc(nomeVal)}" title="Filtra impegni di ${esc(nomeVal)}">${esc(nomeVal) || '—'}</span>` : `<input data-wn list="namesList" value="${esc(nomeVal)}" placeholder="Nome">`) : ''}</div>`;
 }
 
-export function recapHTML(m) {
-  if (state.READONLY) return '';
+function getLiveOrNextMatch() {
+  const now = new Date();
+  const todayStr = iso(now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-  const rows = computeRecapRows(m);
-  if (!rows.length) {
-    return `<aside class="recap" data-m="${m}"><h4>Riepilogo del mese</h4><p>Nessun dato (partite con check ✓).</p></aside>`;
+  const todayMatches = state.items.filter(it => 
+    it.date === todayStr && 
+    it.time && 
+    it.status !== 'annullata' && 
+    it.status !== 'rinviata'
+  ).sort((a, b) => a.time.localeCompare(b.time));
+
+  for (const it of todayMatches) {
+    const [h, m] = it.time.split(':').map(Number);
+    const startM = h * 60 + m;
+    const endM = startM + 105;
+    if (nowMinutes >= startM && nowMinutes <= endM) {
+      return { match: it, type: 'live' };
+    }
   }
 
-  const itemsHtml = rows.map(r => {
+  const nextToday = todayMatches.find(it => {
+    const [h, m] = it.time.split(':').map(Number);
+    return (h * 60 + m) > nowMinutes;
+  });
+  if (nextToday) {
+    return { match: nextToday, type: 'next-today' };
+  }
+
+  const upcomingMatch = state.items
+    .filter(it => it.date > todayStr && it.status !== 'annullata' && it.status !== 'rinviata')
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))[0];
+
+  if (upcomingMatch) {
+    return { match: upcomingMatch, type: 'upcoming' };
+  }
+
+  return null;
+}
+
+function liveMatchBoxHTML() {
+  const info = getLiveOrNextMatch();
+  if (!info || !info.match) {
+    return `
+      <div class="live-match-box">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="live-badge-status idle">Nessuna gara</span>
+          <span style="font-size:11px;color:var(--mute)">Oggi riposo</span>
+        </div>
+        <p style="font-size:12px;color:var(--mute);margin:2px 0 0">Nessuna partita programmata a breve.</p>
+      </div>
+    `;
+  }
+
+  const it = info.match;
+  const isLive = info.type === 'live';
+  const isNextToday = info.type === 'next-today';
+
+  let statusBadge = '';
+  if (isLive) {
+    statusBadge = `<span class="live-badge-status live"><span class="live-pulse-dot"></span> In Corso</span>`;
+  } else if (isNextToday) {
+    statusBadge = `<span class="live-badge-status next">Prossima Oggi</span>`;
+  } else {
+    const dFmt = new Date(it.date + 'T12:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+    statusBadge = `<span class="live-badge-status next">${esc(dFmt)}</span>`;
+  }
+
+  const isFem = (it.cat || '').trim().toUpperCase() === 'FEM';
+  const t1 = it.t1 ? esc(it.t1) : '<span style="color:#f97316">Manca</span>';
+  const t2 = isFem ? '<span style="color:var(--mute)">CSI</span>' : (it.t2 ? esc(it.t2) : '<span style="color:#f97316">Manca</span>');
+  const arb = isFem ? '<span style="color:var(--mute)">CSI</span>' : (it.arb ? esc(it.arb) : '<span style="color:var(--mute)">—</span>');
+
+  return `
+    <div class="live-match-box${isLive ? ' is-live' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        ${statusBadge}
+        <span style="font:800 13px var(--font-title);color:var(--date)">Ore ${esc(it.time || '--:--')}</span>
+      </div>
+
+      <div class="live-match-title" title="${esc(it.title)}">${esc(it.title || 'Partita senza titolo')}</div>
+      <div class="live-match-sub">
+        <span>Cat: <b>${esc(it.cat || 'n.d.')}</b></span>
+        ${it.friendly ? '<span>• Amichevole</span>' : ''}
+      </div>
+
+      <div class="live-roster-pill">
+        <span>Tavolo: <strong>${t1}</strong> / <strong>${t2}</strong></span>
+        <span>Arb: <strong>${arb}</strong></span>
+      </div>
+
+      ${!state.READONLY ? `
+        <button type="button" class="btn-primary-action live-action-btn" data-ghost="${it.id}">
+          ${isLive ? '🏁 Chiudi / Esito' : 'Gestisci Gara'}
+        </button>
+      ` : ''}
+    </div>
+  `;
+}
+
+export function recapHTML(m) {
+  if (state.READONLY) {
+    return '';
+  }
+
+  const rows = computeRecapRows(m);
+  const liveBox = liveMatchBoxHTML();
+
+  if (!rows.length) {
+    return `
+      <aside class="recap" data-m="${m}">
+        <h4>Riepilogo del mese</h4>
+        <p>Nessun dato (partite con check ✓).</p>
+        ${liveBox}
+      </aside>
+    `;
+  }
+
+  const isExpanded = state._recapExpanded === true;
+  const visibleRows = isExpanded ? rows : rows.slice(0, 4);
+  const hasMore = rows.length > 4;
+
+  const itemsHtml = visibleRows.map(r => {
     const v = Object.assign({ p: 10, a: 10, c: 10 }, state.molt[r.n.toLowerCase()]);
     const tot = (r.p * v.p) + (r.a * v.a) + (r.c * v.c);
     const subText = `${r.p} part. • ${r.a + r.c} ap/ch`;
@@ -162,12 +276,20 @@ export function recapHTML(m) {
     </div>`;
   }).join('');
 
+  const toggleBtnHtml = hasMore
+    ? `<button type="button" class="recap-toggle-btn" id="recapToggleBtn">
+        ${isExpanded ? '▴ Riduci a 4' : `▾ Mostra tutti (${rows.length})`}
+       </button>`
+    : '';
+
   return `<aside class="recap" data-m="${m}">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <h4>Riepilogo del mese</h4>
-      <span style="font-size:11px;color:var(--mute)">Tocca per dettagli</span>
+      <span style="font-size:11px;color:var(--mute)">Top 4</span>
     </div>
     <div class="recap-list-wrap">${itemsHtml}</div>
+    ${toggleBtnHtml}
+    ${liveBox}
   </aside>`;
 }
 
